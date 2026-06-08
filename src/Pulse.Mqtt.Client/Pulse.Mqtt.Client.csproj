@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Pulse.Mqtt.Client</PackageId>
+    <Description>Resilient MQTT client: routing, typed messaging, reconnect, and offline queueing.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pulse.Mqtt.Core\Pulse.Mqtt.Core.csproj" />
+  </ItemGroup>
+
+</Project>
