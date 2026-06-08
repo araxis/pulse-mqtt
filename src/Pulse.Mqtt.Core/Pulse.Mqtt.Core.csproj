@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Pulse.Mqtt.Core</PackageId>
+    <Description>Core protocol model, codec, and swappable abstractions for the Pulse MQTT client.</Description>
+  </PropertyGroup>
+
+</Project>

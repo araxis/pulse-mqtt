@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/aot/">
+    <Project Path="aot/Pulse.Mqtt.AotSmoke/Pulse.Mqtt.AotSmoke.csproj" />
+  </Folder>
+  <Folder Name="/bench/">
+    <Project Path="bench/Pulse.Mqtt.Benchmarks/Pulse.Mqtt.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Pulse.Mqtt.Client/Pulse.Mqtt.Client.csproj" />
+    <Project Path="src/Pulse.Mqtt.Core/Pulse.Mqtt.Core.csproj" />
+    <Project Path="src/Pulse.Mqtt.DependencyInjection/Pulse.Mqtt.DependencyInjection.csproj" />
+    <Project Path="src/Pulse.Mqtt.Testing/Pulse.Mqtt.Testing.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Pulse.Mqtt.Core.Tests/Pulse.Mqtt.Core.Tests.csproj" />
+  </Folder>
+</Solution>
