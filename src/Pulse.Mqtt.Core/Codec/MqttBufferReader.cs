@@ -68,6 +68,22 @@ public ref struct MqttBufferReader
         return value;
     }
 
+    /// <summary>Reads <paramref name="length"/> raw bytes as a slice of the underlying buffer (no copy).</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
+    /// <exception cref="MqttProtocolException">Fewer than <paramref name="length"/> bytes remain.</exception>
+    public ReadOnlySpan<byte> ReadSpan(int length)
+    {
+        if (length < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length), length, "Length must be non-negative.");
+        }
+
+        EnsureAvailable(length);
+        var slice = _buffer.Slice(_position, length);
+        _position += length;
+        return slice;
+    }
+
     /// <summary>Reads length-prefixed binary data as a slice of the underlying buffer (no copy).</summary>
     /// <exception cref="MqttProtocolException">The declared length runs past the buffer.</exception>
     public ReadOnlySpan<byte> ReadBinary()
