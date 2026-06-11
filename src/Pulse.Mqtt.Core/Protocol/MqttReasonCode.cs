@@ -9,6 +9,15 @@ public enum MqttReasonCode : byte
     /// <summary>Success / normal disconnection / granted QoS 0 (0x00).</summary>
     Success = 0x00,
 
+    /// <summary>Disconnect carrying the will message (DISCONNECT, 0x04).</summary>
+    DisconnectWithWillMessage = 0x04,
+
+    /// <summary>Continue the authentication exchange (AUTH, 0x18).</summary>
+    ContinueAuthentication = 0x18,
+
+    /// <summary>Re-authenticate using the current method (AUTH, 0x19).</summary>
+    ReAuthenticate = 0x19,
+
     /// <summary>Unspecified error (0x80).</summary>
     UnspecifiedError = 0x80,
 
@@ -32,6 +41,15 @@ public enum MqttReasonCode : byte
 
     /// <summary>The server is busy; try again later (0x89).</summary>
     ServerBusy = 0x89,
+
+    /// <summary>The server is shutting down (0x8B).</summary>
+    ServerShuttingDown = 0x8B,
+
+    /// <summary>The keep-alive period elapsed without a packet (0x8D).</summary>
+    KeepAliveTimeout = 0x8D,
+
+    /// <summary>The session was taken over by another connection (0x8E).</summary>
+    SessionTakenOver = 0x8E,
 
     /// <summary>The client has been banned by the server (0x8A).</summary>
     Banned = 0x8A,
