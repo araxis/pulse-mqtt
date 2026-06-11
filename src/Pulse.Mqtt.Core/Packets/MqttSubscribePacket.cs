@@ -3,7 +3,7 @@ using Pulse.Mqtt.Protocol;
 namespace Pulse.Mqtt.Packets;
 
 /// <summary>A SUBSCRIBE control packet: the client's request to subscribe to one or more topic filters.</summary>
-public sealed record MqttSubscribePacket
+public sealed record MqttSubscribePacket : MqttPacket
 {
     /// <summary>The packet identifier.</summary>
     public required ushort PacketIdentifier { get; init; }

@@ -3,7 +3,7 @@ using Pulse.Mqtt.Protocol;
 namespace Pulse.Mqtt.Packets;
 
 /// <summary>A CONNACK control packet: the broker's response to a CONNECT.</summary>
-public sealed record MqttConnAckPacket
+public sealed record MqttConnAckPacket : MqttPacket
 {
     /// <summary>Whether the broker already held session state for this client.</summary>
     public bool SessionPresent { get; init; }

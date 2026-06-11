@@ -3,7 +3,7 @@ using Pulse.Mqtt.Protocol;
 namespace Pulse.Mqtt.Packets;
 
 /// <summary>A DISCONNECT control packet, sent by either the client or the broker to close the connection.</summary>
-public sealed record MqttDisconnectPacket
+public sealed record MqttDisconnectPacket : MqttPacket
 {
     /// <summary>The disconnect reason. Defaults to <see cref="MqttReasonCode.Success"/> (normal disconnection).</summary>
     public MqttReasonCode ReasonCode { get; init; } = MqttReasonCode.Success;

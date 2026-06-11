@@ -7,7 +7,7 @@ namespace Pulse.Mqtt.Packets;
 /// A publish acknowledgement packet — PUBACK (QoS 1), or PUBREC / PUBREL / PUBCOMP (QoS 2).
 /// All four share the same wire shape, distinguished by <see cref="PacketType"/>.
 /// </summary>
-public sealed record MqttPublishAckPacket
+public sealed record MqttPublishAckPacket : MqttPacket
 {
     /// <summary>Which acknowledgement this is: PUBACK, PUBREC, PUBREL, or PUBCOMP.</summary>
     public required MqttPacketType PacketType { get; init; }
