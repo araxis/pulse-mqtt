@@ -3,7 +3,7 @@ using Pulse.Mqtt.Protocol;
 namespace Pulse.Mqtt.Packets;
 
 /// <summary>An AUTH control packet for the MQTT 5 enhanced authentication exchange.</summary>
-public sealed record MqttAuthPacket
+public sealed record MqttAuthPacket : MqttPacket
 {
     /// <summary>
     /// The authentication reason: <see cref="MqttReasonCode.Success"/>,

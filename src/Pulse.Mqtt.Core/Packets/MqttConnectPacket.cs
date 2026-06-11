@@ -3,7 +3,7 @@ using Pulse.Mqtt.Protocol;
 namespace Pulse.Mqtt.Packets;
 
 /// <summary>A CONNECT control packet: the client's request to open a session with the broker.</summary>
-public sealed record MqttConnectPacket
+public sealed record MqttConnectPacket : MqttPacket
 {
     /// <summary>The client identifier (may be empty to request a server-assigned id).</summary>
     public required string ClientId { get; init; }

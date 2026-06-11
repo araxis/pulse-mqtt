@@ -3,7 +3,7 @@ using Pulse.Mqtt.Protocol;
 namespace Pulse.Mqtt.Packets;
 
 /// <summary>An UNSUBSCRIBE control packet: the client's request to remove one or more subscriptions.</summary>
-public sealed record MqttUnsubscribePacket
+public sealed record MqttUnsubscribePacket : MqttPacket
 {
     /// <summary>The packet identifier.</summary>
     public required ushort PacketIdentifier { get; init; }

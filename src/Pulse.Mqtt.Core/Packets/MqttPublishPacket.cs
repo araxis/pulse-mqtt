@@ -3,7 +3,7 @@ using Pulse.Mqtt.Protocol;
 namespace Pulse.Mqtt.Packets;
 
 /// <summary>A PUBLISH control packet carrying an application message.</summary>
-public sealed record MqttPublishPacket
+public sealed record MqttPublishPacket : MqttPacket
 {
     /// <summary>The topic the message is published to.</summary>
     public required string Topic { get; init; }

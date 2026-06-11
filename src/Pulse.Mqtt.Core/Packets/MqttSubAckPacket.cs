@@ -3,7 +3,7 @@ using Pulse.Mqtt.Protocol;
 namespace Pulse.Mqtt.Packets;
 
 /// <summary>A SUBACK control packet: the broker's response to a SUBSCRIBE, one reason code per filter.</summary>
-public sealed record MqttSubAckPacket
+public sealed record MqttSubAckPacket : MqttPacket
 {
     /// <summary>The packet identifier of the SUBSCRIBE being acknowledged.</summary>
     public required ushort PacketIdentifier { get; init; }
