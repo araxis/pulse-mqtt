@@ -63,9 +63,57 @@ public enum MqttReasonCode : byte
     /// <summary>The authentication method is not supported or does not match (0x8C).</summary>
     BadAuthenticationMethod = 0x8C,
 
+    /// <summary>The topic filter is correctly formed but not accepted (0x8F).</summary>
+    TopicFilterInvalid = 0x8F,
+
+    /// <summary>The topic name is correctly formed but not accepted (0x90).</summary>
+    TopicNameInvalid = 0x90,
+
+    /// <summary>More publishes were received than the receive maximum allows (0x93).</summary>
+    ReceiveMaximumExceeded = 0x93,
+
+    /// <summary>A topic alias is invalid or exceeds the negotiated maximum (0x94).</summary>
+    TopicAliasInvalid = 0x94,
+
     /// <summary>The packet exceeded the negotiated maximum packet size (0x95).</summary>
     PacketTooLarge = 0x95,
 
+    /// <summary>The message rate is too high (0x96).</summary>
+    MessageRateTooHigh = 0x96,
+
     /// <summary>An implementation or administrative imposed quota was exceeded (0x97).</summary>
     QuotaExceeded = 0x97,
+
+    /// <summary>The connection is closed due to an administrative action (0x98).</summary>
+    AdministrativeAction = 0x98,
+
+    /// <summary>The payload does not match the payload format indicator (0x99).</summary>
+    PayloadFormatInvalid = 0x99,
+
+    /// <summary>The server does not support retained messages (0x9A).</summary>
+    RetainNotSupported = 0x9A,
+
+    /// <summary>The requested QoS is not supported (0x9B).</summary>
+    QualityOfServiceNotSupported = 0x9B,
+
+    /// <summary>The client should temporarily use another server (0x9C).</summary>
+    UseAnotherServer = 0x9C,
+
+    /// <summary>The client should permanently use another server (0x9D).</summary>
+    ServerMoved = 0x9D,
+
+    /// <summary>The server does not support shared subscriptions (0x9E).</summary>
+    SharedSubscriptionsNotSupported = 0x9E,
+
+    /// <summary>The connection rate limit was exceeded (0x9F).</summary>
+    ConnectionRateExceeded = 0x9F,
+
+    /// <summary>The maximum connection time authorized for this connection was exceeded (0xA0).</summary>
+    MaximumConnectTime = 0xA0,
+
+    /// <summary>The server does not support subscription identifiers (0xA1).</summary>
+    SubscriptionIdentifiersNotSupported = 0xA1,
+
+    /// <summary>The server does not support wildcard subscriptions (0xA2).</summary>
+    WildcardSubscriptionsNotSupported = 0xA2,
 }

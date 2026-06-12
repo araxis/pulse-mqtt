@@ -16,8 +16,24 @@ public interface IConnectionLifecycle
     /// </summary>
     ValueTask OnConnectionUpAsync(IConnectionUpContext context, CancellationToken cancellationToken);
 
-    /// <summary>Runs when the connection is lost, with the reason when one is known.</summary>
-    ValueTask OnConnectionDownAsync(MqttReasonCode? reason, CancellationToken cancellationToken);
+    /// <summary>Runs when the connection is lost, with what is known about why.</summary>
+    ValueTask OnConnectionDownAsync(IConnectionDownContext context, CancellationToken cancellationToken);
+}
+
+/// <summary>What a lifecycle hook sees when a connection goes down.</summary>
+public interface IConnectionDownContext
+{
+    /// <summary>The broker's disconnect reason, when the session ended with a DISCONNECT.</summary>
+    MqttReasonCode? Reason { get; }
+
+    /// <summary>The broker's human-readable reason, when it sent one.</summary>
+    string? ReasonString { get; }
+
+    /// <summary>An alternate server the broker referred the client to, for redirect-aware deployments.</summary>
+    string? ServerReference { get; }
+
+    /// <summary>The error that ended the session, when one is known.</summary>
+    Exception? Error { get; }
 }
 
 /// <summary>What a lifecycle hook sees when a connection comes up.</summary>

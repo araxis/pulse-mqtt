@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Resilience;
 
 namespace Pulse.Mqtt.Client;
@@ -22,4 +23,8 @@ internal static partial class PulseMqttLog
     [LoggerMessage(EventId = 4, Level = LogLevel.Error,
         Message = "MQTT route {Template} handler failed")]
     public static partial void RouteHandlerFaulted(ILogger logger, string template, Exception error);
+
+    [LoggerMessage(EventId = 5, Level = LogLevel.Warning,
+        Message = "MQTT client {ClientId} was disconnected by the broker: {Reason}")]
+    public static partial void ServerDisconnected(ILogger logger, string clientId, MqttReasonCode reason);
 }

@@ -118,7 +118,7 @@ metrics pipeline. Two surfaces expose state directly:
 await foreach (var change in client.WatchState(token))
 {
     if (change.Current == ConnectionState.Faulted)
-        alerting.Page("MQTT faulted", change.Error);
+        alerting.Page($"MQTT faulted: {change.Reason}");
 }
 
 // Push: a plain event, if that fits better.

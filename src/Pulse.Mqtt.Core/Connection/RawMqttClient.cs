@@ -70,6 +70,12 @@ public sealed class RawMqttClient : IAsyncDisposable
     public Task Completion => _pump ?? Task.CompletedTask;
 
     /// <summary>
+    /// The broker's DISCONNECT, when the session ended with one. <see langword="null"/> for a
+    /// socket-level loss or a client-initiated close.
+    /// </summary>
+    public MqttServerDisconnectedException? ServerDisconnect { get; private set; }
+
+    /// <summary>
     /// Connects the transport, performs the CONNECT/CONNACK handshake, and starts the inbound pump
     /// and keep-alive. A non-success CONNACK is returned to the caller and the connection is closed.
     /// </summary>
@@ -405,9 +411,18 @@ public sealed class RawMqttClient : IAsyncDisposable
                                 },
                                 cancellationToken).ConfigureAwait(false);
                             break;
+                        case MqttDisconnectPacket disconnect:
+                            // The broker ended the session on purpose: an orderly close, not a
+                            // protocol error. Record the reason and stop — waiters fail with it.
+                            var serverDisconnect = new MqttServerDisconnectedException(
+                                disconnect.ReasonCode, disconnect.ReasonString, disconnect.ServerReference);
+                            ServerDisconnect = serverDisconnect;
+                            _messages.Writer.TryComplete(serverDisconnect);
+                            FailPending(serverDisconnect);
+                            return;
                         default:
                             // Acknowledgements complete inline via the inbound filter;
-                            // DISCONNECT/AUTH handling arrives with the resilient layer.
+                            // AUTH handling arrives with the enhanced-authentication feature.
                             break;
                     }
                 }

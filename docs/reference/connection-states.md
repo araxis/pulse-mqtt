@@ -17,7 +17,9 @@ Notes:
 
 - `Connected` is only entered **after** the lifecycle hook ran (re-subscription) and the
   offline queue flushed — by the time you observe it, the session is fully restored.
-- `Faulted` carries the error on the `ConnectionStateChanged.Error` field of the transition.
+- `Faulted` and drop transitions carry the broker's reason code on the
+  `ConnectionStateChanged.Reason` field — for example `SessionTakenOver` after a broker
+  DISCONNECT, or `NotAuthorized` after a rejected CONNECT.
 - Health checks map these as healthy (`Connected`), degraded (`Connecting`, `Reconnecting`,
   `WaitingRetry`), and unhealthy (the rest).
 
@@ -27,4 +29,4 @@ Notes:
 | --- | --- |
 | `Previous` / `Current` | The transition |
 | `Attempt` | The connection attempt number, for retry telemetry |
-| `Error` | The triggering exception, when there is one |
+| `Reason` | The broker's reason code, populated on drops and faults when one is known |
