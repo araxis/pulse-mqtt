@@ -129,7 +129,7 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
     {
         private readonly PulseMqttTestBroker _broker;
         private readonly MqttConnection _connection;
-        private readonly List<MqttTopicFilter> _subscriptions = [];
+        private readonly Dictionary<string, MqttTopicFilter> _subscriptions = [];
         private readonly object _subscriptionGate = new();
         private Task? _loop;
 
@@ -150,7 +150,7 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
             lock (_subscriptionGate)
             {
                 MqttQualityOfService? best = null;
-                foreach (var filter in _subscriptions)
+                foreach (var filter in _subscriptions.Values)
                 {
                     if (MqttTopicFilterMatcher.Matches(filter.Topic, topic)
                         && (best is null || filter.MaximumQualityOfService > best))
@@ -229,8 +229,7 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
                     {
                         foreach (var filter in subscribe.TopicFilters)
                         {
-                            _subscriptions.RemoveAll(existing => existing.Topic == filter.Topic);
-                            _subscriptions.Add(filter);
+                            _subscriptions[filter.Topic] = filter;
                         }
                     }
 
@@ -248,7 +247,7 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
                     {
                         foreach (var topic in unsubscribe.TopicFilters)
                         {
-                            _subscriptions.RemoveAll(existing => existing.Topic == topic);
+                            _subscriptions.Remove(topic);
                         }
                     }
 
