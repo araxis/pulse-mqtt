@@ -27,4 +27,8 @@ internal static partial class PulseMqttLog
     [LoggerMessage(EventId = 5, Level = LogLevel.Warning,
         Message = "MQTT client {ClientId} was disconnected by the broker: {Reason}")]
     public static partial void ServerDisconnected(ILogger logger, string clientId, MqttReasonCode reason);
+
+    [LoggerMessage(EventId = 6, Level = LogLevel.Warning,
+        Message = "MQTT client {ClientId} dropped a queued publish to {Topic}: {PacketSize} bytes exceeds the broker's {Limit}-byte maximum")]
+    public static partial void QueuedPublishTooLarge(ILogger logger, string clientId, string topic, int packetSize, uint limit);
 }

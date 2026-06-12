@@ -178,6 +178,11 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 var reason = await raw.PublishAsync(packet, cancellationToken).ConfigureAwait(false);
                 return new PublishOutcome(PublishDisposition.Delivered, reason);
             }
+            catch (MqttPacketTooLargeException)
+            {
+                // Queueing would retry a permanently-doomed packet forever; the caller decides.
+                throw;
+            }
             catch (Exception ex) when (ex is MqttException or InvalidOperationException or ObjectDisposedException)
             {
                 // The connection died underneath us; fall through to the offline path.
@@ -704,7 +709,25 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     {
         while (await _messageStore.PeekAsync(cancellationToken).ConfigureAwait(false) is { } queued)
         {
-            await raw.PublishAsync(queued, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await raw.PublishAsync(queued, cancellationToken).ConfigureAwait(false);
+            }
+            catch (MqttPacketTooLargeException error)
+            {
+                // This broker accepts smaller packets than the one that queued the message.
+                // Retrying can never succeed; drop it loudly and keep the queue draining.
+                if (_options.Logger is { } logger)
+                {
+                    PulseMqttLog.QueuedPublishTooLarge(logger, _clientId, queued.Topic, error.PacketSize, error.Limit);
+                }
+
+                PulseMqttDiagnostics.MessagesPublished.Add(
+                    1,
+                    new KeyValuePair<string, object?>("client.id", _clientId),
+                    new KeyValuePair<string, object?>("disposition", "DroppedTooLarge"));
+            }
+
             await _messageStore.RemoveHeadAsync(cancellationToken).ConfigureAwait(false);
         }
     }

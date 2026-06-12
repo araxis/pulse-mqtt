@@ -127,6 +127,10 @@ public sealed class RawMqttClient : IAsyncDisposable
             _protocolVersion = connect.ProtocolVersion;
             _connection = connection;
 
+            // Honor the broker's limits from here on. The CONNECT itself is exempt — the limit
+            // is only known once the CONNACK arrives.
+            connection.MaximumOutboundPacketSize = connAck.MaximumPacketSize;
+
             // Acknowledgements complete their waiters on the receive loop itself; only packets
             // that need queue semantics or trigger sends flow through the pump.
             connection.InboundFilter = TryHandleInline;

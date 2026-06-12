@@ -11,6 +11,11 @@
   (reason, reason string, server reference, error) instead of a bare reason code.
 - The `MqttReasonCode` enum gains the remaining MQTT 5 codes (topic/payload validation,
   rate and connection limits, redirects, feature-support indicators).
+- Maximum-packet-size compliance: when the broker's CONNACK advertises a limit, every
+  outbound packet is size-checked before any byte reaches the wire; oversized ones fail fast
+  with `MqttPacketTooLargeException` instead of getting the client disconnected. A queued
+  publish that exceeds a stricter reconnected broker's limit is dropped loudly (logged and
+  counted) rather than poisoning the flush.
 - Builds on the GA .NET 10 SDK; dependency pins refreshed.
 
 ## 0.2.0

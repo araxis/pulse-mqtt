@@ -49,10 +49,15 @@ internal sealed class TestBroker
         await _transport.Output.FlushAsync(cancellationToken);
     }
 
-    public async Task AcceptConnectionAsync(CancellationToken cancellationToken, bool sessionPresent = false)
+    public async Task AcceptConnectionAsync(
+        CancellationToken cancellationToken,
+        bool sessionPresent = false,
+        uint? maximumPacketSize = null)
     {
         (await ReadPacketAsync(cancellationToken)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
-        await SendAsync(new MqttConnAckPacket { SessionPresent = sessionPresent }, cancellationToken);
+        await SendAsync(
+            new MqttConnAckPacket { SessionPresent = sessionPresent, MaximumPacketSize = maximumPacketSize },
+            cancellationToken);
     }
 
     public ValueTask DisposeAsync() => _transport.DisposeAsync();
