@@ -124,6 +124,48 @@ connection layer ignores AUTH packets.
 - [ ] Unit tests drive a scripted multi-step exchange to success and to rejection; rejection
       maps to a terminal connect failure through the existing decision flow.
 
+### F11 — Presence: last-will and birth messages, static and factory forms
+
+Both halves of device presence. The **last will** is the message the broker publishes on the
+client's behalf when the connection dies ungracefully — it already encodes on CONNECT but is
+reachable only through the raw packet today. The **birth message** (the "first will") is its
+mirror: a message the client itself publishes automatically on every connection-up, announcing
+it is online. Together with a retained topic they give the classic presence pattern:
+
+```
+status/device-7   ← birth publishes "online" (retained) on every connect
+status/device-7   ← will publishes "offline" (retained) when the client drops
+```
+
+Static forms cover the common case; **factory forms** compute the topic and payload fresh for
+each connection attempt — session counters, timestamps, current configuration — instead of
+freezing them at startup.
+
+**Definition of done**
+- [ ] **Last will, static**: `PulseMqttClientOptions` (DI) and
+      `PulseMqttClientBuilder.WithWill(...)` (fluent) express topic, payload, QoS, retain,
+      will-delay interval, and the v5 will properties, without touching the raw packet.
+- [ ] **Last will, factory**: a per-connection factory
+      (`CancellationToken → ValueTask<MqttWillMessage>`) is invoked on **every** connection
+      attempt before CONNECT is sent, so each reconnect can carry a fresh topic and payload.
+      A throwing factory fails that attempt like any connect failure — classified by the
+      reconnect decision, never swallowed.
+- [ ] **Birth, static**: an announcement message (topic, payload, QoS, retain) the client
+      publishes automatically on every connection-up — after re-subscription, before the
+      offline queue flushes, before the state becomes `Connected` — so observers never see
+      "online" from a client whose session is not actually restored yet.
+- [ ] **Birth, factory**: the same per-connection factory form, invoked at publish time with
+      the connection attempt visible, so payloads can carry attempt counts or timestamps.
+- [ ] Typed payload overloads for both, through the configured serializer.
+- [ ] Birth publish failures are observable (logged, counted) and configurable: fail the
+      connection-up (default — presence must be true) or log-and-continue.
+- [ ] Both factories take the client's `TimeProvider` reality into account: deterministic in
+      tests with a fake clock.
+- [ ] Integration test against a real broker: subscriber sees retained "online" after
+      connect, "offline" after an ungraceful drop (socket kill), and "online" again after
+      the automatic reconnect — the full presence cycle without application code.
+- [ ] Documented as a presence guide page with the retained online/offline pattern.
+
 ### F7 — API freeze and review
 
 **Definition of done**
@@ -190,34 +232,26 @@ loses; corruption test recovers with a clear error; AOT-safe (no reflection-base
 (generated resolvers, no dynamic codegen at runtime); round-trip and interop tests; documented
 in Typed messaging.
 
-### N3 — Will message ergonomics
-
-Wills already encode on CONNECT; they are reachable only through the raw packet today.
-
-**DoD:** `PulseMqttClientOptions` (DI) and `PulseMqttClientBuilder.WithWill(...)` (fluent)
-express topic, payload, QoS, retain, delay, and properties; an integration test sees the will
-fire on an ungraceful drop.
-
-### N4 — Observability completion
+### N3 — Observability completion
 
 **DoD:** a `receive` span (Consumer kind, linked to the producer context when the publish
 carried trace propagation), a `connect` span around connection attempts, histogram instruments
 for publish duration and connect duration, and gauges for offline-queue depth and dropped
 count; docs updated; overhead measured and negligible with no listener.
 
-### N5 — Trace context propagation
+### N4 — Trace context propagation
 
 W3C `traceparent` in user properties, producer-side inject + consumer-side extract, opt-in.
 
 **DoD:** a publish inside an active span produces a routed handler whose `Activity` is a child
 across two clients; off by default; documented.
 
-### N6 — MQTTnet migration guide
+### N5 — MQTTnet migration guide
 
 **DoD:** a docs page mapping every common MQTTnet pattern (factory/options/builders, handlers,
 managed client behaviors) to the Pulse equivalent, with before/after code.
 
-### N7 — `IAsyncEnumerable` request streaming
+### N6 — `IAsyncEnumerable` request streaming
 
 Server-streamed RPC: one request, many correlated responses.
 
@@ -225,7 +259,7 @@ Server-streamed RPC: one request, many correlated responses.
 responder-side helper publishes the marker; backpressure bounded; tests cover early consumer
 abandonment.
 
-### N8 — WebSocket proxy and header options
+### N7 — WebSocket proxy and header options
 
 **DoD:** explicit proxy configuration and per-connect headers on `WebSocketTransportOptions`
 (today reachable only via `ConfigureClient`); documented with a reverse-proxy example.
@@ -238,8 +272,8 @@ abandonment.
 | --- | --- | --- |
 | **0.3.0** | F1 DISCONNECT, F3 max packet size, F9 GA toolchain | A broker can say no politely and the client behaves; builds on GA SDK |
 | **0.4.0** | F2 receive maximum, F4 topic aliases | Negotiated-limit compliance complete |
-| **0.5.0** | F5 session redelivery, F6 enhanced auth, N1 if ready | Persistent sessions are honest end to end |
-| **0.6.0** | F8 broker matrix, N3/N4/N5 as ready | Interop proven beyond Mosquitto |
+| **0.5.0** | F11 presence (will + birth, static + factory), F5 session redelivery, F6 enhanced auth, N1 if ready | Persistent sessions and presence are honest end to end |
+| **0.6.0** | F8 broker matrix, N3/N4 as ready | Interop proven beyond Mosquitto |
 | **1.0.0-rc.1** | F7 API freeze, F10 soak/stress, docs complete | Public API locked; release candidate published |
 | **1.0.0** | RC feedback only — no new features | All F-items checked; quality gates green |
 
