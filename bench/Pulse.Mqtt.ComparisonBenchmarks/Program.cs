@@ -28,8 +28,13 @@ Console.WriteLine($"Mosquitto at {Broker.Host}:{Broker.Port}");
 await ConnectLatencyPassAsync();
 await ThroughputPassAsync();
 
+// Round trips over the proxied loopback are noisy; ShortRun's three iterations swing run to
+// run, so the latency comparison needs a wider sample.
 var config = ManualConfig.Create(DefaultConfig.Instance)
-    .AddJob(Job.ShortRun.WithToolchain(InProcessEmitToolchain.Instance))
+    .AddJob(Job.Default
+        .WithToolchain(InProcessEmitToolchain.Instance)
+        .WithWarmupCount(5)
+        .WithIterationCount(15))
     .AddDiagnoser(MemoryDiagnoser.Default)
     .WithOptions(ConfigOptions.DisableOptimizationsValidator);
 BenchmarkRunner.Run<RoundTripBenchmarks>(config);
@@ -40,10 +45,10 @@ return;
 static async Task ConnectLatencyPassAsync()
 {
     Console.WriteLine();
-    Console.WriteLine("== Connect latency (10 connect/disconnect cycles, median) ==");
+    Console.WriteLine("== Connect latency (30 connect/disconnect cycles, median) ==");
 
     var pulse = new List<double>();
-    for (var i = 0; i < 10; i++)
+    for (var i = 0; i < 30; i++)
     {
         var sw = Stopwatch.StartNew();
         await using var client = new ResilientMqttClient(
@@ -64,7 +69,7 @@ static async Task ConnectLatencyPassAsync()
 
     var mqttNet = new List<double>();
     var factory = new MqttClientFactory();
-    for (var i = 0; i < 10; i++)
+    for (var i = 0; i < 30; i++)
     {
         var sw = Stopwatch.StartNew();
         using var client = factory.CreateMqttClient();
