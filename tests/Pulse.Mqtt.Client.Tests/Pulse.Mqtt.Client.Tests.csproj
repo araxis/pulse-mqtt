@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Resilience.Polly\Pulse.Mqtt.Resilience.Polly.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Serialization.Json\Pulse.Mqtt.Serialization.Json.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Transport.WebSocket\Pulse.Mqtt.Transport.WebSocket.csproj" />
+    <ProjectReference Include="..\..\src\Pulse.Mqtt.Testing\Pulse.Mqtt.Testing.csproj" />
   </ItemGroup>
 
 </Project>
