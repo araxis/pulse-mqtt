@@ -21,5 +21,7 @@ Initial release.
 - Observability: structured logs, `Pulse.Mqtt` activity source and meter.
 - `PulseMqttTestBroker`: an in-process broker for fast, deterministic consumer tests.
 - Native AOT verified: zero trim/AOT warnings, full-stack native smoke binary.
+- Host-managed or manual client lifecycle: `StartWithHost = false` hands start, stop, and
+  restart to the application.
 - Sample application covering hosting, routing, typed messaging, and request/response.
 - Continuous integration and tag-driven NuGet release pipelines.

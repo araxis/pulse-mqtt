@@ -35,4 +35,13 @@ public sealed class PulseMqttClientOptions
 
     /// <summary>The MQTT protocol version. Defaults to 5.0.</summary>
     public MqttProtocolVersion ProtocolVersion { get; set; } = MqttProtocolVersion.V500;
+
+    /// <summary>
+    /// Whether the host starts the client on startup. Defaults to <see langword="true"/>. Set
+    /// <see langword="false"/> to control the lifecycle yourself through
+    /// <see cref="Client.ResilientMqttClient.StartAsync"/> and
+    /// <see cref="Client.ResilientMqttClient.StopAsync"/> — start, stop, and restart at any
+    /// time. Host shutdown still stops a running client either way.
+    /// </summary>
+    public bool StartWithHost { get; set; } = true;
 }

@@ -103,6 +103,45 @@ public sealed class AddPulseMqttClientTests
     }
 
     [Fact]
+    public async Task A_manually_controlled_client_ignores_host_start_and_restarts_on_demand()
+    {
+        var services = new ServiceCollection();
+        services.AddPulseMqttClient("manual", options =>
+        {
+            ValidOptions(options);
+            options.StartWithHost = false;
+        }).UseTransportFactory(_ => new LoopbackOnlyFactory());
+        await using var provider = services.BuildServiceProvider();
+
+        var hosted = provider.GetRequiredService<IHostedService>();
+        var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("manual");
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await hosted.StartAsync(timeout.Token);
+        client.State.ShouldBe(ConnectionState.Disconnected); // the host did not start it
+
+        // The application starts, stops, and restarts the client whenever it wants.
+        await client.StartAsync(timeout.Token);
+        while (client.State == ConnectionState.Disconnected)
+        {
+            await Task.Delay(5, timeout.Token);
+        }
+
+        await client.StopAsync(timeout.Token);
+        client.State.ShouldBe(ConnectionState.Stopped);
+
+        await client.StartAsync(timeout.Token);
+        while (client.State == ConnectionState.Stopped)
+        {
+            await Task.Delay(5, timeout.Token);
+        }
+
+        // Host shutdown still stops a running client.
+        await hosted.StopAsync(timeout.Token);
+        client.State.ShouldBe(ConnectionState.Stopped);
+    }
+
+    [Fact]
     public async Task The_health_check_tracks_the_connection_state()
     {
         var services = new ServiceCollection();
