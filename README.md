@@ -1,5 +1,7 @@
 # Pulse.Mqtt
 
+[![CI](https://github.com/araxis/pulse-mqtt/actions/workflows/ci.yml/badge.svg)](https://github.com/araxis/pulse-mqtt/actions/workflows/ci.yml)
+
 A high-performance, resilient MQTT 5.0 / 3.1.1 client for modern .NET (`net8.0` + `net10.0`).
 
 Most .NET MQTT clients leave the hard parts to the application: reconnecting, re-subscribing,
@@ -104,17 +106,31 @@ Terminal failures (for example a broker answering `NotAuthorized`) fault the cli
 it stops instead of retrying forever, and an explicit `StartAsync` recovers after the cause is
 fixed.
 
+## Sample
+
+[`samples/Pulse.Mqtt.Sample`](samples/Pulse.Mqtt.Sample) is a runnable console app covering
+hosting, typed publishes, routed subscriptions, and request/response. It needs no
+infrastructure — without arguments it runs against the in-process test broker:
+
+```
+dotnet run --project samples/Pulse.Mqtt.Sample
+dotnet run --project samples/Pulse.Mqtt.Sample -- --host localhost --port 1883
+```
+
 ## Performance
 
 Measured with BenchmarkDotNet (`MemoryDiagnoser`) on .NET 10:
 
 | Operation | Mean | Allocated |
 |---|---|---|
-| Publish encode (QoS 1, v5) | ~175 ns | 64 B |
-| Frame + decode the same packet | ~93 ns | 312 B (the decoded objects themselves) |
+| Publish encode (v5, no properties) | ~60 ns | 0 B |
+| Frame + decode the same packet | ~96 ns | 144 B (the decoded objects themselves) |
 | Topic filter match | ~32 ns | 0 B |
 | Route template match (2 captures) | ~56 ns | 104 B (the captured values) |
 | Variable-length integer round-trip | ~26 ns | 0 B |
+
+Head-to-head against MQTTnet over a real broker — higher throughput, lower allocations in
+every scenario, faster connects: [the full comparison](docs/Benchmark-vs-MQTTnet.md).
 
 Everything is bounded: inbound queues, per-route queues, the offline queue. Backpressure flows
 to the socket instead of buffering without limits. All timing goes through `TimeProvider`, so
@@ -134,11 +150,16 @@ MQTT over QUIC, MessagePack/Protobuf serializers, automatic topic-alias negotiat
 flow-control tuning, and MQTT 5 enhanced authentication are tracked as backlog; the contracts
 they plug into already exist.
 
-## Documents
+## Documentation
 
-- [Development plan](docs/NG-MQTT-Client-Development-Plan.md)
-- [Competitive research](docs/Competitive-Research-MQTT-Clients.md)
-- [Resilience design](docs/Phase-04-Resilience-Detailed-Design.md)
+- [Getting started](docs/Getting-Started.md)
+- [Configuration and swapping behaviors](docs/Configuration-and-Swapping.md)
+- [Routing and typed messaging](docs/Routing-and-Typed-Messaging.md)
+- [Request and response](docs/Request-Response.md)
+- [Testing without a broker](docs/Testing.md)
+- [Releasing and the pipelines](docs/Releasing.md)
+- [Benchmark suite](docs/Benchmark-Suite.md) and [the MQTTnet comparison](docs/Benchmark-vs-MQTTnet.md)
+- [Development plan](docs/NG-MQTT-Client-Development-Plan.md), [competitive research](docs/Competitive-Research-MQTT-Clients.md), [resilience design](docs/Phase-04-Resilience-Detailed-Design.md)
 - [Changelog](CHANGELOG.md)
 
 ## License
