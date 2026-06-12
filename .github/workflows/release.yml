@@ -1,8 +1,17 @@
 name: Release
 
+# A tag push (vX.Y.Z) publishes a stable release with a GitHub release.
+# A push to main publishes a prerelease (X.Y.Z-preview.<run>) to NuGet only.
+# Both publish through the same trusted-publishing policy (this workflow file).
 on:
   push:
+    branches: [main]
     tags: ['v*']
+
+# Serialize publishes per ref so two runs never push the same version at once.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -17,8 +26,16 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Resolve version from tag
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Resolve the version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+            echo "STABLE=true" >> "$GITHUB_ENV"
+          else
+            prefix=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props | head -1)
+            echo "VERSION=${prefix}-preview.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+            echo "STABLE=false" >> "$GITHUB_ENV"
+          fi
 
       - name: Build
         run: dotnet build -c Release -p:Version=$VERSION -p:ContinuousIntegrationBuild=true
@@ -47,6 +64,7 @@ jobs:
           --skip-duplicate
 
       - name: Extract release notes from the changelog
+        if: env.STABLE == 'true'
         run: |
           awk -v version="$VERSION" '
             $0 ~ "^## " version "($| )" { found = 1; next }
@@ -75,6 +93,7 @@ jobs:
           } >> release-notes.md
 
       - name: Create the GitHub release
+        if: env.STABLE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
