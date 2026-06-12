@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0
 
 - Fluent API: `PulseMqttClientBuilder` for direct construction, and chainable
   `Publish`/`Route`/`Request` builders over the regular client operations.
