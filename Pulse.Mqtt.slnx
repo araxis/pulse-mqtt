@@ -12,6 +12,7 @@
     <Project Path="src/Pulse.Mqtt.Resilience.Polly/Pulse.Mqtt.Resilience.Polly.csproj" />
     <Project Path="src/Pulse.Mqtt.Serialization.Json/Pulse.Mqtt.Serialization.Json.csproj" />
     <Project Path="src/Pulse.Mqtt.Testing/Pulse.Mqtt.Testing.csproj" />
+    <Project Path="src/Pulse.Mqtt.Transport.WebSocket/Pulse.Mqtt.Transport.WebSocket.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Pulse.Mqtt.Client.Tests/Pulse.Mqtt.Client.Tests.csproj" />
