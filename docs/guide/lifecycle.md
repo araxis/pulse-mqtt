@@ -65,7 +65,7 @@ _ = Task.Run(async () =>
 
         if (change.Current == ConnectionState.Faulted)
         {
-            alerting.Page("MQTT client faulted", change.Error);
+            alerting.Page($"MQTT client faulted: {change.Reason}");
         }
     }
 });
@@ -84,7 +84,7 @@ await client.StartAsync(token);
 await foreach (var change in client.WatchState(token))
 {
     if (change.Current == ConnectionState.Connected) break;
-    if (change.Current == ConnectionState.Faulted) throw new InvalidOperationException("MQTT faulted", change.Error);
+    if (change.Current == ConnectionState.Faulted) throw new InvalidOperationException($"MQTT faulted: {change.Reason}");
 }
 ```
 

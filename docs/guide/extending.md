@@ -127,7 +127,7 @@ public sealed class TokenAwareDecision(ITokenSource tokens) : IReconnectDecision
 public interface IConnectionLifecycle
 {
     ValueTask OnConnectionUpAsync(IConnectionUpContext context, CancellationToken cancellationToken);
-    ValueTask OnConnectionDownAsync(MqttReasonCode? reason, CancellationToken cancellationToken);
+    ValueTask OnConnectionDownAsync(IConnectionDownContext context, CancellationToken cancellationToken);
 }
 
 public interface IConnectionUpContext
@@ -135,6 +135,14 @@ public interface IConnectionUpContext
     MqttConnAckPacket ConnAck { get; }            // SessionPresent, negotiated limits
     int Attempt { get; }
     ISubscriptionRegistrar Subscriptions { get; } // re-establish subscriptions on the live link
+}
+
+public interface IConnectionDownContext
+{
+    MqttReasonCode? Reason { get; }               // the broker's DISCONNECT reason, when it sent one
+    string? ReasonString { get; }
+    string? ServerReference { get; }              // redirect target, for redirect-aware deployments
+    Exception? Error { get; }                     // what ended the session, when known
 }
 
 public interface ISubscriptionRegistrar
@@ -164,8 +172,8 @@ public sealed class WarmCacheLifecycle(ISessionStore sessions, ICache cache) : I
         await cache.WarmAsync(ct);                         // then your priming
     }
 
-    public ValueTask OnConnectionDownAsync(MqttReasonCode? reason, CancellationToken ct) =>
-        _inner.OnConnectionDownAsync(reason, ct);
+    public ValueTask OnConnectionDownAsync(IConnectionDownContext context, CancellationToken ct) =>
+        _inner.OnConnectionDownAsync(context, ct);
 }
 ```
 

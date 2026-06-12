@@ -2,7 +2,16 @@
 
 ## 0.3.0 (unreleased)
 
-_Nothing yet._
+- Broker-initiated DISCONNECT handling: the reason code, reason string, and server reference
+  surface through `MqttServerDisconnectedException`, the state stream, the lifecycle
+  down-context, and a dedicated log event. Terminal reasons (`NotAuthorized`, `Banned`,
+  `SessionTakenOver`, `ServerMoved`, `UseAnotherServer`) fault sticky instead of reconnecting;
+  the classification is swappable through `IReconnectDecision`.
+- `IConnectionLifecycle.OnConnectionDownAsync` now receives an `IConnectionDownContext`
+  (reason, reason string, server reference, error) instead of a bare reason code.
+- The `MqttReasonCode` enum gains the remaining MQTT 5 codes (topic/payload validation,
+  rate and connection limits, redirects, feature-support indicators).
+- Builds on the GA .NET 10 SDK; dependency pins refreshed.
 
 ## 0.2.0
 

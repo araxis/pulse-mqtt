@@ -54,11 +54,33 @@ Want Polly instead? The whole loop is a swap point:
 
 See [Extending](./extending#custom-reconnect-strategy).
 
+## Broker-initiated disconnects
+
+A broker that sends DISCONNECT gets an orderly close, not a guessing game. The reason code,
+reason string, and server reference are surfaced everywhere they matter: in-flight operations
+fail with `MqttServerDisconnectedException` carrying all three, the
+`ConnectionStateChanged.Reason` field carries the code, the lifecycle's down-context carries
+the details (including `ServerReference` for redirect-aware deployments), and the
+`ServerDisconnected` log event records it.
+
+What happens next depends on the reason, through the same `IReconnectDecision`:
+
+- **Transient reasons** — `ServerShuttingDown`, `ServerBusy`, keep-alive timeouts — reconnect
+  with the normal backoff.
+- **Terminal reasons** — `NotAuthorized`, `Banned`, `ServerMoved`, `UseAnotherServer`, and
+  notably `SessionTakenOver` — fault sticky instead. `SessionTakenOver` is terminal on
+  purpose: another connection owns the session now, and auto-reconnecting would steal it back
+  in an endless takeover war.
+
+Swap the decision to change the classification — for example, to implement automatic redirects
+on `ServerMoved` using the down-context's `ServerReference`.
+
 ## Sticky faults
 
 Some failures should **not** be retried: `NotAuthorized`, `BadUserNameOrPassword`, a banned
-client identifier. The `IReconnectDecision` classifies each failure; terminal ones move the
-client to `Faulted`, where it stays — visibly — instead of hammering the broker forever.
+client identifier, a session takeover. The `IReconnectDecision` classifies each failure;
+terminal ones move the client to `Faulted`, where it stays — visibly — instead of hammering
+the broker forever.
 
 Recovery is explicit:
 

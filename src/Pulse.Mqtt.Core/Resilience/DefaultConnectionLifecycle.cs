@@ -36,6 +36,6 @@ public sealed class DefaultConnectionLifecycle : IConnectionLifecycle
     }
 
     /// <inheritdoc />
-    public ValueTask OnConnectionDownAsync(MqttReasonCode? reason, CancellationToken cancellationToken) =>
+    public ValueTask OnConnectionDownAsync(IConnectionDownContext context, CancellationToken cancellationToken) =>
         ValueTask.CompletedTask;
 }

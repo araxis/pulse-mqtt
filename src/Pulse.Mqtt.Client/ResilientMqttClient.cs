@@ -29,6 +29,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     private readonly IConnectionLifecycle _lifecycle;
     private readonly ISessionStore _sessionStore;
     private readonly IMessageStore _messageStore;
+    private readonly IReconnectDecision _decision;
     private readonly Channel<MqttPublishPacket> _messages;
     private readonly List<Channel<ConnectionStateChanged>> _watchers = [];
     private readonly Dictionary<string, MqttTopicFilter> _subscriptions = [];
@@ -61,8 +62,8 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
         _sessionStore = options.SessionStore ?? new InMemorySessionStore();
         _messageStore = options.MessageStore ?? new InMemoryMessageStore(options.OfflineQueue);
-        var decision = options.ReconnectDecision ?? new DefaultReconnectDecision();
-        _strategy = options.ReconnectStrategy ?? new BackoffReconnectStrategy(options.Backoff, decision);
+        _decision = options.ReconnectDecision ?? new DefaultReconnectDecision();
+        _strategy = options.ReconnectStrategy ?? new BackoffReconnectStrategy(options.Backoff, _decision);
         _lifecycle = options.Lifecycle ?? new DefaultConnectionLifecycle(_sessionStore);
 
         _messages = Channel.CreateBounded<MqttPublishPacket>(new BoundedChannelOptions(options.Raw.InboundMessageCapacity)
@@ -560,11 +561,13 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     private async Task SuperviseAsync(CancellationToken cancellationToken)
     {
+        MqttReasonCode? dropReason = null;
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                Transition(_attempt == 0 ? ConnectionState.Connecting : ConnectionState.Reconnecting);
+                Transition(_attempt == 0 ? ConnectionState.Connecting : ConnectionState.Reconnecting, dropReason);
+                dropReason = null;
 
                 RawMqttClient? raw = null;
                 MqttConnAckPacket? connAck = null;
@@ -642,6 +645,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 }
 
                 _raw = null;
+                var serverDisconnect = raw!.ServerDisconnect;
                 await raw!.DisposeAsync().ConfigureAwait(false);
 
                 if (cancellationToken.IsCancellationRequested)
@@ -651,17 +655,40 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
                 if (_options.Logger is { } logger)
                 {
-                    PulseMqttLog.ConnectionLost(logger, _clientId);
+                    if (serverDisconnect is not null)
+                    {
+                        PulseMqttLog.ServerDisconnected(logger, _clientId, serverDisconnect.ReasonCode);
+                    }
+                    else
+                    {
+                        PulseMqttLog.ConnectionLost(logger, _clientId);
+                    }
                 }
 
                 _attempt++;
+                dropReason = serverDisconnect?.ReasonCode;
                 try
                 {
-                    await _lifecycle.OnConnectionDownAsync(null, cancellationToken).ConfigureAwait(false);
+                    await _lifecycle.OnConnectionDownAsync(
+                            new ConnectionDownContext(
+                                serverDisconnect?.ReasonCode,
+                                serverDisconnect?.ReasonString,
+                                serverDisconnect?.ServerReference,
+                                serverDisconnect),
+                            cancellationToken)
+                        .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
                     break;
+                }
+
+                // A broker that said "stop" — a ban, a takeover, a redirect — must not be
+                // hammered with reconnects. The decision classifies; terminal reasons fault.
+                if (serverDisconnect is not null && !_decision.ShouldRetry(_attempt, serverDisconnect))
+                {
+                    Fault(serverDisconnect);
+                    return;
                 }
             }
 
@@ -684,9 +711,16 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     private void Fault(Exception error)
     {
-        var reason = error as MqttConnectRejectedException ?? error.InnerException as MqttConnectRejectedException;
-        Transition(ConnectionState.Faulted, reason?.ReasonCode);
+        var reason = (error as MqttConnectRejectedException ?? error.InnerException as MqttConnectRejectedException)?.ReasonCode
+            ?? (error as MqttServerDisconnectedException ?? error.InnerException as MqttServerDisconnectedException)?.ReasonCode;
+        Transition(ConnectionState.Faulted, reason);
     }
+
+    private sealed record ConnectionDownContext(
+        MqttReasonCode? Reason,
+        string? ReasonString,
+        string? ServerReference,
+        Exception? Error) : IConnectionDownContext;
 
     private void Transition(ConnectionState next, MqttReasonCode? reason = null)
     {
