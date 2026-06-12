@@ -43,3 +43,6 @@ Thumbs.db
 .env
 *.received.*
 run-output*.txt
+docs/node_modules/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
