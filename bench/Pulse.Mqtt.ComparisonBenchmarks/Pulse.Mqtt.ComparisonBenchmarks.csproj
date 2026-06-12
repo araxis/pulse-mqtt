@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Head-to-head measurements against MQTTnet over a real Mosquitto broker (requires Docker). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+    <PackageReference Include="MQTTnet" />
+    <PackageReference Include="Testcontainers" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Pulse.Mqtt.Core\Pulse.Mqtt.Core.csproj" />
+    <ProjectReference Include="..\..\src\Pulse.Mqtt.Client\Pulse.Mqtt.Client.csproj" />
+  </ItemGroup>
+
+</Project>
