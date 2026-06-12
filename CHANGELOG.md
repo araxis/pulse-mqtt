@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+_Nothing yet._
+
 ## 0.2.0
 
 - Fluent API: `PulseMqttClientBuilder` for direct construction, and chainable
