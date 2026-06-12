@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0 (unreleased)
+
+- Fluent API: `PulseMqttClientBuilder` for direct construction, and chainable
+  `Publish`/`Route`/`Request` builders over the regular client operations.
+
 ## 0.1.0
 
 Initial release.
@@ -23,7 +28,5 @@ Initial release.
 - Native AOT verified: zero trim/AOT warnings, full-stack native smoke binary.
 - Host-managed or manual client lifecycle: `StartWithHost = false` hands start, stop, and
   restart to the application.
-- Fluent API: `PulseMqttClientBuilder` for direct construction, and chainable
-  `Publish`/`Route`/`Request` builders over the regular client operations.
 - Sample application covering hosting, routing, typed messaging, and request/response.
 - Continuous integration and tag-driven NuGet release pipelines.
