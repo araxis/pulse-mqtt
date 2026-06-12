@@ -44,6 +44,13 @@ builder.Services
 `Wait` (backpressure), `DropOldest`, or `DropNewest`. QoS 0 messages drop by default while
 offline; set `IncludeQos0` to queue them too.
 
+## Lifecycle
+
+By default the registered client starts with the host and stops on shutdown. Set
+`StartWithHost = false` in `PulseMqttClientOptions` to take over: call `StartAsync` and
+`StopAsync` on the resolved client whenever you want, as many times as you want. Host shutdown
+still stops a running client.
+
 ## Options binding
 
 `PulseMqttClientOptions` is named-options friendly:

@@ -32,6 +32,26 @@ reconnects on its own. Resolve it anywhere:
 var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("devices");
 ```
 
+### Controlling the lifecycle yourself
+
+To start and stop the client explicitly instead — on a feature flag, a UI toggle, a schedule —
+opt out of the automatic start:
+
+```csharp
+options.StartWithHost = false;
+```
+
+then drive it whenever you want:
+
+```csharp
+await client.StartAsync(token);   // begins connecting in the background
+await client.StopAsync(token);    // disconnects and stops reconnecting
+await client.StartAsync(token);   // start again later — restart is fully supported
+```
+
+`StartWithHost = true` (the default) and manual calls compose: `StopAsync` is idempotent and a
+stopped client can always be restarted. Host shutdown stops a running client in both modes.
+
 ## Publish and subscribe
 
 ```csharp

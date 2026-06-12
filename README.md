@@ -38,6 +38,7 @@ services.AddPulseMqttClient("telemetry", options =>
     options.ClientId = "service-1";
 });
 // The client connects with the host, reconnects on drops, re-subscribes, and reports health.
+// Prefer manual control? options.StartWithHost = false, then StartAsync/StopAsync at will.
 
 var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("telemetry");
 ```

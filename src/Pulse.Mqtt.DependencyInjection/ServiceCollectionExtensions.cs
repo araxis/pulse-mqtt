@@ -72,7 +72,9 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddSingleton<IHostedService>(provider =>
-            new PulseMqttHostedService(provider.GetRequiredKeyedService<ResilientMqttClient>(name)));
+            new PulseMqttHostedService(
+                provider.GetRequiredKeyedService<ResilientMqttClient>(name),
+                provider.GetRequiredService<IOptionsMonitor<PulseMqttClientOptions>>().Get(name).StartWithHost));
 
         return new PulseMqttBuilder(services, name);
     }
