@@ -5,6 +5,7 @@ using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Resilience;
 using Pulse.Mqtt.Routing;
+using Pulse.Mqtt.Serialization;
 using Pulse.Mqtt.Transport;
 
 namespace Pulse.Mqtt.Client;
@@ -262,6 +263,60 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         };
         return SubscribeAsync([filter], cancellationToken);
     }
+
+    /// <summary>
+    /// Serializes <paramref name="value"/> with the configured serializer and publishes it, with
+    /// the serializer's content type and payload format stamped on the message.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No serializer is configured.</exception>
+    public Task<PublishOutcome> PublishAsync<T>(
+        string topic,
+        T value,
+        MqttQualityOfService qualityOfService = MqttQualityOfService.AtMostOnce,
+        bool retain = false,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(topic);
+        var serializer = SerializerOrThrow();
+
+        var packet = new MqttPublishPacket
+        {
+            Topic = topic,
+            Payload = serializer.Serialize(value),
+            QualityOfService = qualityOfService,
+            Retain = retain,
+            ContentType = serializer.ContentType,
+            PayloadFormatIndicator = serializer.PayloadFormat,
+        };
+        return PublishAsync(packet, cancellationToken);
+    }
+
+    /// <summary>
+    /// Registers a typed handler for a route template: payloads are deserialized with the
+    /// configured serializer before the handler runs. Deserialization failures surface through
+    /// <see cref="MqttRouter.HandlerFaulted"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No serializer is configured.</exception>
+    public Task<IDisposable> OnAsync<T>(
+        string template,
+        MqttTypedRouteHandler<T> handler,
+        MqttRouteOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        var serializer = SerializerOrThrow();
+
+        return OnAsync(
+            template,
+            (message, values, token) =>
+                handler(serializer.Deserialize<T>(message.Payload), new MqttRoutedMessage(message, values), token),
+            options,
+            cancellationToken);
+    }
+
+    private IMqttSerializer SerializerOrThrow() =>
+        _options.Serializer
+        ?? throw new InvalidOperationException("Configure a serializer in the options to use typed messaging.");
 
     /// <summary>Streams state transitions. Late subscribers see transitions from subscription onward.</summary>
     public async IAsyncEnumerable<ConnectionStateChanged> WatchState(
