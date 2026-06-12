@@ -44,6 +44,14 @@ public sealed class MqttConnection : IAsyncDisposable
     /// </summary>
     public ChannelReader<MqttPacket> Inbound => _inbound.Reader;
 
+    /// <summary>
+    /// An optional handler invoked on the receive loop for every decoded packet. Return
+    /// <see langword="true"/> to consume the packet without queueing it to <see cref="Inbound"/>
+    /// — one less task hop for latency-sensitive packets like acknowledgements. The handler runs
+    /// on the receive loop, so it must be fast and must not block or send.
+    /// </summary>
+    public Func<MqttPacket, bool>? InboundFilter { get; set; }
+
     /// <summary>Completes when the receive loop has stopped, for orderly shutdown.</summary>
     public Task Completion => _receiveLoop ?? Task.CompletedTask;
 
@@ -121,6 +129,11 @@ public sealed class MqttConnection : IAsyncDisposable
 
                 while (TryDecodePacket(ref buffer, out var packet))
                 {
+                    if (InboundFilter?.Invoke(packet) == true)
+                    {
+                        continue;
+                    }
+
                     await _inbound.Writer.WriteAsync(packet, cancellationToken).ConfigureAwait(false);
                 }
 

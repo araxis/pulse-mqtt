@@ -58,6 +58,18 @@ public sealed class RawMqttClient : IAsyncDisposable
     public ChannelReader<MqttPublishPacket> Messages => _messages.Reader;
 
     /// <summary>
+    /// An optional delivery sink that replaces <see cref="Messages"/>: when set before
+    /// <see cref="ConnectAsync"/>, inbound application messages go straight to it from the inbound
+    /// pump and the <see cref="Messages"/> channel stays empty — one less queue between the wire
+    /// and a consumer that already has its own. The connection's close no longer completes
+    /// anything; observe <see cref="Completion"/> instead.
+    /// </summary>
+    public Func<MqttPublishPacket, CancellationToken, ValueTask>? MessageSink { get; set; }
+
+    /// <summary>Completes when the inbound pump stops — the connection is over, however it ended.</summary>
+    public Task Completion => _pump ?? Task.CompletedTask;
+
+    /// <summary>
     /// Connects the transport, performs the CONNECT/CONNACK handshake, and starts the inbound pump
     /// and keep-alive. A non-success CONNACK is returned to the caller and the connection is closed.
     /// </summary>
@@ -108,6 +120,10 @@ public sealed class RawMqttClient : IAsyncDisposable
 
             _protocolVersion = connect.ProtocolVersion;
             _connection = connection;
+
+            // Acknowledgements complete their waiters on the receive loop itself; only packets
+            // that need queue semantics or trigger sends flow through the pump.
+            connection.InboundFilter = TryHandleInline;
             _pump = Task.Run(() => PumpInboundAsync(connection, _lifetime.Token), CancellationToken.None);
 
             var keepAliveSeconds = connAck.ServerKeepAlive ?? connect.KeepAliveSeconds;
@@ -341,6 +357,29 @@ public sealed class RawMqttClient : IAsyncDisposable
         Volatile.Write(ref _lastSendTimestamp, _time.GetTimestamp());
     }
 
+    // Runs on the connection's receive loop: completes waiters without a queue hop. PUBREL is
+    // excluded because answering it sends a packet, which the receive loop must not do.
+    private bool TryHandleInline(MqttPacket packet)
+    {
+        switch (packet)
+        {
+            case MqttPublishAckPacket { PacketType: not MqttPacketType.PubRel } ack:
+                CompletePending(ack.PacketIdentifier, ack);
+                return true;
+            case MqttSubAckPacket subAck:
+                CompletePending(subAck.PacketIdentifier, subAck);
+                return true;
+            case MqttUnsubAckPacket unsubAck:
+                CompletePending(unsubAck.PacketIdentifier, unsubAck);
+                return true;
+            case MqttPingRespPacket:
+                _pongSignal?.TrySetResult();
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private async Task PumpInboundAsync(MqttConnection connection, CancellationToken cancellationToken)
     {
         try
@@ -366,19 +405,8 @@ public sealed class RawMqttClient : IAsyncDisposable
                                 },
                                 cancellationToken).ConfigureAwait(false);
                             break;
-                        case MqttPublishAckPacket ack:
-                            CompletePending(ack.PacketIdentifier, ack);
-                            break;
-                        case MqttSubAckPacket subAck:
-                            CompletePending(subAck.PacketIdentifier, subAck);
-                            break;
-                        case MqttUnsubAckPacket unsubAck:
-                            CompletePending(unsubAck.PacketIdentifier, unsubAck);
-                            break;
-                        case MqttPingRespPacket:
-                            _pongSignal?.TrySetResult();
-                            break;
                         default:
+                            // Acknowledgements complete inline via the inbound filter;
                             // DISCONNECT/AUTH handling arrives with the resilient layer.
                             break;
                     }
@@ -414,13 +442,13 @@ public sealed class RawMqttClient : IAsyncDisposable
         switch (publish.QualityOfService)
         {
             case MqttQualityOfService.AtMostOnce:
-                await _messages.Writer.WriteAsync(publish, cancellationToken).ConfigureAwait(false);
+                await DeliverAsync(publish, cancellationToken).ConfigureAwait(false);
                 break;
 
             case MqttQualityOfService.AtLeastOnce:
             {
                 var id = RequiredId(publish);
-                await _messages.Writer.WriteAsync(publish, cancellationToken).ConfigureAwait(false);
+                await DeliverAsync(publish, cancellationToken).ConfigureAwait(false);
                 await SendThroughAsync(
                     connection,
                     new MqttPublishAckPacket
@@ -438,7 +466,7 @@ public sealed class RawMqttClient : IAsyncDisposable
                 var id = RequiredId(publish);
                 if (_inboundQos2.Add(id))
                 {
-                    await _messages.Writer.WriteAsync(publish, cancellationToken).ConfigureAwait(false);
+                    await DeliverAsync(publish, cancellationToken).ConfigureAwait(false);
                 }
 
                 await SendThroughAsync(
@@ -458,6 +486,11 @@ public sealed class RawMqttClient : IAsyncDisposable
             publish.PacketIdentifier
             ?? throw new MqttProtocolException("A QoS > 0 PUBLISH must carry a packet identifier.");
     }
+
+    private ValueTask DeliverAsync(MqttPublishPacket publish, CancellationToken cancellationToken) =>
+        MessageSink is { } sink
+            ? sink(publish, cancellationToken)
+            : _messages.Writer.WriteAsync(publish, cancellationToken);
 
     private void CompletePending(ushort id, MqttPacket response)
     {

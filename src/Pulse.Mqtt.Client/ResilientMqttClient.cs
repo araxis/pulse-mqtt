@@ -575,6 +575,11 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                         async token =>
                         {
                             var candidate = new RawMqttClient(_transportFactory, _options.Raw, _time);
+                            candidate.MessageSink = (message, sinkToken) =>
+                            {
+                                PulseMqttDiagnostics.MessagesReceived.Add(1, new KeyValuePair<string, object?>("client.id", _clientId));
+                                return _messages.Writer.WriteAsync(message, sinkToken);
+                            };
                             try
                             {
                                 var ack = await candidate.ConnectAsync(_options.Connect, token).ConfigureAwait(false);
@@ -627,7 +632,14 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 _raw = raw;
                 Transition(ConnectionState.Connected);
 
-                await ForwardSessionMessagesAsync(raw!, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await raw!.Completion.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Shutdown; the loop below observes the token.
+                }
 
                 _raw = null;
                 await raw!.DisposeAsync().ConfigureAwait(false);
@@ -658,29 +670,6 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         catch (Exception error)
         {
             Fault(error);
-        }
-    }
-
-    private async Task ForwardSessionMessagesAsync(RawMqttClient raw, CancellationToken cancellationToken)
-    {
-        try
-        {
-            while (await raw.Messages.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                while (raw.Messages.TryRead(out var message))
-                {
-                    PulseMqttDiagnostics.MessagesReceived.Add(1, new KeyValuePair<string, object?>("client.id", _clientId));
-                    await _messages.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Shutdown; the supervisor loop observes the token.
-        }
-        catch (ChannelClosedException)
-        {
-            // The session faulted; the supervisor reconnects.
         }
     }
 
