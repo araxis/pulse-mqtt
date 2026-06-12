@@ -6,7 +6,7 @@
     <IsAotCompatible>true</IsAotCompatible>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>Pulse.Mqtt.DependencyInjection</PackageId>
-    <Description>Dependency-injection integration for Pulse: AddMqttClient, named clients, options binding.</Description>
+    <Description>Dependency-injection integration for the Pulse MQTT client: AddPulseMqttClient, named clients, options binding, hosted lifecycle, and health checks.</Description>
   </PropertyGroup>
 
   <ItemGroup>
