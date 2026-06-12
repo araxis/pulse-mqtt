@@ -37,6 +37,7 @@ export default defineConfig({
             { text: 'Routing', link: '/guide/routing' },
             { text: 'Typed messaging', link: '/guide/typed-messaging' },
             { text: 'Request and response', link: '/guide/request-response' },
+            { text: 'Fluent API', link: '/guide/fluent-api' },
           ],
         },
         {

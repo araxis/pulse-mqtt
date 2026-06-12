@@ -88,6 +88,22 @@ await client.OnRequestAsync<StatusQuery, StatusReply>("devices/{id}/status",
     (query, msg, ct) => ValueTask.FromResult(BuildStatus(msg.Values["id"])));
 ```
 
+### Or do it all fluently
+
+```csharp
+await using var client = await new PulseMqttClientBuilder()
+    .WithTcp("broker.example.com", 8883, useTls: true)
+    .WithClientId("service-1")
+    .WithSerializer(new JsonMqttSerializer(AppJsonContext.Default))
+    .BuildAndStartAsync(ct);
+
+await client.Publish("telemetry/1").AtLeastOnce().WithRetain()
+    .WithPayload(new Reading("dev-1", 21.5)).SendAsync(ct);
+
+using var route = await client.Route("sensors/{deviceId}/temp")
+    .WithConcurrency(4).HandleAsync<Reading>((reading, msg, ct) => Handle(reading));
+```
+
 ### Test without a broker
 
 ```csharp
