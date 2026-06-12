@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 (unreleased)
+## 0.3.0
 
 - Broker-initiated DISCONNECT handling: the reason code, reason string, and server reference
   surface through `MqttServerDisconnectedException`, the state stream, the lifecycle
