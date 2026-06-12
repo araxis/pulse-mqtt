@@ -486,7 +486,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         }
     }
 
-    private IMqttSerializer SerializerOrThrow() =>
+    internal IMqttSerializer SerializerOrThrow() =>
         _options.Serializer
         ?? throw new InvalidOperationException("Configure a serializer in the options to use typed messaging.");
 
