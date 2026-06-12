@@ -6,6 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Runtime (provided in-box on modern TFMs; referenced for net8.0) -->
+    <PackageVersion Include="System.IO.Pipelines" Version="9.0.0" />
+
     <!-- Extensions (used from later phases; pinned centrally now) -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />

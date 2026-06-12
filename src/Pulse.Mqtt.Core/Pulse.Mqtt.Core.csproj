@@ -9,4 +9,8 @@
     <Description>Core protocol model, codec, and swappable abstractions for the Pulse MQTT client.</Description>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="System.IO.Pipelines" />
+  </ItemGroup>
+
 </Project>
