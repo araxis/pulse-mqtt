@@ -108,15 +108,21 @@ static async Task ThroughputPassAsync()
         {
             for (var sent = 0; sent < total; sent += window)
             {
-                await Task.WhenAll(Enumerable.Range(0, window).Select(_ =>
-                    client.PublishAsync(
+                await Task.WhenAll(Enumerable.Range(0, window).Select(async _ =>
+                {
+                    var outcome = await client.PublishAsync(
                         new MqttPublishPacket
                         {
                             Topic = "bench/tp/pulse",
                             Payload = payload,
                             QualityOfService = MqttQualityOfService.AtLeastOnce,
                         },
-                        CancellationToken.None)));
+                        CancellationToken.None);
+                    if (outcome.Disposition != PublishDisposition.Delivered)
+                    {
+                        throw new InvalidOperationException($"Publish was {outcome.Disposition}, not delivered.");
+                    }
+                }));
             }
         });
         Report("Pulse.Mqtt", total, elapsed, allocated, collections);
