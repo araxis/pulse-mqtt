@@ -16,6 +16,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Pulse.Mqtt.Client.Tests/Pulse.Mqtt.Client.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Core.Tests/Pulse.Mqtt.Core.Tests.csproj" />
+    <Project Path="tests/Pulse.Mqtt.DependencyInjection.Tests/Pulse.Mqtt.DependencyInjection.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.IntegrationTests/Pulse.Mqtt.IntegrationTests.csproj" />
   </Folder>
 </Solution>
