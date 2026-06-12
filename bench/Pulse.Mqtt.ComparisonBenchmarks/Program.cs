@@ -55,7 +55,7 @@ static async Task ConnectLatencyPassAsync()
         await client.StartAsync(CancellationToken.None);
         while (client.State != ConnectionState.Connected)
         {
-            await Task.Delay(1);
+            await Task.Yield();
         }
 
         pulse.Add(sw.Elapsed.TotalMilliseconds);
@@ -101,7 +101,7 @@ static async Task ThroughputPassAsync()
         await client.StartAsync(CancellationToken.None);
         while (client.State != ConnectionState.Connected)
         {
-            await Task.Delay(1);
+            await Task.Yield();
         }
 
         var (elapsed, allocated, collections) = await MeasureAsync(async () =>
@@ -128,13 +128,19 @@ static async Task ThroughputPassAsync()
         Report("Pulse.Mqtt", total, elapsed, allocated, collections);
     }
 
-    // MQTTnet
+    // MQTTnet, with its default packet fragmentation and with single-write packets.
+    foreach (var (label, fragmented) in new[] { ("MQTTnet", true), ("MQTTnet nf", false) })
     {
-        using var client = new MqttClientFactory().CreateMqttClient();
-        await client.ConnectAsync(new MqttClientOptionsBuilder()
+        var builder = new MqttClientOptionsBuilder()
             .WithTcpServer(Broker.Host, Broker.Port)
-            .WithClientId("net-tp")
-            .Build());
+            .WithClientId($"net-tp-{(fragmented ? "frag" : "single")}");
+        if (!fragmented)
+        {
+            builder = builder.WithoutPacketFragmentation();
+        }
+
+        using var client = new MqttClientFactory().CreateMqttClient();
+        await client.ConnectAsync(builder.Build());
 
         var (elapsed, allocated, collections) = await MeasureAsync(async () =>
         {
@@ -148,7 +154,7 @@ static async Task ThroughputPassAsync()
                         .Build())));
             }
         });
-        Report("MQTTnet", total, elapsed, allocated, collections);
+        Report(label, total, elapsed, allocated, collections);
     }
 }
 

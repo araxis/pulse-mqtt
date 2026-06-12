@@ -23,8 +23,12 @@ public class RoundTripBenchmarks
     private static volatile TaskCompletionSource? _pulseReceived;
     private static volatile TaskCompletionSource? _mqttNetReceived;
 
+    // InProcessEmit jits the workload immediately after invoking setup without awaiting an async
+    // one, so initialization must block until both clients are connected.
     [GlobalSetup]
-    public async Task Setup()
+    public void Setup() => SetupAsync().GetAwaiter().GetResult();
+
+    private static async Task SetupAsync()
     {
         await InitGate.WaitAsync();
         try
@@ -47,7 +51,7 @@ public class RoundTripBenchmarks
             await pulse.StartAsync(CancellationToken.None);
             while (pulse.State != ConnectionState.Connected)
             {
-                await Task.Delay(1);
+                await Task.Yield();
             }
 
             await pulse.SubscribeAsync([new MqttTopicFilter("bench/rt/pulse")], CancellationToken.None);
@@ -65,10 +69,13 @@ public class RoundTripBenchmarks
                 _mqttNetReceived?.TrySetResult();
                 return Task.CompletedTask;
             };
+            // Fragmented packets (the default) cost a Nagle round trip per publish on proxied
+            // loopback; a single write per packet matches what the Pulse transport does.
             await mqttNet.ConnectAsync(new MqttClientOptionsBuilder()
                 .WithTcpServer(Broker.Host, Broker.Port)
                 .WithClientId($"net-bench-{Guid.NewGuid():N}")
                 .WithKeepAlivePeriod(TimeSpan.FromSeconds(60))
+                .WithoutPacketFragmentation()
                 .Build());
             await mqttNet.SubscribeAsync(new MqttClientSubscribeOptionsBuilder()
                 .WithTopicFilter(f => f.WithTopic("bench/rt/net").WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtMostOnce))
