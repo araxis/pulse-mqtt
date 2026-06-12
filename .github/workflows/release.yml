@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Resolve version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: dotnet build -c Release -p:Version=$VERSION -p:ContinuousIntegrationBuild=true
+
+      - name: Test
+        run: dotnet test -c Release --no-build --logger "console;verbosity=minimal"
+
+      - name: Pack
+        run: dotnet pack -c Release --no-build -p:Version=$VERSION -o packages
+
+      - name: Push to NuGet
+        run: >
+          dotnet nuget push "packages/*.nupkg"
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+      - name: Extract release notes from the changelog
+        run: |
+          awk -v version="$VERSION" '
+            $0 ~ "^## " version "($| )" { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No changelog section for $VERSION; using the heading only." >&2
+            echo "Release $VERSION." > release-notes.md
+          fi
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          packages/*.nupkg
+          --title "$GITHUB_REF_NAME"
+          --notes-file release-notes.md
