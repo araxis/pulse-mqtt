@@ -1,0 +1,25 @@
+using Microsoft.Extensions.Logging;
+using Pulse.Mqtt.Resilience;
+
+namespace Pulse.Mqtt.Client;
+
+/// <summary>Source-generated log messages for the resilient client. Allocation-free when disabled.</summary>
+internal static partial class PulseMqttLog
+{
+    [LoggerMessage(EventId = 1, Level = LogLevel.Information,
+        Message = "MQTT client {ClientId} state {Previous} -> {Current} (attempt {Attempt})")]
+    public static partial void StateChanged(
+        ILogger logger, string clientId, ConnectionState previous, ConnectionState current, int attempt);
+
+    [LoggerMessage(EventId = 2, Level = LogLevel.Warning,
+        Message = "MQTT client {ClientId} connect attempt {Attempt} failed")]
+    public static partial void ConnectAttemptFailed(ILogger logger, string clientId, int attempt, Exception error);
+
+    [LoggerMessage(EventId = 3, Level = LogLevel.Information,
+        Message = "MQTT client {ClientId} lost its connection")]
+    public static partial void ConnectionLost(ILogger logger, string clientId);
+
+    [LoggerMessage(EventId = 4, Level = LogLevel.Error,
+        Message = "MQTT route {Template} handler failed")]
+    public static partial void RouteHandlerFaulted(ILogger logger, string template, Exception error);
+}

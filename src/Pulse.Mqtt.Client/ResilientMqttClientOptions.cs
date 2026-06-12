@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Pulse.Mqtt.Connection;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Resilience;
@@ -44,4 +45,7 @@ public sealed record ResilientMqttClientOptions
     /// typed messaging throws until one is configured (for example the JSON serializer add-on).
     /// </summary>
     public IMqttSerializer? Serializer { get; init; }
+
+    /// <summary>Receives the client's structured logs. <see langword="null"/> (the default) is silent.</summary>
+    public ILogger? Logger { get; init; }
 }

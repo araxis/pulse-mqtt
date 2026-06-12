@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
 using Pulse.Mqtt.Connection;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
@@ -32,6 +34,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     private readonly object _subscriptionGate = new();
 
     private readonly Lazy<MqttRouter> _router;
+    private readonly string _clientId;
     private CancellationTokenSource? _lifetime;
     private Task? _supervisor;
     private volatile RawMqttClient? _raw;
@@ -64,10 +67,16 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             FullMode = BoundedChannelFullMode.Wait,
         });
 
+        _clientId = options.Connect.ClientId;
         _router = new Lazy<MqttRouter>(
             () =>
             {
                 var router = new MqttRouter(_messages.Reader);
+                if (options.Logger is { } logger)
+                {
+                    router.HandlerFaulted += (template, error) => PulseMqttLog.RouteHandlerFaulted(logger, template, error);
+                }
+
                 router.Start();
                 return router;
             },
@@ -129,6 +138,27 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(packet);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        using var activity = PulseMqttDiagnostics.ActivitySource.StartActivity("publish", ActivityKind.Producer);
+        if (activity is not null)
+        {
+            activity.DisplayName = $"publish {packet.Topic}";
+            activity.SetTag("messaging.system", "mqtt");
+            activity.SetTag("messaging.destination.name", packet.Topic);
+            activity.SetTag("messaging.operation.type", "send");
+        }
+
+        var outcome = await PublishCoreAsync(packet, cancellationToken).ConfigureAwait(false);
+
+        activity?.SetTag("pulse.mqtt.disposition", outcome.Disposition.ToString());
+        PulseMqttDiagnostics.MessagesPublished.Add(
+            1,
+            new KeyValuePair<string, object?>("client.id", _clientId),
+            new KeyValuePair<string, object?>("disposition", outcome.Disposition.ToString()));
+        return outcome;
+    }
+
+    private async Task<PublishOutcome> PublishCoreAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
+    {
         if (_raw is { } raw)
         {
             try
@@ -465,6 +495,11 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                     break;
                 }
 
+                if (_options.Logger is { } logger)
+                {
+                    PulseMqttLog.ConnectionLost(logger, _clientId);
+                }
+
                 _attempt++;
                 try
                 {
@@ -492,6 +527,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             {
                 while (raw.Messages.TryRead(out var message))
                 {
+                    PulseMqttDiagnostics.MessagesReceived.Add(1, new KeyValuePair<string, object?>("client.id", _clientId));
                     await _messages.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false);
                 }
             }
@@ -532,6 +568,16 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             watchers = [.. _watchers];
         }
 
+        if (_options.Logger is { } logger)
+        {
+            PulseMqttLog.StateChanged(logger, _clientId, changed.Previous, changed.Current, changed.Attempt);
+        }
+
+        PulseMqttDiagnostics.StateTransitions.Add(
+            1,
+            new KeyValuePair<string, object?>("client.id", _clientId),
+            new KeyValuePair<string, object?>("state", next.ToString()));
+
         StateChanged?.Invoke(changed);
         foreach (var watcher in watchers)
         {
@@ -548,6 +594,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         public void OnAttemptStarting(int attempt)
         {
             Attempt = attempt;
+            PulseMqttDiagnostics.ConnectAttempts.Add(1, new KeyValuePair<string, object?>("client.id", client._clientId));
             if (attempt > 1)
             {
                 client.Transition(client._attempt == 0 ? ConnectionState.Connecting : ConnectionState.Reconnecting);
@@ -556,6 +603,11 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
         public void OnAttemptFailed(int attempt, Exception error)
         {
+            if (client._options.Logger is { } logger)
+            {
+                PulseMqttLog.ConnectAttemptFailed(logger, client._clientId, attempt, error);
+            }
+
             var reason = (error as MqttConnectRejectedException)?.ReasonCode;
             client.Transition(ConnectionState.WaitingRetry, reason);
         }
