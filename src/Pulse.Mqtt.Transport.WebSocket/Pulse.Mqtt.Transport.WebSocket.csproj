@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Pulse.Mqtt.Transport.WebSocket</PackageId>
+    <Description>MQTT-over-WebSocket transport for the Pulse MQTT client.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pulse.Mqtt.Core\Pulse.Mqtt.Core.csproj" />
+  </ItemGroup>
+
+</Project>
