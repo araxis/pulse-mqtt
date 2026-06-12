@@ -75,6 +75,7 @@ export default defineConfig({
         {
           text: 'Project',
           items: [
+            { text: 'Road to 1.0', link: '/road-to-1.0' },
             { text: 'Benchmark suite', link: '/Benchmark-Suite' },
             { text: 'MQTTnet comparison', link: '/Benchmark-vs-MQTTnet' },
             { text: 'Development plan', link: '/NG-MQTT-Client-Development-Plan' },
