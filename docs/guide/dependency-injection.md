@@ -111,6 +111,6 @@ builder.Services.AddPulseMqttClient("devices", configure)
     .AddHealthCheck();
 ```
 
-Registers a check named after the client reporting `Healthy` (connected), `Degraded`
-(connecting, reconnecting, waiting to retry), or `Unhealthy` (disconnected, stopped, faulted) —
-ready for `MapHealthChecks` and orchestrator probes.
+Registers a check named `pulse-mqtt-<name>` that maps the connection state to `Healthy` /
+`Degraded` / `Unhealthy`. The full mapping, liveness-vs-readiness split, and custom checks are
+in [Health checks](./health-checks).

@@ -46,6 +46,7 @@ export default defineConfig({
             { text: 'Resilience', link: '/guide/resilience' },
             { text: 'Lifecycle and state', link: '/guide/lifecycle' },
             { text: 'Dependency injection', link: '/guide/dependency-injection' },
+            { text: 'Health checks', link: '/guide/health-checks' },
             { text: 'Observability', link: '/guide/observability' },
             { text: 'Testing', link: '/guide/testing' },
           ],
