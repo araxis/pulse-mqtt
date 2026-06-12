@@ -4,6 +4,7 @@ using Pulse.Mqtt.Connection;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Resilience;
+using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Transport;
 
 namespace Pulse.Mqtt.Client;
@@ -29,6 +30,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     private readonly object _stateGate = new();
     private readonly object _subscriptionGate = new();
 
+    private readonly Lazy<MqttRouter> _router;
     private CancellationTokenSource? _lifetime;
     private Task? _supervisor;
     private volatile RawMqttClient? _raw;
@@ -60,6 +62,15 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             SingleReader = false,
             FullMode = BoundedChannelFullMode.Wait,
         });
+
+        _router = new Lazy<MqttRouter>(
+            () =>
+            {
+                var router = new MqttRouter(_messages.Reader);
+                router.Start();
+                return router;
+            },
+            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     /// <summary>The current connection state.</summary>
@@ -70,9 +81,16 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     /// <summary>
     /// Received application messages across all sessions, in arrival order. Completes only when
-    /// the client is disposed.
+    /// the client is disposed. Use either this reader or <see cref="Router"/> — once the router is
+    /// created it owns consumption of the stream.
     /// </summary>
     public ChannelReader<MqttPublishPacket> Messages => _messages.Reader;
+
+    /// <summary>
+    /// The topic router over <see cref="Messages"/>. Created (and started) on first access; from
+    /// then on the router owns the message stream — do not also read <see cref="Messages"/> directly.
+    /// </summary>
+    public MqttRouter Router => _router.Value;
 
     /// <summary>Starts the supervisor. Connection happens in the background; watch <see cref="State"/>.</summary>
     /// <exception cref="InvalidOperationException">The client is already running.</exception>
@@ -207,6 +225,44 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         return [];
     }
 
+    /// <summary>
+    /// Registers a handler for a route template (for example <c>sensors/{deviceId}/temp</c>) and
+    /// subscribes to the template's topic filter. Dispose the registration to remove the route;
+    /// the subscription stays until <see cref="UnsubscribeAsync"/>.
+    /// </summary>
+    public async Task<IDisposable> OnAsync(
+        string template,
+        MqttRouteHandler handler,
+        MqttRouteOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var parsed = MqttRouteTemplate.Parse(template);
+        var registration = Router.On(parsed, handler, options);
+        await SubscribeToTemplateAsync(parsed, options, cancellationToken).ConfigureAwait(false);
+        return registration;
+    }
+
+    /// <summary>Opens an <c>await foreach</c>-able stream for a route template and subscribes to its filter.</summary>
+    public async Task<MqttRouteStream> OpenStreamAsync(
+        string template,
+        MqttRouteOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var parsed = MqttRouteTemplate.Parse(template);
+        var stream = Router.OpenStream(parsed, options);
+        await SubscribeToTemplateAsync(parsed, options, cancellationToken).ConfigureAwait(false);
+        return stream;
+    }
+
+    private Task SubscribeToTemplateAsync(MqttRouteTemplate template, MqttRouteOptions? options, CancellationToken cancellationToken)
+    {
+        var filter = new MqttTopicFilter(template.TopicFilter)
+        {
+            MaximumQualityOfService = (options ?? new MqttRouteOptions()).SubscriptionQualityOfService,
+        };
+        return SubscribeAsync([filter], cancellationToken);
+    }
+
     /// <summary>Streams state transitions. Late subscribers see transitions from subscription onward.</summary>
     public async IAsyncEnumerable<ConnectionStateChanged> WatchState(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -267,6 +323,11 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         _disposed = true;
         await StopAsync(CancellationToken.None).ConfigureAwait(false);
         _messages.Writer.TryComplete();
+        if (_router.IsValueCreated)
+        {
+            await _router.Value.DisposeAsync().ConfigureAwait(false);
+        }
+
         _lifetime?.Dispose();
     }
 
