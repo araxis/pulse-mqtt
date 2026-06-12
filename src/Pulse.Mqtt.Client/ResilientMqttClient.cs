@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Pulse.Mqtt.Connection;
@@ -35,6 +37,9 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     private readonly Lazy<MqttRouter> _router;
     private readonly string _clientId;
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<MqttPublishPacket>> _pendingRequests = new();
+    private readonly object _rpcGate = new();
+    private Task? _rpcRoute;
     private CancellationTokenSource? _lifetime;
     private Task? _supervisor;
     private volatile RawMqttClient? _raw;
@@ -342,6 +347,144 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 handler(serializer.Deserialize<T>(message.Payload), new MqttRoutedMessage(message, values), token),
             options,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Sends a request and awaits the matching response. The client assigns the response topic
+    /// (<c>pulse-rpc/&lt;clientId&gt;/&lt;correlation&gt;</c>) and correlation data; the responder must
+    /// publish its answer to the request's response topic.
+    /// </summary>
+    /// <exception cref="MqttException">The client is offline, or no response arrived in time.</exception>
+    public async Task<MqttPublishPacket> RequestAsync(
+        MqttPublishPacket request,
+        MqttRequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.ResponseTopic is not null || request.CorrelationData is not null)
+        {
+            throw new ArgumentException("The client assigns the response topic and correlation data.", nameof(request));
+        }
+
+        var requestOptions = options ?? new MqttRequestOptions();
+        await EnsureResponseRouteAsync(cancellationToken).ConfigureAwait(false);
+
+        var correlation = Guid.NewGuid().ToString("N");
+        var pending = new TaskCompletionSource<MqttPublishPacket>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingRequests[correlation] = pending;
+
+        try
+        {
+            var outgoing = request with
+            {
+                QualityOfService = requestOptions.QualityOfService,
+                ResponseTopic = $"pulse-rpc/{_clientId}/{correlation}",
+                CorrelationData = Encoding.UTF8.GetBytes(correlation),
+            };
+
+            var outcome = await PublishAsync(outgoing, cancellationToken).ConfigureAwait(false);
+            if (outcome.Disposition != PublishDisposition.Delivered)
+            {
+                throw new MqttException("The request could not be delivered: the client is offline.");
+            }
+
+            try
+            {
+                return await pending.Task
+                    .WaitAsync(requestOptions.Timeout, _time, cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                throw new MqttException($"No response arrived within {requestOptions.Timeout}.");
+            }
+        }
+        finally
+        {
+            _pendingRequests.TryRemove(correlation, out _);
+        }
+    }
+
+    /// <summary>Sends a typed request and returns the typed response, using the configured serializer.</summary>
+    public async Task<TResponse> RequestAsync<TRequest, TResponse>(
+        string topic,
+        TRequest request,
+        MqttRequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(topic);
+        var serializer = SerializerOrThrow();
+
+        var packet = new MqttPublishPacket
+        {
+            Topic = topic,
+            Payload = serializer.Serialize(request),
+            ContentType = serializer.ContentType,
+            PayloadFormatIndicator = serializer.PayloadFormat,
+        };
+
+        var response = await RequestAsync(packet, options, cancellationToken).ConfigureAwait(false);
+        return serializer.Deserialize<TResponse>(response.Payload);
+    }
+
+    /// <summary>
+    /// Registers a typed responder for a route template: each request is deserialized, handled,
+    /// and the response published to the request's response topic with its correlation data
+    /// echoed. Requests without a response topic are ignored.
+    /// </summary>
+    public Task<IDisposable> OnRequestAsync<TRequest, TResponse>(
+        string template,
+        Func<TRequest, MqttRoutedMessage, CancellationToken, ValueTask<TResponse>> handler,
+        MqttRouteOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        var serializer = SerializerOrThrow();
+
+        return OnAsync(
+            template,
+            async (message, values, token) =>
+            {
+                if (message.ResponseTopic is not { } responseTopic)
+                {
+                    return;
+                }
+
+                var request = serializer.Deserialize<TRequest>(message.Payload);
+                var response = await handler(request, new MqttRoutedMessage(message, values), token).ConfigureAwait(false);
+
+                var reply = new MqttPublishPacket
+                {
+                    Topic = responseTopic,
+                    Payload = serializer.Serialize(response),
+                    QualityOfService = message.QualityOfService,
+                    ContentType = serializer.ContentType,
+                    PayloadFormatIndicator = serializer.PayloadFormat,
+                    CorrelationData = message.CorrelationData,
+                };
+                await PublishAsync(reply, token).ConfigureAwait(false);
+            },
+            options,
+            cancellationToken);
+    }
+
+    private Task EnsureResponseRouteAsync(CancellationToken cancellationToken)
+    {
+        lock (_rpcGate)
+        {
+            _rpcRoute ??= OnAsync(
+                $"pulse-rpc/{_clientId}/{{correlation}}",
+                (message, values, _) =>
+                {
+                    if (_pendingRequests.TryGetValue(values["correlation"], out var pending))
+                    {
+                        pending.TrySetResult(message);
+                    }
+
+                    return ValueTask.CompletedTask;
+                },
+                cancellationToken: cancellationToken);
+            return _rpcRoute;
+        }
     }
 
     private IMqttSerializer SerializerOrThrow() =>
