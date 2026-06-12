@@ -7,10 +7,14 @@ How this repository ships.
 - **CI** (`.github/workflows/ci.yml`): every push and pull request to `main` builds the
   solution, runs all test projects (the integration tests start Mosquitto in Docker on the
   runner), and uploads the packages as a build artifact.
-- **Release** (`.github/workflows/release.yml`): pushing a tag that starts with `v` builds,
-  tests, packs every packable project with the tag's version, pushes the packages to
-  nuget.org, and creates a GitHub release whose notes come from the matching `CHANGELOG.md`
-  section, with the packages attached.
+- **Release** (`.github/workflows/release.yml`) publishes in two modes:
+  - **Stable** — pushing a tag that starts with `v` builds, tests, packs every packable
+    project with the tag's version, pushes to nuget.org, and creates a GitHub release whose
+    notes come from the matching `CHANGELOG.md` section, with the packages attached.
+  - **Prerelease** — every push to `main` publishes `X.Y.Z-preview.<run-number>` (the
+    `X.Y.Z` from `VersionPrefix` in `Directory.Build.props`) to nuget.org, with no GitHub
+    release. Prereleases are excluded from `dotnet add package` by default, so consumers keep
+    getting the last stable version unless they opt in with `--prerelease`.
 
 ## One-time setup
 
@@ -48,6 +52,9 @@ it from the nuget.org UI.
 
 The workflow does the rest. `--skip-duplicate` makes re-running safe: versions already on
 nuget.org are left alone.
+
+Between stable releases, each merge to `main` ships a `-preview.<run>` build automatically, so
+there is always a fresh package to test against without burning a stable version number.
 
 ## Versioning
 
