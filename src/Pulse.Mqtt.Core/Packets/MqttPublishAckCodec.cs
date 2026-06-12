@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using Pulse.Mqtt.Buffers;
 using Pulse.Mqtt.Codec;
 using Pulse.Mqtt.Protocol;
@@ -20,28 +21,36 @@ public static class MqttPublishAckCodec
             throw new ArgumentException($"{packet.PacketType} is not a publish acknowledgement.", nameof(packet));
         }
 
+        var flags = packet.PacketType == MqttPacketType.PubRel ? (byte)0x02 : (byte)0x00;
+        var isV5 = packet.ProtocolVersion == MqttProtocolVersion.V500;
+        var hasProperties = isV5 && (packet.ReasonString is not null || packet.UserProperties.Count > 0);
+
+        // The dominant shape — no properties — is two or three bytes; write it directly.
+        // The reason code and properties may be omitted when the result is Success with no properties.
+        if (!hasProperties)
+        {
+            var withReason = isV5 && packet.ReasonCode != MqttReasonCode.Success;
+            var remaining = withReason ? 3 : 2;
+            MqttFrameWriter.WriteHeader(output, new MqttFixedHeader(packet.PacketType, flags, remaining));
+
+            var span = output.GetSpan(remaining);
+            BinaryPrimitives.WriteUInt16BigEndian(span, packet.PacketIdentifier);
+            if (withReason)
+            {
+                span[2] = (byte)packet.ReasonCode;
+            }
+
+            output.Advance(remaining);
+            return;
+        }
+
         using var body = new PooledBufferWriter();
         var writer = new MqttBufferWriter(body);
 
         writer.WriteUInt16(packet.PacketIdentifier);
+        writer.WriteByte((byte)packet.ReasonCode);
+        WriteProperties(body, packet);
 
-        if (packet.ProtocolVersion == MqttProtocolVersion.V500)
-        {
-            var hasProperties = packet.ReasonString is not null || packet.UserProperties.Count > 0;
-
-            // The reason code and properties may be omitted when the result is Success with no properties.
-            if (packet.ReasonCode != MqttReasonCode.Success || hasProperties)
-            {
-                writer.WriteByte((byte)packet.ReasonCode);
-
-                if (hasProperties)
-                {
-                    WriteProperties(body, packet);
-                }
-            }
-        }
-
-        var flags = packet.PacketType == MqttPacketType.PubRel ? (byte)0x02 : (byte)0x00;
         MqttFrameWriter.WriteHeader(output, new MqttFixedHeader(packet.PacketType, flags, body.WrittenCount));
         var destination = output.GetSpan(body.WrittenCount);
         body.WrittenSpan.CopyTo(destination);
@@ -62,7 +71,7 @@ public static class MqttPublishAckCodec
 
         var reasonCode = MqttReasonCode.Success;
         string? reasonString = null;
-        var userProperties = new List<MqttUserProperty>();
+        List<MqttUserProperty>? userProperties = null;
 
         if (version == MqttProtocolVersion.V500 && reader.Remaining > 0)
         {
@@ -83,7 +92,7 @@ public static class MqttPublishAckCodec
                             break;
                         case MqttPropertyId.UserProperty:
                             var (name, value) = properties.ReadStringPair();
-                            userProperties.Add(new MqttUserProperty(name, value));
+                            (userProperties ??= []).Add(new MqttUserProperty(name, value));
                             break;
                         default:
                             throw new MqttProtocolException($"Property {id} is not valid in {header.PacketType}.");
@@ -99,9 +108,11 @@ public static class MqttPublishAckCodec
             ReasonCode = reasonCode,
             ProtocolVersion = version,
             ReasonString = reasonString,
-            UserProperties = userProperties,
+            UserProperties = userProperties ?? (IReadOnlyList<MqttUserProperty>)NoUserProperties,
         };
     }
+
+    private static readonly MqttUserProperty[] NoUserProperties = [];
 
     private static bool IsAckType(MqttPacketType packetType) => packetType
         is MqttPacketType.PubAck
