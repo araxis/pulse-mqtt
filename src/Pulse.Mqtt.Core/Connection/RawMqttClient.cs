@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Threading.Channels;
+using Pulse.Mqtt.Codec;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Transport;
@@ -6,9 +8,10 @@ using Pulse.Mqtt.Transport;
 namespace Pulse.Mqtt.Connection;
 
 /// <summary>
-/// A non-resilient MQTT client: one connection, the CONNECT/CONNACK handshake, and protocol
-/// keep-alive. Received application messages surface on <see cref="Messages"/>. Reconnection,
-/// re-subscription, and offline queueing live in the resilient layer built on top of this type.
+/// A non-resilient MQTT client: one connection, the CONNECT/CONNACK handshake, protocol keep-alive,
+/// QoS 0/1/2 publishing, and subscriptions. Received application messages surface on
+/// <see cref="Messages"/>. Reconnection, re-subscription, and offline queueing live in the
+/// resilient layer built on top of this type.
 /// </summary>
 public sealed class RawMqttClient : IAsyncDisposable
 {
@@ -17,6 +20,9 @@ public sealed class RawMqttClient : IAsyncDisposable
     private readonly TimeProvider _time;
     private readonly Channel<MqttPublishPacket> _messages;
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly ConcurrentDictionary<ushort, TaskCompletionSource<MqttPacket>> _pending = new();
+    private readonly MqttPacketIdAllocator _packetIds = new();
+    private readonly HashSet<ushort> _inboundQos2 = []; // touched only by the single-threaded pump
 
     private MqttConnection? _connection;
     private MqttProtocolVersion _protocolVersion = MqttProtocolVersion.V500;
@@ -120,6 +126,125 @@ public sealed class RawMqttClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Publishes a message at its declared QoS and returns the broker's result. The client assigns
+    /// the packet identifier; QoS 0 always returns <see cref="MqttReasonCode.Success"/>.
+    /// </summary>
+    /// <exception cref="MqttException">The broker did not acknowledge in time or the connection closed.</exception>
+    public async Task<MqttReasonCode> PublishAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(packet);
+        if (packet.PacketIdentifier is not null)
+        {
+            throw new ArgumentException("The client assigns packet identifiers.", nameof(packet));
+        }
+
+        var connection = ConnectedOrThrow();
+        packet = packet with { ProtocolVersion = _protocolVersion };
+
+        if (packet.QualityOfService == MqttQualityOfService.AtMostOnce)
+        {
+            await SendThroughAsync(connection, packet, cancellationToken).ConfigureAwait(false);
+            return MqttReasonCode.Success;
+        }
+
+        var id = _packetIds.Rent();
+        try
+        {
+            packet = packet with { PacketIdentifier = id };
+
+            if (packet.QualityOfService == MqttQualityOfService.AtLeastOnce)
+            {
+                var response = await RequestAsync(connection, packet, id, cancellationToken).ConfigureAwait(false);
+                return response is MqttPublishAckPacket { PacketType: MqttPacketType.PubAck } pubAck
+                    ? pubAck.ReasonCode
+                    : throw new MqttProtocolException($"Expected a PUBACK for {id} but received {response.GetType().Name}.");
+            }
+
+            var first = await RequestAsync(connection, packet, id, cancellationToken).ConfigureAwait(false);
+            if (first is not MqttPublishAckPacket { PacketType: MqttPacketType.PubRec } pubRec)
+            {
+                throw new MqttProtocolException($"Expected a PUBREC for {id} but received {first.GetType().Name}.");
+            }
+
+            if ((byte)pubRec.ReasonCode >= 0x80)
+            {
+                return pubRec.ReasonCode;
+            }
+
+            var release = new MqttPublishAckPacket
+            {
+                PacketType = MqttPacketType.PubRel,
+                PacketIdentifier = id,
+                ProtocolVersion = _protocolVersion,
+            };
+            var second = await RequestAsync(connection, release, id, cancellationToken).ConfigureAwait(false);
+            return second is MqttPublishAckPacket { PacketType: MqttPacketType.PubComp } pubComp
+                ? pubComp.ReasonCode
+                : throw new MqttProtocolException($"Expected a PUBCOMP for {id} but received {second.GetType().Name}.");
+        }
+        finally
+        {
+            _packetIds.Return(id);
+        }
+    }
+
+    /// <summary>Subscribes to one or more topic filters and returns the broker's per-filter results.</summary>
+    public async Task<IReadOnlyList<MqttReasonCode>> SubscribeAsync(
+        IReadOnlyList<MqttTopicFilter> topicFilters,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(topicFilters);
+        var connection = ConnectedOrThrow();
+
+        var id = _packetIds.Rent();
+        try
+        {
+            var subscribe = new MqttSubscribePacket
+            {
+                PacketIdentifier = id,
+                TopicFilters = topicFilters,
+                ProtocolVersion = _protocolVersion,
+            };
+            var response = await RequestAsync(connection, subscribe, id, cancellationToken).ConfigureAwait(false);
+            return response is MqttSubAckPacket subAck
+                ? subAck.ReasonCodes
+                : throw new MqttProtocolException($"Expected a SUBACK for {id} but received {response.GetType().Name}.");
+        }
+        finally
+        {
+            _packetIds.Return(id);
+        }
+    }
+
+    /// <summary>Removes one or more subscriptions. The result list is empty for MQTT 3.1.1.</summary>
+    public async Task<IReadOnlyList<MqttReasonCode>> UnsubscribeAsync(
+        IReadOnlyList<string> topicFilters,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(topicFilters);
+        var connection = ConnectedOrThrow();
+
+        var id = _packetIds.Rent();
+        try
+        {
+            var unsubscribe = new MqttUnsubscribePacket
+            {
+                PacketIdentifier = id,
+                TopicFilters = topicFilters,
+                ProtocolVersion = _protocolVersion,
+            };
+            var response = await RequestAsync(connection, unsubscribe, id, cancellationToken).ConfigureAwait(false);
+            return response is MqttUnsubAckPacket unsubAck
+                ? unsubAck.ReasonCodes
+                : throw new MqttProtocolException($"Expected an UNSUBACK for {id} but received {response.GetType().Name}.");
+        }
+        finally
+        {
+            _packetIds.Return(id);
+        }
+    }
+
     /// <summary>Sends a DISCONNECT (best effort) and tears the client down.</summary>
     public async Task DisconnectAsync(CancellationToken cancellationToken)
     {
@@ -168,7 +293,46 @@ public sealed class RawMqttClient : IAsyncDisposable
         }
 
         _messages.Writer.TryComplete();
+        FailPending(new MqttException("The client was disposed before the broker acknowledged."));
         _lifetime.Dispose();
+    }
+
+    private MqttConnection ConnectedOrThrow()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _connection ?? throw new InvalidOperationException("Connect before performing operations.");
+    }
+
+    private async Task<MqttPacket> RequestAsync(
+        MqttConnection connection,
+        MqttPacket request,
+        ushort id,
+        CancellationToken cancellationToken)
+    {
+        var pending = new TaskCompletionSource<MqttPacket>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!_pending.TryAdd(id, pending))
+        {
+            throw new InvalidOperationException($"Packet identifier {id} already has a pending operation.");
+        }
+
+        try
+        {
+            await SendThroughAsync(connection, request, cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                return await pending.Task
+                    .WaitAsync(_options.AcknowledgementTimeout, _time, cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                throw new MqttException($"The broker did not acknowledge packet {id} in time.");
+            }
+        }
+        finally
+        {
+            _pending.TryRemove(id, out _);
+        }
     }
 
     private async ValueTask SendThroughAsync(MqttConnection connection, MqttPacket packet, CancellationToken cancellationToken)
@@ -188,31 +352,126 @@ public sealed class RawMqttClient : IAsyncDisposable
                     switch (packet)
                     {
                         case MqttPublishPacket publish:
-                            await _messages.Writer.WriteAsync(publish, cancellationToken).ConfigureAwait(false);
+                            await HandleInboundPublishAsync(connection, publish, cancellationToken).ConfigureAwait(false);
+                            break;
+                        case MqttPublishAckPacket { PacketType: MqttPacketType.PubRel } pubRel:
+                            _inboundQos2.Remove(pubRel.PacketIdentifier);
+                            await SendThroughAsync(
+                                connection,
+                                new MqttPublishAckPacket
+                                {
+                                    PacketType = MqttPacketType.PubComp,
+                                    PacketIdentifier = pubRel.PacketIdentifier,
+                                    ProtocolVersion = _protocolVersion,
+                                },
+                                cancellationToken).ConfigureAwait(false);
+                            break;
+                        case MqttPublishAckPacket ack:
+                            CompletePending(ack.PacketIdentifier, ack);
+                            break;
+                        case MqttSubAckPacket subAck:
+                            CompletePending(subAck.PacketIdentifier, subAck);
+                            break;
+                        case MqttUnsubAckPacket unsubAck:
+                            CompletePending(unsubAck.PacketIdentifier, unsubAck);
                             break;
                         case MqttPingRespPacket:
                             _pongSignal?.TrySetResult();
                             break;
                         default:
-                            // Acknowledgement correlation arrives with the QoS layer.
+                            // DISCONNECT/AUTH handling arrives with the resilient layer.
                             break;
                     }
                 }
             }
 
             _messages.Writer.TryComplete();
+            FailPending(new MqttException("The connection closed before the broker acknowledged."));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             _messages.Writer.TryComplete();
+            FailPending(new MqttException("The client shut down before the broker acknowledged."));
         }
         catch (ChannelClosedException ex)
         {
-            _messages.Writer.TryComplete(ex.InnerException ?? ex);
+            var error = ex.InnerException ?? ex;
+            _messages.Writer.TryComplete(error);
+            FailPending(error);
         }
         catch (Exception ex)
         {
             _messages.Writer.TryComplete(ex);
+            FailPending(ex);
+        }
+    }
+
+    private async ValueTask HandleInboundPublishAsync(
+        MqttConnection connection,
+        MqttPublishPacket publish,
+        CancellationToken cancellationToken)
+    {
+        switch (publish.QualityOfService)
+        {
+            case MqttQualityOfService.AtMostOnce:
+                await _messages.Writer.WriteAsync(publish, cancellationToken).ConfigureAwait(false);
+                break;
+
+            case MqttQualityOfService.AtLeastOnce:
+            {
+                var id = RequiredId(publish);
+                await _messages.Writer.WriteAsync(publish, cancellationToken).ConfigureAwait(false);
+                await SendThroughAsync(
+                    connection,
+                    new MqttPublishAckPacket
+                    {
+                        PacketType = MqttPacketType.PubAck,
+                        PacketIdentifier = id,
+                        ProtocolVersion = _protocolVersion,
+                    },
+                    cancellationToken).ConfigureAwait(false);
+                break;
+            }
+
+            case MqttQualityOfService.ExactlyOnce:
+            {
+                var id = RequiredId(publish);
+                if (_inboundQos2.Add(id))
+                {
+                    await _messages.Writer.WriteAsync(publish, cancellationToken).ConfigureAwait(false);
+                }
+
+                await SendThroughAsync(
+                    connection,
+                    new MqttPublishAckPacket
+                    {
+                        PacketType = MqttPacketType.PubRec,
+                        PacketIdentifier = id,
+                        ProtocolVersion = _protocolVersion,
+                    },
+                    cancellationToken).ConfigureAwait(false);
+                break;
+            }
+        }
+
+        static ushort RequiredId(MqttPublishPacket publish) =>
+            publish.PacketIdentifier
+            ?? throw new MqttProtocolException("A QoS > 0 PUBLISH must carry a packet identifier.");
+    }
+
+    private void CompletePending(ushort id, MqttPacket response)
+    {
+        if (_pending.TryGetValue(id, out var pending))
+        {
+            pending.TrySetResult(response);
+        }
+    }
+
+    private void FailPending(Exception error)
+    {
+        foreach (var entry in _pending)
+        {
+            entry.Value.TrySetException(error);
         }
     }
 
@@ -239,8 +498,9 @@ public sealed class RawMqttClient : IAsyncDisposable
                 }
                 catch (TimeoutException)
                 {
-                    _messages.Writer.TryComplete(
-                        new MqttException("The broker did not answer a PINGREQ within the keep-alive window."));
+                    var error = new MqttException("The broker did not answer a PINGREQ within the keep-alive window.");
+                    _messages.Writer.TryComplete(error);
+                    FailPending(error);
                     await connection.DisposeAsync().ConfigureAwait(false);
                     return;
                 }
