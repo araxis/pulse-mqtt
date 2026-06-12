@@ -1,0 +1,22 @@
+# Packages
+
+All packages target `net8.0` and `net10.0`, carry XML documentation, and are Native AOT
+compatible. MIT licensed.
+
+| Package | What it is | Depends on |
+| --- | --- | --- |
+| `Pulse.Mqtt.Core` | Wire codec (all 15 control packets, MQTT 5.0 + 3.1.1), transports (TCP/TLS, in-memory loopback), `MqttConnection`, `RawMqttClient`, every swap-point contract | BCL + `System.IO.Pipelines` only |
+| `Pulse.Mqtt.Client` | `ResilientMqttClient`: supervision, topic routing, typed messaging, request/response, diagnostics | Core, `Microsoft.Extensions.Logging.Abstractions` |
+| `Pulse.Mqtt.DependencyInjection` | `AddPulseMqttClient`, named clients, options binding, hosted lifecycle, health checks | Client + `Microsoft.Extensions.*` abstractions |
+| `Pulse.Mqtt.Serialization.Json` | Source-generated `System.Text.Json` serializer | Client |
+| `Pulse.Mqtt.Resilience.Polly` | `PollyReconnectStrategy` over a Polly v8 `ResiliencePipeline` | Core, `Polly.Core` |
+| `Pulse.Mqtt.Transport.WebSocket` | MQTT over `ws`/`wss` | Core |
+| `Pulse.Mqtt.Testing` | `PulseMqttTestBroker`, the in-process broker | Core |
+
+## Which do I need?
+
+- **A typical service**: `Client` + `DependencyInjection` + `Serialization.Json`.
+- **Minimal footprint / your own composition**: `Client` alone (or `Core` alone for the raw
+  layers).
+- **Tests**: add `Testing`.
+- **Polly policies or WebSocket brokers**: add the matching add-on.

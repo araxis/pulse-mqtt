@@ -153,14 +153,21 @@ they plug into already exist.
 
 ## Documentation
 
-- [Getting started](docs/Getting-Started.md)
-- [Configuration and swapping behaviors](docs/Configuration-and-Swapping.md)
-- [Routing and typed messaging](docs/Routing-and-Typed-Messaging.md)
-- [Request and response](docs/Request-Response.md)
-- [Testing without a broker](docs/Testing.md)
-- [Releasing and the pipelines](docs/Releasing.md)
-- [Benchmark suite](docs/Benchmark-Suite.md) and [the MQTTnet comparison](docs/Benchmark-vs-MQTTnet.md)
-- [Development plan](docs/NG-MQTT-Client-Development-Plan.md), [competitive research](docs/Competitive-Research-MQTT-Clients.md), [resilience design](docs/Phase-04-Resilience-Detailed-Design.md)
+The full documentation is a VitePress site under [`docs/`](docs) — run it locally with
+`cd docs && npm install && npm run docs:dev`, or read the pages directly:
+
+**Guides**
+- [Introduction](docs/guide/introduction.md) · [Getting started](docs/guide/getting-started.md) · [Connecting](docs/guide/connecting.md)
+- [Publishing](docs/guide/publishing.md) · [Subscribing](docs/guide/subscribing.md) · [Routing](docs/guide/routing.md) · [Typed messaging](docs/guide/typed-messaging.md) · [Request and response](docs/guide/request-response.md)
+- [Resilience](docs/guide/resilience.md) · [Lifecycle and state](docs/guide/lifecycle.md) · [Dependency injection](docs/guide/dependency-injection.md) · [Observability](docs/guide/observability.md) · [Testing](docs/guide/testing.md)
+- [Extending the client](docs/guide/extending.md) · [The raw client](docs/guide/raw-client.md) · [Native AOT](docs/guide/native-aot.md) · [Performance](docs/guide/performance.md) · [Releasing](docs/guide/releasing.md)
+
+**Reference**
+- [Packages](docs/reference/packages.md) · [Options](docs/reference/options.md) · [Connection states](docs/reference/connection-states.md) · [Errors](docs/reference/errors.md)
+
+**Project**
+- [Benchmark suite](docs/Benchmark-Suite.md) · [MQTTnet comparison](docs/Benchmark-vs-MQTTnet.md)
+- [Development plan](docs/NG-MQTT-Client-Development-Plan.md) · [competitive research](docs/Competitive-Research-MQTT-Clients.md) · [resilience design](docs/Phase-04-Resilience-Detailed-Design.md)
 - [Changelog](CHANGELOG.md)
 
 ## License
