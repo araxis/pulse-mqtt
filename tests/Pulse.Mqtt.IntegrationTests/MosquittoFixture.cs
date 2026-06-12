@@ -10,11 +10,10 @@ namespace Pulse.Mqtt.IntegrationTests;
 /// </summary>
 public sealed class MosquittoFixture : IAsyncLifetime
 {
-    private readonly IContainer _container = new ContainerBuilder()
-        .WithImage("eclipse-mosquitto:2")
+    private readonly IContainer _container = new ContainerBuilder("eclipse-mosquitto:2")
         .WithCommand("mosquitto", "-c", "/mosquitto-no-auth.conf")
         .WithPortBinding(1883, assignRandomHostPort: true)
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(1883))
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(1883))
         .Build();
 
     public string Host => _container.Hostname;

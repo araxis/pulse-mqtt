@@ -14,11 +14,10 @@ using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Resilience;
 using Pulse.Mqtt.Transport;
 
-var container = new ContainerBuilder()
-    .WithImage("eclipse-mosquitto:2")
+var container = new ContainerBuilder("eclipse-mosquitto:2")
     .WithCommand("mosquitto", "-c", "/mosquitto-no-auth.conf")
     .WithPortBinding(1883, assignRandomHostPort: true)
-    .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(1883))
+    .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(1883))
     .Build();
 await container.StartAsync();
 Broker.Host = container.Hostname;
