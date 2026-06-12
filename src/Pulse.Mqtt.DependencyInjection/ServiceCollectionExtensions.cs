@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pulse.Mqtt.Client;
 using Pulse.Mqtt.Packets;
@@ -64,6 +65,7 @@ public static class ServiceCollectionExtensions
                 SessionStore = provider.GetKeyedService<ISessionStore>(clientName),
                 MessageStore = provider.GetKeyedService<IMessageStore>(clientName),
                 Serializer = provider.GetKeyedService<IMqttSerializer>(clientName),
+                Logger = provider.GetService<ILoggerFactory>()?.CreateLogger($"Pulse.Mqtt.Client.{clientName}"),
             };
 
             return new ResilientMqttClient(transportFactory, clientOptions, provider.GetService<TimeProvider>());
