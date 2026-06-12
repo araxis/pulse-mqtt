@@ -14,8 +14,26 @@ How this repository ships.
 
 ## One-time setup
 
-Add a repository secret named `NUGET_API_KEY` holding a nuget.org API key with push rights for
-the `Pulse.Mqtt.*` packages (Settings → Secrets and variables → Actions).
+Publishing uses NuGet [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing):
+the workflow exchanges a short-lived GitHub OIDC token for a one-hour nuget.org API key at
+push time, so there is **no long-lived secret to store or rotate**.
+
+1. On **nuget.org**, open your profile → **Trusted Publishing** and add a policy:
+   - **Repository Owner:** `araxis`
+   - **Repository:** `pulse-mqtt`
+   - **Workflow File:** `release.yml` (file name only)
+   - **Environment:** leave empty
+2. Add one repository secret, `NUGET_USER`, set to your nuget.org account name (the profile
+   name, **not** an email). It identifies the account but is not itself a credential.
+
+The workflow already requests the token (`permissions: id-token: write`) and logs in with
+`NuGet/login@v1` before pushing.
+
+::: tip First publish on a private repository
+A new policy on a private repository is provisional for 7 days until the first successful
+publish locks it to the repository and owner IDs. Publish once within that window, or restart
+it from the nuget.org UI.
+:::
 
 ## Cutting a release
 
