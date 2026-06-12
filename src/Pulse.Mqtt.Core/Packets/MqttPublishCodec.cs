@@ -1,4 +1,6 @@
 using System.Buffers;
+using System.Buffers.Binary;
+using System.Text;
 using Pulse.Mqtt.Buffers;
 using Pulse.Mqtt.Codec;
 using Pulse.Mqtt.Protocol;
@@ -10,6 +12,9 @@ public static class MqttPublishCodec
 {
     private const byte DupFlag = 0x08;
     private const byte RetainFlag = 0x01;
+
+    private static readonly uint[] NoSubscriptionIdentifiers = [];
+    private static readonly MqttUserProperty[] NoUserProperties = [];
 
     /// <summary>Encodes <paramref name="packet"/> into <paramref name="output"/>, fixed header included.</summary>
     public static void Encode(IBufferWriter<byte> output, MqttPublishPacket packet)
@@ -28,6 +33,13 @@ public static class MqttPublishCodec
             throw new ArgumentException("A packet identifier must not be set for QoS 0.", nameof(packet));
         }
 
+        var isV5 = packet.ProtocolVersion == MqttProtocolVersion.V500;
+        if (!isV5 || !HasProperties(packet))
+        {
+            EncodeWithoutProperties(output, packet, hasPacketId, isV5);
+            return;
+        }
+
         using var body = new PooledBufferWriter();
         var writer = new MqttBufferWriter(body);
 
@@ -37,10 +49,7 @@ public static class MqttPublishCodec
             writer.WriteUInt16(packet.PacketIdentifier!.Value);
         }
 
-        if (packet.ProtocolVersion == MqttProtocolVersion.V500)
-        {
-            WriteProperties(body, packet);
-        }
+        WriteProperties(body, packet);
 
         if (!packet.Payload.IsEmpty)
         {
@@ -49,16 +58,62 @@ public static class MqttPublishCodec
             body.Advance(packet.Payload.Length);
         }
 
-        var flags = (byte)(
-            (packet.Dup ? DupFlag : 0)
-            | ((byte)packet.QualityOfService << 1)
-            | (packet.Retain ? RetainFlag : 0));
-
-        MqttFrameWriter.WriteHeader(output, new MqttFixedHeader(MqttPacketType.Publish, flags, body.WrittenCount));
+        MqttFrameWriter.WriteHeader(output, new MqttFixedHeader(MqttPacketType.Publish, Flags(packet), body.WrittenCount));
         var destination = output.GetSpan(body.WrittenCount);
         body.WrittenSpan.CopyTo(destination);
         output.Advance(body.WrittenCount);
     }
+
+    // The dominant shape — no MQTT 5 properties — sizes the body up front and writes it in one
+    // pass, with no intermediate buffer and a single copy of the payload.
+    private static void EncodeWithoutProperties(IBufferWriter<byte> output, MqttPublishPacket packet, bool hasPacketId, bool isV5)
+    {
+        var topicLength = Encoding.UTF8.GetByteCount(packet.Topic);
+        if (topicLength > ushort.MaxValue)
+        {
+            throw new ArgumentException($"String exceeds the {ushort.MaxValue}-byte protocol limit.", nameof(packet));
+        }
+
+        var remaining = 2 + topicLength
+            + (hasPacketId ? 2 : 0)
+            + (isV5 ? 1 : 0)
+            + packet.Payload.Length;
+
+        MqttFrameWriter.WriteHeader(output, new MqttFixedHeader(MqttPacketType.Publish, Flags(packet), remaining));
+
+        var span = output.GetSpan(remaining);
+        BinaryPrimitives.WriteUInt16BigEndian(span, (ushort)topicLength);
+        var written = 2 + Encoding.UTF8.GetBytes(packet.Topic, span[2..]);
+
+        if (hasPacketId)
+        {
+            BinaryPrimitives.WriteUInt16BigEndian(span[written..], packet.PacketIdentifier!.Value);
+            written += 2;
+        }
+
+        if (isV5)
+        {
+            span[written++] = 0; // empty property section
+        }
+
+        packet.Payload.Span.CopyTo(span[written..]);
+        output.Advance(remaining);
+    }
+
+    private static byte Flags(MqttPublishPacket packet) => (byte)(
+        (packet.Dup ? DupFlag : 0)
+        | ((byte)packet.QualityOfService << 1)
+        | (packet.Retain ? RetainFlag : 0));
+
+    private static bool HasProperties(MqttPublishPacket packet) =>
+        packet.PayloadFormatIndicator != MqttPayloadFormatIndicator.Unspecified
+        || packet.MessageExpiryInterval is not null
+        || packet.TopicAlias is not null
+        || packet.ResponseTopic is not null
+        || packet.CorrelationData is not null
+        || packet.ContentType is not null
+        || packet.SubscriptionIdentifiers.Count > 0
+        || packet.UserProperties.Count > 0;
 
     /// <summary>Decodes a PUBLISH packet using the fixed header's flags for the negotiated <paramref name="version"/>.</summary>
     /// <exception cref="MqttProtocolException">The packet is malformed.</exception>
@@ -88,8 +143,8 @@ public static class MqttPublishCodec
         string? responseTopic = null;
         ReadOnlyMemory<byte>? correlationData = null;
         string? contentType = null;
-        var subscriptionIdentifiers = new List<uint>();
-        var userProperties = new List<MqttUserProperty>();
+        List<uint>? subscriptionIdentifiers = null;
+        List<MqttUserProperty>? userProperties = null;
 
         if (version == MqttProtocolVersion.V500)
         {
@@ -120,11 +175,11 @@ public static class MqttPublishCodec
                         contentType = properties.ReadString();
                         break;
                     case MqttPropertyId.SubscriptionIdentifier:
-                        subscriptionIdentifiers.Add(properties.ReadVarInt());
+                        (subscriptionIdentifiers ??= []).Add(properties.ReadVarInt());
                         break;
                     case MqttPropertyId.UserProperty:
                         var (name, value) = properties.ReadStringPair();
-                        userProperties.Add(new MqttUserProperty(name, value));
+                        (userProperties ??= []).Add(new MqttUserProperty(name, value));
                         break;
                     default:
                         throw new MqttProtocolException($"Property {id} is not valid in PUBLISH.");
@@ -149,8 +204,8 @@ public static class MqttPublishCodec
             ResponseTopic = responseTopic,
             CorrelationData = correlationData,
             ContentType = contentType,
-            SubscriptionIdentifiers = subscriptionIdentifiers,
-            UserProperties = userProperties,
+            SubscriptionIdentifiers = subscriptionIdentifiers ?? (IReadOnlyList<uint>)NoSubscriptionIdentifiers,
+            UserProperties = userProperties ?? (IReadOnlyList<MqttUserProperty>)NoUserProperties,
         };
     }
 

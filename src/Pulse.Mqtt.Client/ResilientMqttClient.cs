@@ -31,7 +31,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     private readonly IMessageStore _messageStore;
     private readonly Channel<MqttPublishPacket> _messages;
     private readonly List<Channel<ConnectionStateChanged>> _watchers = [];
-    private readonly List<MqttTopicFilter> _subscriptions = [];
+    private readonly Dictionary<string, MqttTopicFilter> _subscriptions = [];
     private readonly object _stateGate = new();
     private readonly object _subscriptionGate = new();
 
@@ -124,14 +124,20 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         lock (_subscriptionGate)
         {
             _subscriptions.Clear();
-            _subscriptions.AddRange(stored);
+            foreach (var filter in stored)
+            {
+                _subscriptions[filter.Topic] = filter;
+            }
         }
 
         _attempt = 0;
         _lifetime?.Dispose();
         var lifetime = new CancellationTokenSource();
         _lifetime = lifetime;
-        _supervisor = Task.Run(() => SuperviseAsync(lifetime.Token), CancellationToken.None);
+
+        // Started inline: the first connect attempt reaches its first await (the socket connect)
+        // on the calling task instead of waiting for a thread-pool slot.
+        _supervisor = SuperviseAsync(lifetime.Token);
     }
 
     /// <summary>
@@ -197,19 +203,15 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(topicFilters);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        IReadOnlyList<MqttTopicFilter> snapshot;
         lock (_subscriptionGate)
         {
             foreach (var filter in topicFilters)
             {
-                _subscriptions.RemoveAll(existing => existing.Topic == filter.Topic);
-                _subscriptions.Add(filter);
+                _subscriptions[filter.Topic] = filter;
             }
-
-            snapshot = _subscriptions.ToArray();
         }
 
-        await _sessionStore.SaveSubscriptionsAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        await _sessionStore.UpsertSubscriptionsAsync(topicFilters, cancellationToken).ConfigureAwait(false);
 
         if (_raw is { } raw)
         {
@@ -234,18 +236,15 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(topicFilters);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        IReadOnlyList<MqttTopicFilter> snapshot;
         lock (_subscriptionGate)
         {
             foreach (var topic in topicFilters)
             {
-                _subscriptions.RemoveAll(existing => existing.Topic == topic);
+                _subscriptions.Remove(topic);
             }
-
-            snapshot = _subscriptions.ToArray();
         }
 
-        await _sessionStore.SaveSubscriptionsAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        await _sessionStore.RemoveSubscriptionsAsync(topicFilters, cancellationToken).ConfigureAwait(false);
 
         if (_raw is { } raw)
         {
@@ -576,6 +575,11 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                         async token =>
                         {
                             var candidate = new RawMqttClient(_transportFactory, _options.Raw, _time);
+                            candidate.MessageSink = (message, sinkToken) =>
+                            {
+                                PulseMqttDiagnostics.MessagesReceived.Add(1, new KeyValuePair<string, object?>("client.id", _clientId));
+                                return _messages.Writer.WriteAsync(message, sinkToken);
+                            };
                             try
                             {
                                 var ack = await candidate.ConnectAsync(_options.Connect, token).ConfigureAwait(false);
@@ -628,7 +632,14 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 _raw = raw;
                 Transition(ConnectionState.Connected);
 
-                await ForwardSessionMessagesAsync(raw!, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await raw!.Completion.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Shutdown; the loop below observes the token.
+                }
 
                 _raw = null;
                 await raw!.DisposeAsync().ConfigureAwait(false);
@@ -659,29 +670,6 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         catch (Exception error)
         {
             Fault(error);
-        }
-    }
-
-    private async Task ForwardSessionMessagesAsync(RawMqttClient raw, CancellationToken cancellationToken)
-    {
-        try
-        {
-            while (await raw.Messages.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                while (raw.Messages.TryRead(out var message))
-                {
-                    PulseMqttDiagnostics.MessagesReceived.Add(1, new KeyValuePair<string, object?>("client.id", _clientId));
-                    await _messages.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Shutdown; the supervisor loop observes the token.
-        }
-        catch (ChannelClosedException)
-        {
-            // The session faulted; the supervisor reconnects.
         }
     }
 

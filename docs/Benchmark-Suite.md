@@ -50,8 +50,8 @@ ShortRun error bars are wide; treat means as indicative, allocations as exact.
 
 | Benchmark | Mean | Allocated |
 | --- | --- | --- |
-| Serialize_10000_Messages | 1.77 ms (177 ns each) | 64 B per packet |
-| Deserialize_10000_Messages | 0.94 ms (94 ns each) | 208 B per packet |
+| Serialize_10000_Messages | 596 µs (60 ns each) | 0 B |
+| Deserialize_10000_Messages | 0.96 ms (96 ns each) | 144 B per packet |
 | Read_100_000_Messages (11 fields each) | 12.7 ms | 360 B per round (the three decoded strings) |
 | Write_100_000_Messages (11 fields each) | 18.8 ms | 0 B |
 | Pulse_ReadString (long string) | 763 ns | parity with `Encoding.UTF8.GetString` (0.97 ratio) |
@@ -63,8 +63,8 @@ ShortRun error bars are wide; treat means as indicative, allocations as exact.
 
 | Benchmark | Mean | Allocated |
 | --- | --- | --- |
-| Connection Send_10000_Messages | 3.00 ms (300 ns each) | 64 B per packet |
-| Connection Receive_10000_Messages | 3.37 ms (337 ns each) | 209 B per packet |
+| Connection Send_10000_Messages | 2.87 ms (287 ns each) | 0 B |
+| Connection Receive_10000_Messages | 3.4–4.7 ms (run-to-run spread) | 145 B per packet |
 | SendLock Wait_100_000_Times | 4.17 ms (42 ns per acquire/release) | 136 B total |
 | SendLock Synchronize_100_Tasks | 1.55 s (dominated by the deliberate 5 ms hold) | 53 KB |
 | Log_10000_Messages_NullLogger | 3.1 µs (0.3 ns each) | 0 B |
@@ -75,17 +75,18 @@ ShortRun error bars are wide; treat means as indicative, allocations as exact.
 
 | Benchmark | Mean | Allocated |
 | --- | --- | --- |
-| Send_10000_Messages (client to broker, QoS 0) | 8.48 ms (848 ns each) | 430 B per publish, both sides |
+| Send_10000_Messages (client to broker, QoS 0) | 8.65 ms (865 ns each) | 350 B per publish, both sides |
 | DeliverMessages (10 subscribers × 5 topics) | 239 µs | 68 KB |
 | DeliverMessages (10 subscribers × 50 topics) | 8.03 ms | 716 KB |
-| Subscribe_10000_Topics | 1.92 s | 1.51 GB |
-| Unsubscribe_10000_Topics | 161 ms | 19.4 MB |
+| Subscribe_10000_Topics | 119 ms | 19.2 MB |
+| Unsubscribe_10000_Topics | 143 ms | 17.7 MB |
 | Tcp_Send_10000_Chunks (5 B each, loopback TCP) | 149 ms | 0 B |
 | Loopback_Send_10000_Chunks (in-memory pair) | 1.17 ms | 466 B |
 | MemoryCopy Array vs Span (63–5095 B) | parity within noise | 0 B |
 
-Two of these flagged real costs rather than measuring healthy paths. Subscribing topics one at a
-time snapshots the durable subscription set per call — quadratic time and allocation at high
-subscription counts. The TCP chunk drain trails the in-memory pair by two orders of magnitude,
-pointing at per-chunk overhead in the socket-to-pipe path. Both are tracked for optimization;
-the tables above record the suite as first measured.
+The suite's first run flagged two real costs. Subscribing topics one at a time snapshotted the
+durable subscription set per call — 1.92 s and 1.51 GB for 10,000 subscribes. Incremental
+subscription bookkeeping (dictionary state plus in-place session-store updates) brought that to
+119 ms and 19.2 MB, and the same run motivated the single-pass publish/ack encoders that took
+serialization to zero allocation. The remaining gap between the TCP chunk drain and the
+in-memory pair is per-segment socket cost, the same physics any client pays on that path.
