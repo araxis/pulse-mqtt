@@ -12,6 +12,9 @@ public sealed record RawMqttClientOptions
     /// <summary>How long to wait for a PINGRESP after a keep-alive PINGREQ before faulting.</summary>
     public TimeSpan PingResponseTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>How long to wait for the broker to acknowledge a publish, subscribe, or unsubscribe.</summary>
+    public TimeSpan AcknowledgementTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
     /// <summary>The bounded capacity of the received-message queue.</summary>
     public int InboundMessageCapacity { get; init; } = 256;
 }

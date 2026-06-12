@@ -9,6 +9,12 @@ public enum MqttReasonCode : byte
     /// <summary>Success / normal disconnection / granted QoS 0 (0x00).</summary>
     Success = 0x00,
 
+    /// <summary>The subscription was granted at QoS 1 (SUBACK, 0x01).</summary>
+    GrantedQualityOfService1 = 0x01,
+
+    /// <summary>The subscription was granted at QoS 2 (SUBACK, 0x02).</summary>
+    GrantedQualityOfService2 = 0x02,
+
     /// <summary>Disconnect carrying the will message (DISCONNECT, 0x04).</summary>
     DisconnectWithWillMessage = 0x04,
 
