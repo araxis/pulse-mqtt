@@ -1,6 +1,11 @@
 # Pulse.Mqtt
 
+[![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Client?logo=nuget&label=Pulse.Mqtt.Client)](https://www.nuget.org/packages/Pulse.Mqtt.Client)
+[![Downloads](https://img.shields.io/nuget/dt/Pulse.Mqtt.Client?logo=nuget&label=downloads)](https://www.nuget.org/packages/Pulse.Mqtt.Client)
 [![CI](https://github.com/araxis/pulse-mqtt/actions/workflows/ci.yml/badge.svg)](https://github.com/araxis/pulse-mqtt/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%2010.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com)
+[![Docs](https://img.shields.io/badge/docs-pulse--mqtt-1f6feb)](https://araxis.github.io/pulse-mqtt/)
 
 A high-performance, resilient MQTT 5.0 / 3.1.1 client for modern .NET (`net8.0` + `net10.0`).
 
@@ -15,15 +20,15 @@ one line, not a fork.
 
 ## Packages
 
-| Package | What it is |
-|---|---|
-| `Pulse.Mqtt.Core` | Wire codec (all 15 control packets, v5 + v3.1.1), transports (TCP/TLS, in-memory loopback), the raw client, all swap-point contracts. Depends only on the BCL + `System.IO.Pipelines`. |
-| `Pulse.Mqtt.Client` | The resilient client: supervisor, topic routing, typed messaging, request/response. |
-| `Pulse.Mqtt.DependencyInjection` | `AddPulseMqttClient`, named clients, hosted lifecycle, health checks. |
-| `Pulse.Mqtt.Serialization.Json` | Source-generated `System.Text.Json` payload serialization (AOT-safe). |
-| `Pulse.Mqtt.Resilience.Polly` | Reconnect strategy backed by a Polly v8 `ResiliencePipeline`. |
-| `Pulse.Mqtt.Transport.WebSocket` | MQTT over WebSocket (`ws`/`wss`). |
-| `Pulse.Mqtt.Testing` | `PulseMqttTestBroker` — an in-process broker for millisecond tests with no Docker. |
+| Package | NuGet | What it is |
+|---|---|---|
+| `Pulse.Mqtt.Core` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Core?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Core) | Wire codec (all 15 control packets, v5 + v3.1.1), transports (TCP/TLS, in-memory loopback), the raw client, all swap-point contracts. Depends only on the BCL + `System.IO.Pipelines`. |
+| `Pulse.Mqtt.Client` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Client?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Client) | The resilient client: supervisor, topic routing, typed messaging, request/response. |
+| `Pulse.Mqtt.DependencyInjection` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.DependencyInjection?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.DependencyInjection) | `AddPulseMqttClient`, named clients, hosted lifecycle, health checks. |
+| `Pulse.Mqtt.Serialization.Json` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Serialization.Json?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Serialization.Json) | Source-generated `System.Text.Json` payload serialization (AOT-safe). |
+| `Pulse.Mqtt.Resilience.Polly` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Resilience.Polly?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Resilience.Polly) | Reconnect strategy backed by a Polly v8 `ResiliencePipeline`. |
+| `Pulse.Mqtt.Transport.WebSocket` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Transport.WebSocket?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Transport.WebSocket) | MQTT over WebSocket (`ws`/`wss`). |
+| `Pulse.Mqtt.Testing` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Testing?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Testing) | `PulseMqttTestBroker` — an in-process broker for millisecond tests with no Docker. |
 
 ## Quick start
 

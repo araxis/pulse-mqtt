@@ -6,7 +6,7 @@
     <IsAotCompatible>true</IsAotCompatible>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>Pulse.Mqtt.Client</PackageId>
-    <Description>Resilient MQTT client: routing, typed messaging, reconnect, and offline queueing.</Description>
+    <Description>Resilient MQTT 5.0 / 3.1.1 client for .NET: background auto-reconnect, topic routing, typed messaging, request/response, and a bounded offline queue. Every behavior is swappable.</Description>
   </PropertyGroup>
 
   <ItemGroup>

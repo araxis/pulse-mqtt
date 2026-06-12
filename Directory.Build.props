@@ -16,10 +16,10 @@
     <VersionPrefix>0.1.0</VersionPrefix>
     <Authors>araxis</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/araxis/pulse-mqtt</PackageProjectUrl>
+    <PackageProjectUrl>https://araxis.github.io/pulse-mqtt/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/araxis/pulse-mqtt</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>mqtt;mqtt5;iot;messaging;client;resilience;aot</PackageTags>
+    <PackageTags>mqtt;mqtt5;mqtt-client;iot;messaging;client;resilience;aot</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>

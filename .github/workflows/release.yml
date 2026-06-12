@@ -47,6 +47,22 @@ jobs:
             echo "Release $VERSION." > release-notes.md
           fi
 
+          {
+            echo
+            echo "### Packages on NuGet"
+            echo
+            for id in \
+              Pulse.Mqtt.Core \
+              Pulse.Mqtt.Client \
+              Pulse.Mqtt.DependencyInjection \
+              Pulse.Mqtt.Serialization.Json \
+              Pulse.Mqtt.Resilience.Polly \
+              Pulse.Mqtt.Transport.WebSocket \
+              Pulse.Mqtt.Testing; do
+              echo "- [\`$id\`](https://www.nuget.org/packages/$id/$VERSION)"
+            done
+          } >> release-notes.md
+
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
