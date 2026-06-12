@@ -24,6 +24,9 @@
     <!-- Benchmarks -->
     <PackageVersion Include="BenchmarkDotNet" Version="0.14.0" />
 
+    <!-- Resilience add-on -->
+    <PackageVersion Include="Polly.Core" Version="8.4.2" />
+
     <!-- Integration tests -->
     <PackageVersion Include="Testcontainers" Version="4.1.0" />
   </ItemGroup>

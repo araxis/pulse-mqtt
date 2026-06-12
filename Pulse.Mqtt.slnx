@@ -9,6 +9,7 @@
     <Project Path="src/Pulse.Mqtt.Client/Pulse.Mqtt.Client.csproj" />
     <Project Path="src/Pulse.Mqtt.Core/Pulse.Mqtt.Core.csproj" />
     <Project Path="src/Pulse.Mqtt.DependencyInjection/Pulse.Mqtt.DependencyInjection.csproj" />
+    <Project Path="src/Pulse.Mqtt.Resilience.Polly/Pulse.Mqtt.Resilience.Polly.csproj" />
     <Project Path="src/Pulse.Mqtt.Testing/Pulse.Mqtt.Testing.csproj" />
   </Folder>
   <Folder Name="/tests/">
