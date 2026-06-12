@@ -42,4 +42,4 @@ Thumbs.db
 *.local
 .env
 *.received.*
-run-output.txt
+run-output*.txt
