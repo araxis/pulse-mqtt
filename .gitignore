@@ -7,7 +7,6 @@ artifacts/
 [Rr]elease/
 x64/
 x86/
-
 # Test output
 [Tt]est[Rr]esults/
 *.trx
@@ -15,7 +14,6 @@ x86/
 *.coverage.xml
 coverage/
 BenchmarkDotNet.Artifacts/
-
 # IDE / editor
 .vs/
 .vscode/
@@ -26,20 +24,17 @@ BenchmarkDotNet.Artifacts/
 *.sln.docstates
 *_i.c
 *_p.c
-
 # NuGet
 *.nupkg
 *.snupkg
 .nuget/
 packages/
 !**/packages/build/
-
 # OS
 .DS_Store
 Thumbs.db
-
 # Local environment
 *.local
 .env
 *.received.*
-run-output.txt
+run-output*.txt
