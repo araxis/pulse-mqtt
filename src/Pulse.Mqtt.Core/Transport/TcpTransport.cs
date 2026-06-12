@@ -17,8 +17,12 @@ public sealed class TcpTransport : IMqttTransport
     {
         _socket = socket;
         _stream = stream;
-        Input = PipeReader.Create(stream);
-        Output = PipeWriter.Create(stream);
+
+        // leaveOpen: this transport owns the stream and disposes it exactly once below. Without
+        // it, completing the reader would dispose the stream and the writer's final flush would
+        // then hit a disposed NetworkStream.
+        Input = PipeReader.Create(stream, new StreamPipeReaderOptions(leaveOpen: true));
+        Output = PipeWriter.Create(stream, new StreamPipeWriterOptions(leaveOpen: true));
     }
 
     /// <inheritdoc />
@@ -30,8 +34,17 @@ public sealed class TcpTransport : IMqttTransport
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        await Input.CompleteAsync().ConfigureAwait(false);
-        await Output.CompleteAsync().ConfigureAwait(false);
+        // Teardown path: a peer that already closed the connection can fault the final flush of
+        // buffered bytes. That is expected during disconnect and not worth surfacing from disposal.
+        try
+        {
+            await Output.CompleteAsync().ConfigureAwait(false);
+            await Input.CompleteAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or SocketException)
+        {
+        }
+
         await _stream.DisposeAsync().ConfigureAwait(false);
         _socket.Dispose();
     }
