@@ -92,6 +92,17 @@ Nothing special to write — publish as usual and read the outcome. QoS 1/2 mess
 reconnect; QoS 0 messages drop by default or queue with `IncludeQos0 = true`. Details and
 tuning live in [Resilience](./resilience#the-offline-queue).
 
+## Size limits
+
+When the broker advertises a maximum packet size in its CONNACK, the client enforces it: a
+publish whose **encoded** size (fixed header, properties, payload) exceeds the limit fails
+immediately with `MqttPacketTooLargeException` — before any byte reaches the wire, so the
+connection never gets killed with `PacketTooLarge`. The exception carries the actual size and
+the limit. A too-large publish is never silently queued; and if a *queued* message turns out
+too large for a stricter broker after a reconnect, it is dropped loudly (logged, counted as
+`DroppedTooLarge`) so the rest of the queue keeps flushing. Brokers that advertise no limit
+cost the send path nothing.
+
 ## Concurrency
 
 `PublishAsync` is safe to call from any number of tasks concurrently. Sends are serialized on

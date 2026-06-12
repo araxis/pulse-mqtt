@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Threading.Channels;
+using Pulse.Mqtt.Buffers;
 using Pulse.Mqtt.Codec;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Transport;
@@ -52,6 +53,14 @@ public sealed class MqttConnection : IAsyncDisposable
     /// </summary>
     public Func<MqttPacket, bool>? InboundFilter { get; set; }
 
+    /// <summary>
+    /// The broker's maximum packet size from its CONNACK, when it advertised one. While set,
+    /// every outbound packet is size-checked before any byte reaches the wire and an oversized
+    /// one fails with <see cref="MqttPacketTooLargeException"/>. Unset (the default) costs the
+    /// send path nothing.
+    /// </summary>
+    public uint? MaximumOutboundPacketSize { get; set; }
+
     /// <summary>Completes when the receive loop has stopped, for orderly shutdown.</summary>
     public Task Completion => _receiveLoop ?? Task.CompletedTask;
 
@@ -76,7 +85,26 @@ public sealed class MqttConnection : IAsyncDisposable
         await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            MqttPacketWriter.Write(_transport.Output, packet);
+            if (MaximumOutboundPacketSize is { } limit)
+            {
+                // The broker bounded what it accepts: stage the packet to learn its encoded
+                // size and reject an oversized one before any byte reaches the wire.
+                using var staging = new PooledBufferWriter();
+                MqttPacketWriter.Write(staging, packet);
+                if ((uint)staging.WrittenCount > limit)
+                {
+                    throw new MqttPacketTooLargeException(staging.WrittenCount, limit);
+                }
+
+                var destination = _transport.Output.GetSpan(staging.WrittenCount);
+                staging.WrittenSpan.CopyTo(destination);
+                _transport.Output.Advance(staging.WrittenCount);
+            }
+            else
+            {
+                MqttPacketWriter.Write(_transport.Output, packet);
+            }
+
             var result = await _transport.Output.FlushAsync(cancellationToken).ConfigureAwait(false);
             if (result.IsCompleted)
             {
