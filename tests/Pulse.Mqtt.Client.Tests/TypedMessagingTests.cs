@@ -103,6 +103,13 @@ public sealed class TypedMessagingTests
         await client.StartAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
+
+        // Publishing before the supervisor finishes connection-up would silently drop QoS 0.
+        while (client.State != Pulse.Mqtt.Resilience.ConnectionState.Connected)
+        {
+            await Task.Delay(1, timeout.Token);
+        }
+
         return (client, broker, timeout.Token);
     }
 }

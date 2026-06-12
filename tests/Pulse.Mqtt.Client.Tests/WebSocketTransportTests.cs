@@ -54,17 +54,29 @@ public sealed class WebSocketTransportTests
         var (listener, uri) = StartListener();
         using var ownedListener = listener;
 
+        // The server socket must stay open until the client has read the CONNACK; disposing it
+        // inside the task can abort the connection before the bytes are consumed.
         var serverTask = Task.Run(async () =>
         {
-            using var server = await AcceptWebSocketAsync(listener);
-            var connect = await ReceiveFrameAsync(server, timeout.Token);
-            var status = MqttFrameReader.TryReadFrame(connect, out _, out var body, out _);
-            status.ShouldBe(MqttFrameStatus.Complete);
-            MqttConnectCodec.Decode(body).ClientId.ShouldBe("ws-client");
+            var server = await AcceptWebSocketAsync(listener);
+            try
+            {
+                var connect = await ReceiveFrameAsync(server, timeout.Token);
+                var status = MqttFrameReader.TryReadFrame(connect, out _, out var body, out _);
+                status.ShouldBe(MqttFrameStatus.Complete);
+                MqttConnectCodec.Decode(body).ClientId.ShouldBe("ws-client");
 
-            var scratch = new ArrayBufferWriter<byte>();
-            MqttConnAckCodec.Encode(scratch, new MqttConnAckPacket());
-            await server.SendAsync(scratch.WrittenMemory, WebSocketMessageType.Binary, endOfMessage: true, timeout.Token);
+                var scratch = new ArrayBufferWriter<byte>();
+                MqttConnAckCodec.Encode(scratch, new MqttConnAckPacket());
+                await server.SendAsync(scratch.WrittenMemory, WebSocketMessageType.Binary, endOfMessage: true, timeout.Token);
+            }
+            catch
+            {
+                server.Dispose();
+                throw;
+            }
+
+            return server;
         }, timeout.Token);
 
         var factory = new WebSocketTransportFactory(new WebSocketTransportOptions { Uri = uri });
@@ -73,7 +85,7 @@ public sealed class WebSocketTransportTests
             new MqttConnectPacket { ClientId = "ws-client", KeepAliveSeconds = 0 }, timeout.Token);
 
         connAck.ReasonCode.ShouldBe(MqttReasonCode.Success);
-        await serverTask;
+        using var server = await serverTask;
     }
 
     [Fact]

@@ -184,6 +184,12 @@ public sealed class MqttRouterTests
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
 
+        // Registering the route after connection-up keeps it to exactly one SUBSCRIBE packet.
+        while (client.State != Pulse.Mqtt.Resilience.ConnectionState.Connected)
+        {
+            await Task.Delay(1, timeout.Token);
+        }
+
         var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         var onTask = client.OnAsync("sensors/{id}", (_, values, _) =>
         {
