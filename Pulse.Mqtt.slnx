@@ -13,5 +13,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Pulse.Mqtt.Core.Tests/Pulse.Mqtt.Core.Tests.csproj" />
+    <Project Path="tests/Pulse.Mqtt.IntegrationTests/Pulse.Mqtt.IntegrationTests.csproj" />
   </Folder>
 </Solution>

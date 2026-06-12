@@ -23,6 +23,9 @@
 
     <!-- Benchmarks -->
     <PackageVersion Include="BenchmarkDotNet" Version="0.14.0" />
+
+    <!-- Integration tests -->
+    <PackageVersion Include="Testcontainers" Version="4.1.0" />
   </ItemGroup>
 
 </Project>
