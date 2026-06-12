@@ -44,64 +44,65 @@ Fairness rules baked into the harness:
 
 ## Connect latency
 
-| Library | Median (10 cycles) |
+| Library | Median (30 cycles) |
 | --- | --- |
-| Pulse.Mqtt | 2.89 ms |
-| MQTTnet | 1.96 ms |
+| Pulse.Mqtt | 1.83 ms |
+| MQTTnet | 1.93 ms |
 
-MQTTnet wins here. Pulse's `StartAsync` hands the connection to a supervisor loop, so reaching
-the connected state crosses an extra task boundary and a state-channel hop. That is the price
-of the always-supervised design; at ~1 ms it is irrelevant for long-lived connections but it is
-a real difference for connect-per-operation patterns.
+An earlier revision lost this by about a millisecond: `StartAsync` queued the whole supervisor
+through the thread pool, so even the TCP connect waited for a scheduler slot. The supervisor now
+starts inline and reaches the socket connect on the calling task, which removed the gap while
+keeping `StartAsync` non-blocking.
 
 ## Sustained throughput — 20,000 QoS 1 publishes, 200 in flight
 
 | Library | Throughput | Wall clock | Allocated per message | GC gen0/gen1/gen2 |
 | --- | --- | --- | --- | --- |
-| Pulse.Mqtt | 4,014 msg/s | 4,983 ms | 1,620 B | 2 / 0 / 0 |
-| MQTTnet (defaults) | 2,254 msg/s | 8,874 ms | 1,589 B | 2 / 2 / 0 |
-| MQTTnet (`WithoutPacketFragmentation`) | 3,904 msg/s | 5,123 ms | 1,848 B | 2 / 2 / 0 |
+| Pulse.Mqtt | 4,009 msg/s | 4,989 ms | 1,494 B | 2 / 0 / 0 |
+| MQTTnet (defaults) | 2,239 msg/s | 8,932 ms | 1,590 B | 2 / 2 / 0 |
+| MQTTnet (`WithoutPacketFragmentation`) | 3,772 msg/s | 5,302 ms | 1,763 B | 2 / 2 / 0 |
 
-Pulse is 78% faster than MQTTnet as configured out of the box and 3% faster than MQTTnet after
-tuning, with 12% fewer bytes per message than the tuned configuration and no generation 1
-collections. MQTTnet's per-message allocation in default mode is marginally lower than Pulse's,
-but its objects live longer — the gen 1 collections show survivors that Pulse does not produce.
+Pulse is 79% faster than MQTTnet as configured out of the box and 6% faster than MQTTnet after
+tuning, with the lowest bytes per message of the three configurations and no generation 1
+collections — MQTTnet's gen 1 collections show survivors under load that Pulse does not produce.
 
 ## Per-operation latency and allocation
 
-ShortRun, in-process, 64-byte payloads, MQTTnet fragmentation-free. Latency on this path is
-dominated by the broker round trip through the Docker proxy and has high run-to-run variance
-(error bars overlap on QoS 0 and QoS 1); allocations are stable and exact.
+Fifteen iterations in-process, 64-byte payloads, MQTTnet fragmentation-free. Latency on this
+path is dominated by the broker round trip through the Docker proxy, so medians are the robust
+statistic; allocations are stable and exact.
 
-| Operation | Pulse.Mqtt | MQTTnet | Pulse allocated | MQTTnet allocated |
+| Operation | Pulse.Mqtt median | MQTTnet median | Pulse allocated | MQTTnet allocated |
 | --- | --- | --- | --- | --- |
-| QoS 0 round trip | 361.6 µs | 313.4 µs | 1.09 KB | 2.74 KB |
-| QoS 1 publish to PUBACK | 382.0 µs | 475.4 µs | 1.70 KB | 2.10 KB |
-| QoS 2 publish to PUBCOMP | 1,590.1 µs | 2,045.3 µs | 2.46 KB | 3.63 KB |
+| QoS 0 round trip | 408 µs | 529 µs | 892 B | 2,802 B |
+| QoS 1 publish to PUBACK | 471 µs | 525 µs | 1,547 B | 2,156 B |
+| QoS 2 publish to PUBCOMP | 924 µs | 909 µs | 2,161 B | 3,717 B |
 
 Reading it honestly:
 
-- **QoS 0**: MQTTnet's mean is ~13% lower, within overlapping error bars. Call it a tie on
-  latency; Pulse allocates 60% less per round trip.
-- **QoS 1**: Pulse's mean is ~20% lower, again with overlapping error bars (MQTTnet's median
-  was lower than its mean by a wide margin). Tie-to-slight-Pulse on latency; Pulse allocates
-  19% less.
-- **QoS 2**: Pulse is ~22% faster with non-overlapping medians and allocates 32% less. The
-  four-packet exchange amplifies per-packet overhead, which is where the single-write framing
-  and pooled buffers pay off.
+- **QoS 0**: Pulse's median is 23% lower and it allocates 68% less per round trip. The earlier
+  revision trailed here; completing acknowledgements on the receive loop and delivering
+  messages without an intermediate forwarding queue removed two task wake-ups per message.
+- **QoS 1**: Pulse's median is 10% lower with 28% less allocation.
+- **QoS 2**: medians are within 1.6% of each other — inside the noise (the standard error is
+  several times that) — with Pulse ahead on minimum, first quartile, and allocating 42% less.
+  The four-packet exchange is two full broker round trips, so the wire dominates both clients
+  equally.
 
 ## Summary
 
-- Pulse delivers higher sustained throughput than MQTTnet in both MQTTnet configurations, and
-  the gap against out-of-the-box MQTTnet is 78% on this setup.
-- Pulse allocates less in every scenario (19–60% per operation) and avoids the generation 1
-  collections MQTTnet incurs under load — less GC pressure on long-running processes.
-- Per-operation latency over a real broker is broker-bound: Pulse and MQTTnet are within each
-  other's error bars at QoS 0/1, and Pulse leads at QoS 2.
-- MQTTnet establishes connections about 1 ms faster than Pulse's supervised client.
+- Pulse delivers higher sustained throughput than MQTTnet in both MQTTnet configurations: 79%
+  ahead of out-of-the-box MQTTnet, 6% ahead of the tuned configuration, with the lowest
+  per-message allocation of the three.
+- Pulse connects faster (1.83 ms vs 1.93 ms median over 30 cycles).
+- Pulse's per-operation medians lead at QoS 0 (−23%) and QoS 1 (−10%) and are statistically
+  tied at QoS 2.
+- Pulse allocates 28–68% less in every per-operation scenario and produces no generation 1
+  collections under load, where MQTTnet does — less GC pressure on long-running processes.
 - MQTTnet's default packet fragmentation is a real-world footgun on any path with a Nagle hop
   (container proxies, some gateways): it cost 40 ms per operation here until disabled. Pulse
   has no equivalent failure mode.
 
-Wire-codec micro-benchmarks (encode/decode without a broker, where Pulse measures 93–175 ns and
-0–312 B per packet) live in `bench/Pulse.Mqtt.Benchmarks` and are reported in the readme.
+Wire-codec micro-benchmarks (encode/decode without a broker: 60 ns and zero allocation per
+PUBLISH encode, 96 ns per decode) live in `bench/Pulse.Mqtt.Benchmarks` and are documented in
+[Benchmark-Suite.md](Benchmark-Suite.md).

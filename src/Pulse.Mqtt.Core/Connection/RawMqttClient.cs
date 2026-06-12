@@ -156,18 +156,18 @@ public sealed class RawMqttClient : IAsyncDisposable
         }
 
         var connection = ConnectedOrThrow();
-        packet = packet with { ProtocolVersion = _protocolVersion };
 
         if (packet.QualityOfService == MqttQualityOfService.AtMostOnce)
         {
-            await SendThroughAsync(connection, packet, cancellationToken).ConfigureAwait(false);
+            await SendThroughAsync(connection, packet with { ProtocolVersion = _protocolVersion }, cancellationToken)
+                .ConfigureAwait(false);
             return MqttReasonCode.Success;
         }
 
         var id = _packetIds.Rent();
         try
         {
-            packet = packet with { PacketIdentifier = id };
+            packet = packet with { ProtocolVersion = _protocolVersion, PacketIdentifier = id };
 
             if (packet.QualityOfService == MqttQualityOfService.AtLeastOnce)
             {
