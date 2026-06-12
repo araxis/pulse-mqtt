@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+_Nothing yet._
+
 ## 0.3.0
 
 - Broker-initiated DISCONNECT handling: the reason code, reason string, and server reference
