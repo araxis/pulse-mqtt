@@ -32,6 +32,9 @@
 
     <!-- Integration tests -->
     <PackageVersion Include="Testcontainers" Version="4.1.0" />
+
+    <!-- Comparison benchmarks only -->
+    <PackageVersion Include="MQTTnet" Version="5.1.0.1559" />
   </ItemGroup>
 
 </Project>
