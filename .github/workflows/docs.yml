@@ -9,6 +9,11 @@ on:
     paths: ['docs/**']
   workflow_dispatch:
 
+# One deploy at a time; let an in-flight publish finish rather than cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,10 +38,10 @@ jobs:
         with:
           path: docs/.vitepress/dist
 
-  # Deploys on manual dispatch. Requires Pages to be enabled on the repository with
-  # "GitHub Actions" as the source.
+  # Deploys on every push to main and on manual dispatch, never from pull requests (a fork PR
+  # must not publish the site). Requires Pages enabled with "GitHub Actions" as the source.
   deploy:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:
