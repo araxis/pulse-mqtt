@@ -66,6 +66,7 @@ npm run docs:dev       # live-reload authoring at localhost:5173
 npm run docs:build     # static site into docs/.vitepress/dist
 ```
 
-`.github/workflows/docs.yml` builds the site on every change for verification and deploys to
-GitHub Pages on manual dispatch (Pages must be enabled on the repository, with "GitHub
-Actions" as the source).
+`.github/workflows/docs.yml` builds the site on every pull request for verification and
+**deploys to GitHub Pages automatically on every merge to `main`** that touches `docs/**`
+(also available on manual dispatch). Pages must be enabled on the repository with "GitHub
+Actions" as the source.
