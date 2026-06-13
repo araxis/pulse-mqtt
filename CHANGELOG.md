@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0
+
+The first stable release. Promotes `1.0.0-rc.1` with no functional changes — the public API is now
+frozen under semantic versioning (see `BREAKING-CHANGES.md`). Every required feature (F1–F11) and
+nice-to-have (N1–N7) from the road to 1.0 is shipped: MQTT 5.0/3.1.1 compliance end to end,
+always-on resilience with persistent-session redelivery, presence, enhanced auth, durable SQLite
+storage, JSON and MessagePack serialization, request/response and server-streamed RPC, full
+observability with trace propagation, and a cross-broker interop matrix — all validated under
+chaos against real brokers.
+
 ## 1.0.0-rc.1
 
 - Stress and soak validation: a deterministic chaos test runs in CI — random disconnects under

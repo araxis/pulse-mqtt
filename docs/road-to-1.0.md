@@ -317,12 +317,18 @@ reverse-proxy example.
 
 | Version | Contents | Exit criterion |
 | --- | --- | --- |
-| **0.3.0** | F1 DISCONNECT, F3 max packet size, F9 GA toolchain | A broker can say no politely and the client behaves; builds on GA SDK |
-| **0.4.0** | F2 receive maximum, F4 topic aliases | Negotiated-limit compliance complete |
-| **0.5.0** | F11 presence (will + birth, static + factory), F5 session redelivery, F6 enhanced auth, N1 if ready | Persistent sessions and presence are honest end to end |
-| **0.6.0** | F8 broker matrix, N3/N4 as ready | Interop proven beyond Mosquitto |
-| **1.0.0-rc.1** | F7 API freeze, F10 soak/stress, docs complete | Public API locked; release candidate published |
-| **1.0.0** | RC feedback only — no new features | All F-items checked; quality gates green |
+| **0.3.0** ✅ | F1 DISCONNECT, F3 max packet size, F9 GA toolchain | A broker can say no politely and the client behaves; builds on GA SDK |
+| **0.4.0** ✅ | F2 receive maximum, F4 topic aliases | Negotiated-limit compliance complete |
+| **0.5.0** ✅ | F11 presence (will + birth, static + factory), F5 session redelivery, F6 enhanced auth | Persistent sessions and presence are honest end to end |
+| **0.6.0** ✅ | F8 broker matrix, N3/N4 | Interop proven beyond Mosquitto |
+| **0.7.0** ✅ | N1 SQLite stores, N2 MessagePack, N5 migration guide, N6 request streaming, N7 WebSocket proxy | Nice-to-haves shipped |
+| **1.0.0-rc.1** ✅ | F7 API freeze, F10 soak/stress, docs complete | Public API locked; release candidate published |
+| **1.0.0** ✅ | rc.1 promoted, no new features | All F-items checked; quality gates green |
+
+Every required feature (F1–F11) and every nice-to-have (N1–N7) is implemented, tested, and
+shipped. The public API is frozen and analyzer-enforced; the resilience guarantees are validated
+under chaos against real brokers; the interop matrix covers Mosquitto, EMQX, and HiveMQ. **1.0.0 is
+released.**
 
 Rules of the road, unchanged from the start of the project: every step lands as its own merged
 PR with tests; quality, performance, memory, and swap-point interchangeability are
