@@ -17,4 +17,11 @@ public sealed record RawMqttClientOptions
 
     /// <summary>The bounded capacity of the received-message queue.</summary>
     public int InboundMessageCapacity { get; init; } = 256;
+
+    /// <summary>
+    /// Whether to compress repeated publish topics into MQTT 5 topic aliases, within the
+    /// maximum the broker advertises. Aliases are assigned first come, first served, and reset
+    /// on every connection. Off by default.
+    /// </summary>
+    public bool UseOutboundTopicAliases { get; init; }
 }
