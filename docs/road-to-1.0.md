@@ -215,7 +215,8 @@ Mosquitto alone proves too little for a 1.0 interop claim.
 **Definition of done**
 - [x] A soak harness (`SoakTests`, tagged `Soak`) runs sustained QoS 1 traffic through endless
       random disconnects against a real broker for a configurable duration
-      (`PULSE_SOAK_DURATION`, default 30 s smoke / set to `24:00:00` for the full run): it asserts
+      (`PULSE_SOAK_DURATION`, a `TimeSpan` string; default 30 s smoke / set to `1.00:00:00` — one
+      day — for the full run, since `24:00:00` parses as 24 *days*): it asserts
       zero lost messages, that reconnect always recovers, and that the managed heap stays within a
       bounded tolerance of a post-warmup snapshot. Run on demand; restart the broker container
       during the run to cover process restarts alongside the network cuts.

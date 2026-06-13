@@ -14,8 +14,9 @@ namespace Pulse.Mqtt.IntegrationTests;
 
 /// <summary>
 /// The soak harness: sustained QoS 1 traffic through endless random disconnects, for a duration set
-/// by the <c>PULSE_SOAK_DURATION</c> environment variable (default 30 s for a smoke check; set to
-/// <c>24:00:00</c> for the real run). It asserts zero lost messages, that reconnect always recovers,
+/// by the <c>PULSE_SOAK_DURATION</c> environment variable (a <see cref="TimeSpan"/> string; default
+/// 30 s for a smoke check; set to <c>1.00:00:00</c> — one day — for the real run, since
+/// <c>24:00:00</c> parses as 24 <em>days</em>). It asserts zero lost messages, that reconnect always recovers,
 /// and that the managed heap does not grow without bound. Tagged <c>Soak</c> so it stays out of the
 /// normal CI run; invoke it with <c>dotnet test --filter "Category=Soak"</c> against a broker, and
 /// restart the broker container periodically to cover process restarts as well as network cuts.
