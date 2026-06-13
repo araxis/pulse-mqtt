@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 (unreleased)
+
+_Nothing yet._
+
 ## 1.0.0
 
 The first stable release. Promotes `1.0.0-rc.1` with no functional changes — the public API is now
