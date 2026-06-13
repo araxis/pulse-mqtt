@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Core\Pulse.Mqtt.Core.csproj" />
+    <ProjectReference Include="..\..\src\Pulse.Mqtt.Client\Pulse.Mqtt.Client.csproj" />
   </ItemGroup>
 
 </Project>

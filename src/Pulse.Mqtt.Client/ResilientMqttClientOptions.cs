@@ -48,4 +48,48 @@ public sealed record ResilientMqttClientOptions
 
     /// <summary>Receives the client's structured logs. <see langword="null"/> (the default) is silent.</summary>
     public ILogger? Logger { get; init; }
+
+    /// <summary>
+    /// The last-will message registered with every CONNECT — the broker publishes it when the
+    /// connection dies ungracefully. Overrides <see cref="MqttConnectPacket.Will"/> on
+    /// <see cref="Connect"/> when set; <see cref="WillFactory"/> wins over both.
+    /// </summary>
+    public MqttWillMessage? Will { get; init; }
+
+    /// <summary>
+    /// Computes the will fresh for every connection attempt — timestamps, session counters,
+    /// current configuration — instead of freezing it at startup. A throwing factory fails
+    /// that attempt like any connect failure, classified by the reconnect decision.
+    /// </summary>
+    public Func<CancellationToken, ValueTask<MqttWillMessage>>? WillFactory { get; init; }
+
+    /// <summary>
+    /// The birth message — the will's mirror — published automatically on every connection-up:
+    /// after re-subscription, before the offline queue flushes, before the state becomes
+    /// <see cref="Resilience.ConnectionState.Connected"/>. Pair a retained birth ("online")
+    /// with a retained will ("offline") for the classic presence pattern.
+    /// </summary>
+    public MqttPublishPacket? Birth { get; init; }
+
+    /// <summary>
+    /// Computes the birth message fresh for every connection-up; the argument is the
+    /// connection attempt counter. Wins over <see cref="Birth"/> when both are set.
+    /// </summary>
+    public Func<int, CancellationToken, ValueTask<MqttPublishPacket>>? BirthFactory { get; init; }
+
+    /// <summary>What happens when publishing the birth message fails. Default: the connection-up fails and retries.</summary>
+    public BirthFailurePolicy BirthFailure { get; init; } = BirthFailurePolicy.FailConnection;
+}
+
+/// <summary>How a failed birth publish is treated.</summary>
+public enum BirthFailurePolicy
+{
+    /// <summary>
+    /// The connection-up fails and the reconnect cycle retries — presence stays truthful:
+    /// nobody observes a connected client whose "online" announcement never went out.
+    /// </summary>
+    FailConnection,
+
+    /// <summary>The failure is logged and counted; the connection proceeds without the announcement.</summary>
+    LogAndContinue,
 }

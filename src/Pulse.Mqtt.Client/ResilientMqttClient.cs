@@ -590,7 +590,20 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                             };
                             try
                             {
-                                var ack = await candidate.ConnectAsync(_options.Connect, token).ConfigureAwait(false);
+                                // The will is computed per attempt: a factory produces a fresh
+                                // topic and payload for every reconnect, and a throwing factory
+                                // fails this attempt like any other connect failure.
+                                var connect = _options.Connect;
+                                if (_options.WillFactory is { } willFactory)
+                                {
+                                    connect = connect with { Will = await willFactory(token).ConfigureAwait(false) };
+                                }
+                                else if (_options.Will is { } will)
+                                {
+                                    connect = connect with { Will = will };
+                                }
+
+                                var ack = await candidate.ConnectAsync(connect, token).ConfigureAwait(false);
                                 if (ack.ReasonCode != MqttReasonCode.Success)
                                 {
                                     throw new MqttConnectRejectedException(ack.ReasonCode);
@@ -622,6 +635,12 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 {
                     var upContext = new ConnectionUpContext(connAck!, _attempt, new RawSubscriptionRegistrar(raw!));
                     await _lifecycle.OnConnectionUpAsync(upContext, cancellationToken).ConfigureAwait(false);
+
+                    // Presence order is deliberate: re-subscription is in place (above), the
+                    // birth announces before queued traffic flushes, and the state only becomes
+                    // Connected afterwards — nobody observes "online" from a half-restored
+                    // session.
+                    await PublishBirthAsync(raw!, cancellationToken).ConfigureAwait(false);
                     await FlushQueuedAsync(raw!, cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
@@ -702,6 +721,38 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         catch (Exception error)
         {
             Fault(error);
+        }
+    }
+
+    private async Task PublishBirthAsync(RawMqttClient raw, CancellationToken cancellationToken)
+    {
+        var birth = _options.BirthFactory is { } factory
+            ? await factory(_attempt, cancellationToken).ConfigureAwait(false)
+            : _options.Birth;
+        if (birth is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await raw.PublishAsync(birth, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception error) when (_options.BirthFailure == BirthFailurePolicy.LogAndContinue)
+        {
+            if (_options.Logger is { } logger)
+            {
+                PulseMqttLog.BirthPublishFailed(logger, _clientId, birth.Topic, error);
+            }
+
+            PulseMqttDiagnostics.MessagesPublished.Add(
+                1,
+                new KeyValuePair<string, object?>("client.id", _clientId),
+                new KeyValuePair<string, object?>("disposition", "BirthFailed"));
         }
     }
 

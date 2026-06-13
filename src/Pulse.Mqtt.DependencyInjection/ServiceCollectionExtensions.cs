@@ -66,6 +66,26 @@ public static class ServiceCollectionExtensions
                 MessageStore = provider.GetKeyedService<IMessageStore>(clientName),
                 Serializer = provider.GetKeyedService<IMqttSerializer>(clientName),
                 Logger = provider.GetService<ILoggerFactory>()?.CreateLogger($"Pulse.Mqtt.Client.{clientName}"),
+                Will = options.Will is { } will
+                    ? new MqttWillMessage(will.Topic)
+                    {
+                        Payload = Encoding.UTF8.GetBytes(will.Payload),
+                        QualityOfService = will.QualityOfService,
+                        Retain = will.Retain,
+                        DelayInterval = will.DelaySeconds,
+                    }
+                    : null,
+                WillFactory = provider.GetKeyedService<Func<CancellationToken, ValueTask<MqttWillMessage>>>(clientName),
+                Birth = options.Birth is { } birth
+                    ? new MqttPublishPacket
+                    {
+                        Topic = birth.Topic,
+                        Payload = Encoding.UTF8.GetBytes(birth.Payload),
+                        QualityOfService = birth.QualityOfService,
+                        Retain = birth.Retain,
+                    }
+                    : null,
+                BirthFactory = provider.GetKeyedService<Func<int, CancellationToken, ValueTask<MqttPublishPacket>>>(clientName),
             };
 
             return new ResilientMqttClient(transportFactory, clientOptions, provider.GetService<TimeProvider>());

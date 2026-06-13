@@ -31,4 +31,8 @@ internal static partial class PulseMqttLog
     [LoggerMessage(EventId = 6, Level = LogLevel.Warning,
         Message = "MQTT client {ClientId} dropped a queued publish to {Topic}: {PacketSize} bytes exceeds the broker's {Limit}-byte maximum")]
     public static partial void QueuedPublishTooLarge(ILogger logger, string clientId, string topic, int packetSize, uint limit);
+
+    [LoggerMessage(EventId = 7, Level = LogLevel.Warning,
+        Message = "MQTT client {ClientId} failed to publish its birth message to {Topic}")]
+    public static partial void BirthPublishFailed(ILogger logger, string clientId, string topic, Exception error);
 }
