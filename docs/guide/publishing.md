@@ -46,6 +46,7 @@ Every publish returns a `PublishOutcome`:
 | `Delivered` | The broker received it (QoS > 0: acknowledged). `ReasonCode` carries the broker's answer. |
 | `Queued` | The client is offline; the message sits in the [offline queue](./resilience#the-offline-queue) and flushes after reconnect, **after** re-subscription. |
 | `DroppedOffline` | The client is offline and QoS 0 messages are configured to drop (the default for QoS 0). |
+| `InFlight` | The connection dropped mid-exchange while a [persistent session](./resilience#in-flight-redelivery-on-session-resume) was tracking this QoS 1/2 publish. The message is held and redelivers (with DUP) on resume. |
 
 ```csharp
 var outcome = await client.PublishAsync(packet, token);

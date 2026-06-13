@@ -39,4 +39,17 @@ public sealed class MqttPacketIdAllocator
             _inUse.Remove(id);
         }
     }
+
+    /// <summary>
+    /// Marks a specific identifier as in use — for session resume, where redelivered exchanges
+    /// keep the identifiers from the previous connection. Reserving an already-reserved
+    /// identifier is a no-op.
+    /// </summary>
+    public void Reserve(ushort id)
+    {
+        lock (_gate)
+        {
+            _inUse.Add(id);
+        }
+    }
 }

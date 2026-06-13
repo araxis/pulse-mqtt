@@ -61,4 +61,15 @@ public interface ISessionStore
 
         await SaveSubscriptionsAsync(remaining, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Persists the session's unfinished QoS state so a resume can redeliver. The default keeps
+    /// nothing — a store that does not override these gets today's behavior (no redelivery
+    /// across restarts); the in-memory default and durable stores implement them.
+    /// </summary>
+    ValueTask SaveInFlightAsync(MqttInFlightState state, CancellationToken cancellationToken) => default;
+
+    /// <summary>Returns the stored in-flight state, or <see langword="null"/> when nothing was saved.</summary>
+    ValueTask<MqttInFlightState?> LoadInFlightAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult<MqttInFlightState?>(null);
 }

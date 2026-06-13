@@ -6,6 +6,7 @@ public sealed class InMemorySessionStore : ISessionStore
     private readonly object _gate = new();
     private readonly Dictionary<string, MqttTopicFilter> _subscriptions = [];
     private IReadOnlyList<MqttTopicFilter>? _snapshot;
+    private MqttInFlightState? _inFlight;
 
     /// <inheritdoc />
     public ValueTask SaveSubscriptionsAsync(IReadOnlyList<MqttTopicFilter> topicFilters, CancellationToken cancellationToken)
@@ -72,12 +73,34 @@ public sealed class InMemorySessionStore : ISessionStore
     }
 
     /// <inheritdoc />
+    public ValueTask SaveInFlightAsync(MqttInFlightState state, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        lock (_gate)
+        {
+            _inFlight = state;
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public ValueTask<MqttInFlightState?> LoadInFlightAsync(CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            return ValueTask.FromResult(_inFlight);
+        }
+    }
+
+    /// <inheritdoc />
     public ValueTask ClearAsync(CancellationToken cancellationToken)
     {
         lock (_gate)
         {
             _subscriptions.Clear();
             _snapshot = null;
+            _inFlight = null;
         }
 
         return ValueTask.CompletedTask;

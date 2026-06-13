@@ -117,6 +117,41 @@ Choosing an overflow policy:
 The queue is in-memory by default; a durable store that survives restarts is one interface
 away — [Extending](./extending#custom-message-store).
 
+## In-flight redelivery on session resume
+
+With a **persistent session** — `CleanStart = false` and a broker that preserves the session —
+Pulse honors the MQTT 5 requirement to retransmit unfinished QoS 1/2 work after a reconnect,
+so a publish interrupted mid-exchange is never lost:
+
+- An unacknowledged QoS 1/2 PUBLISH is recorded the moment it goes to the wire. If the
+  connection drops before its acknowledgement, `PublishAsync` returns
+  `PublishDisposition.InFlight` — the message is held, not lost.
+- On reconnect, if the broker reports the session is present, the held exchanges **redeliver in
+  their original order, before the offline queue flushes**. A PUBLISH still awaiting its PUBACK
+  or PUBREC re-sends with the **DUP** flag and its original packet identifier; an exchange that
+  already received its PUBREC re-sends only the **PUBREL**.
+- Inbound QoS 2 duplicate-suppression state is restored too, so a message the broker redelivers
+  after the reconnect is acknowledged but **not delivered to your handlers twice**.
+- If the broker reports a **fresh** session (it did not preserve the old one), the in-flight
+  state is discarded per the specification.
+
+The tracked state lives behind the [`ISessionStore`](./extending#custom-session-store) swap
+point: the in-memory default keeps it for the process (covering reconnects within a run), and a
+durable store carries it across process restarts. Clean-start clients (the default) skip the
+tracking entirely, so the hot publish path keeps its zero-allocation cost.
+
+```csharp
+new ResilientMqttClientOptions
+{
+    Connect = new MqttConnectPacket
+    {
+        ClientId = "device-7",
+        CleanStart = false,            // resume an existing session
+        SessionExpiryInterval = 300,   // ask the broker to keep it for 5 minutes
+    },
+};
+```
+
 ## Sessions and re-subscription
 
 The durable subscription set lives in an `ISessionStore` (in-memory by default). On

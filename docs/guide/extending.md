@@ -202,6 +202,13 @@ restores subscriptions across restarts. The `Upsert`/`Remove` methods ship with 
 implementations built on `Load` + `Save`; override both when subscription counts are high enough
 that rewriting the whole set per call hurts (the in-memory store does exactly this).
 
+The store also persists the session's **in-flight QoS state** for
+[redelivery on resume](./resilience#in-flight-redelivery-on-session-resume) through
+`SaveInFlightAsync`/`LoadInFlightAsync` (an `MqttInFlightState` of unfinished outbound exchanges
+and inbound QoS 2 identifiers). Both have default no-op implementations, so a store that does
+not override them simply opts out of cross-restart redelivery; override them in a durable store
+to carry in-flight work across process restarts.
+
 ## Message store
 
 **Contract.** The bounded offline publish queue.

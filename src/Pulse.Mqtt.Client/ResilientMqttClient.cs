@@ -30,6 +30,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     private readonly ISessionStore _sessionStore;
     private readonly IMessageStore _messageStore;
     private readonly IReconnectDecision _decision;
+    private readonly MqttInFlightSession? _inFlightSession;
     private readonly Channel<MqttPublishPacket> _messages;
     private readonly List<Channel<ConnectionStateChanged>> _watchers = [];
     private readonly Dictionary<string, MqttTopicFilter> _subscriptions = [];
@@ -65,6 +66,15 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         _decision = options.ReconnectDecision ?? new DefaultReconnectDecision();
         _strategy = options.ReconnectStrategy ?? new BackoffReconnectStrategy(options.Backoff, _decision);
         _lifecycle = options.Lifecycle ?? new DefaultConnectionLifecycle(_sessionStore);
+
+        // In-flight QoS redelivery is only meaningful for a persistent session — a client that
+        // asks for one (CleanStart = false). For clean-start clients the tracking is skipped
+        // entirely, so the hot publish path keeps its zero-allocation cost.
+        if (!options.Connect.CleanStart)
+        {
+            _inFlightSession = new MqttInFlightSession(
+                (state, token) => _sessionStore.SaveInFlightAsync(state, token));
+        }
 
         _messages = Channel.CreateBounded<MqttPublishPacket>(new BoundedChannelOptions(options.Raw.InboundMessageCapacity)
         {
@@ -131,6 +141,13 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             }
         }
 
+        // Restore any in-flight QoS state a durable store persisted across a restart, so the
+        // first connection can redeliver it.
+        if (_inFlightSession is not null)
+        {
+            _inFlightSession.Restore(await _sessionStore.LoadInFlightAsync(cancellationToken).ConfigureAwait(false));
+        }
+
         _attempt = 0;
         _lifetime?.Dispose();
         var lifetime = new CancellationTokenSource();
@@ -182,6 +199,13 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             {
                 // Queueing would retry a permanently-doomed packet forever; the caller decides.
                 throw;
+            }
+            catch (MqttPublishInFlightException)
+            {
+                // The connection died mid-exchange while a persistent session was tracking this
+                // publish: the session holds it and redelivers it with DUP on resume. Queueing it
+                // too would double-send, so it returns as in-flight, not queued.
+                return new PublishOutcome(PublishDisposition.InFlight);
             }
             catch (Exception ex) when (ex is MqttException or InvalidOperationException or ObjectDisposedException)
             {
@@ -612,10 +636,20 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                                     connect = connect with { Will = will };
                                 }
 
-                                var ack = await candidate.ConnectAsync(connect, token).ConfigureAwait(false);
+                                // Held in-flight work is only redeliverable if the broker keeps
+                                // the session; capture the count first so a clean session that
+                                // discards it (per spec) is observable rather than silent.
+                                var heldInFlight = _inFlightSession?.Snapshot().Outbound.Count ?? 0;
+
+                                var ack = await candidate.ConnectAsync(connect, _inFlightSession, token).ConfigureAwait(false);
                                 if (ack.ReasonCode != MqttReasonCode.Success)
                                 {
                                     throw new MqttConnectRejectedException(ack.ReasonCode);
+                                }
+
+                                if (heldInFlight > 0 && !ack.SessionPresent && _options.Logger is { } discardLogger)
+                                {
+                                    PulseMqttLog.InFlightDiscarded(discardLogger, _clientId, heldInFlight);
                                 }
 
                                 raw = candidate;
@@ -645,10 +679,15 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                     var upContext = new ConnectionUpContext(connAck!, _attempt, new RawSubscriptionRegistrar(raw!));
                     await _lifecycle.OnConnectionUpAsync(upContext, cancellationToken).ConfigureAwait(false);
 
-                    // Presence order is deliberate: re-subscription is in place (above), the
-                    // birth announces before queued traffic flushes, and the state only becomes
-                    // Connected afterwards — nobody observes "online" from a half-restored
-                    // session.
+                    // Order is deliberate and spec-driven:
+                    //   1. re-subscription (above) is in place first,
+                    //   2. unacknowledged QoS 1/2 exchanges from the resumed session redeliver,
+                    //   3. the birth announces "online",
+                    //   4. never-sent offline publishes flush,
+                    //   5. the state becomes Connected.
+                    // Redelivery precedes the queue flush so resumed in-flight work completes in
+                    // its original order before any newly-queued traffic.
+                    await raw!.RedeliverAsync(cancellationToken).ConfigureAwait(false);
                     await PublishBirthAsync(raw!, cancellationToken).ConfigureAwait(false);
                     await FlushQueuedAsync(raw!, cancellationToken).ConfigureAwait(false);
                 }

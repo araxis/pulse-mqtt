@@ -35,4 +35,8 @@ internal static partial class PulseMqttLog
     [LoggerMessage(EventId = 7, Level = LogLevel.Warning,
         Message = "MQTT client {ClientId} failed to publish its birth message to {Topic}")]
     public static partial void BirthPublishFailed(ILogger logger, string clientId, string topic, Exception error);
+
+    [LoggerMessage(EventId = 8, Level = LogLevel.Warning,
+        Message = "MQTT client {ClientId} discarded {Count} in-flight publish(es): the broker did not preserve the session")]
+    public static partial void InFlightDiscarded(ILogger logger, string clientId, int count);
 }

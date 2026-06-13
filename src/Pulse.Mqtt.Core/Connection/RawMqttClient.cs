@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using Pulse.Mqtt.Codec;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
+using Pulse.Mqtt.Resilience;
 using Pulse.Mqtt.Transport;
 
 namespace Pulse.Mqtt.Connection;
@@ -30,6 +31,7 @@ public sealed class RawMqttClient : IAsyncDisposable
     private Dictionary<string, ushort>? _outboundAliases;   // touched only inside the send lock
     private ushort _outboundAliasMaximum;
     private TaskCompletionSource? _reauthSignal;   // swapped with Interlocked; completed by the pump
+    private MqttInFlightSession? _session;
     private MqttProtocolVersion _protocolVersion = MqttProtocolVersion.V500;
     private Task? _pump;
     private Task? _keepAliveLoop;
@@ -64,7 +66,7 @@ public sealed class RawMqttClient : IAsyncDisposable
 
     /// <summary>
     /// An optional delivery sink that replaces <see cref="Messages"/>: when set before
-    /// <see cref="ConnectAsync"/>, inbound application messages go straight to it from the inbound
+    /// connecting, inbound application messages go straight to it from the inbound
     /// pump and the <see cref="Messages"/> channel stays empty — one less queue between the wire
     /// and a consumer that already has its own. The connection's close no longer completes
     /// anything; observe <see cref="Completion"/> instead.
@@ -86,7 +88,20 @@ public sealed class RawMqttClient : IAsyncDisposable
     /// </summary>
     /// <exception cref="MqttException">The broker did not answer in time or closed during the handshake.</exception>
     /// <exception cref="MqttProtocolException">The broker's first packet was not a CONNACK.</exception>
-    public async Task<MqttConnAckPacket> ConnectAsync(MqttConnectPacket connect, CancellationToken cancellationToken)
+    public Task<MqttConnAckPacket> ConnectAsync(MqttConnectPacket connect, CancellationToken cancellationToken) =>
+        ConnectAsync(connect, session: null, cancellationToken);
+
+    /// <summary>
+    /// Connects with persistent-session tracking: unfinished QoS exchanges record into
+    /// <paramref name="session"/>, and when the broker reports a present session its inbound
+    /// duplicate-suppression identifiers are restored and the outbound identifiers reserved so
+    /// <see cref="RedeliverAsync"/> can resume them. When the broker did not preserve the
+    /// session, the tracked state is discarded.
+    /// </summary>
+    public async Task<MqttConnAckPacket> ConnectAsync(
+        MqttConnectPacket connect,
+        MqttInFlightSession? session,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(connect);
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -168,6 +183,30 @@ public sealed class RawMqttClient : IAsyncDisposable
             _protocolVersion = connect.ProtocolVersion;
             _connection = connection;
 
+            // Persistent-session state: restore it while the pump is not yet running (no
+            // races), or discard it when the broker reports a fresh session.
+            _session = session;
+            if (session is not null)
+            {
+                if (connAck.SessionPresent)
+                {
+                    var state = session.Snapshot();
+                    foreach (var id in state.InboundExactlyOnce)
+                    {
+                        _inboundQos2.Add(id);
+                    }
+
+                    foreach (var entry in state.Outbound)
+                    {
+                        _packetIds.Reserve(entry.Packet.PacketIdentifier!.Value);
+                    }
+                }
+                else
+                {
+                    await session.ClearAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+
             // Honor the broker's limits from here on. The CONNECT itself is exempt — the limit
             // is only known once the CONNACK arrives.
             connection.MaximumOutboundPacketSize = connAck.MaximumPacketSize;
@@ -238,50 +277,38 @@ public sealed class RawMqttClient : IAsyncDisposable
         }
 
         var id = _packetIds.Rent();
+
+        // The identifier returns to the allocator only when the exchange truly finishes (or the
+        // packet never reached the wire). When a persistent session keeps an interrupted entry,
+        // the id stays reserved so a still-live connection can never re-rent it and clobber that
+        // entry (which would lose the message and collide identifiers on the wire). Without a
+        // session there is nothing to protect, so the id always returns.
+        var settled = false;
         try
         {
             packet = packet with { ProtocolVersion = _protocolVersion, PacketIdentifier = id };
 
             if (packet.QualityOfService == MqttQualityOfService.AtLeastOnce)
             {
-                MqttPacket response;
-                var quota = _sendQuota;
-                if (quota is not null)
+                var response = await ExchangeUnderQuotaAsync(
+                    connection, packet, id, MqttInFlightStage.AwaitingPubAck, cancellationToken).ConfigureAwait(false);
+
+                if (response is not MqttPublishAckPacket { PacketType: MqttPacketType.PubAck } pubAck)
                 {
-                    await quota.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    throw new MqttProtocolException($"Expected a PUBACK for {id} but received {response.GetType().Name}.");
                 }
 
-                try
+                if (_session is { } qos1Session)
                 {
-                    response = await RequestAsync(connection, packet, id, cancellationToken).ConfigureAwait(false);
-                }
-                finally
-                {
-                    quota?.Release();
+                    await qos1Session.OutboundCompletedAsync(id, cancellationToken).ConfigureAwait(false);
                 }
 
-                return response is MqttPublishAckPacket { PacketType: MqttPacketType.PubAck } pubAck
-                    ? pubAck.ReasonCode
-                    : throw new MqttProtocolException($"Expected a PUBACK for {id} but received {response.GetType().Name}.");
+                settled = true;
+                return pubAck.ReasonCode;
             }
 
-            MqttPacket first;
-            var qos2Quota = _sendQuota;
-            if (qos2Quota is not null)
-            {
-                await qos2Quota.WaitAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            try
-            {
-                // The quota frees at PUBREC: the broker has the message from that point on,
-                // and PUBREL/PUBCOMP complete outside the receive-maximum window.
-                first = await RequestAsync(connection, packet, id, cancellationToken).ConfigureAwait(false);
-            }
-            finally
-            {
-                qos2Quota?.Release();
-            }
+            var first = await ExchangeUnderQuotaAsync(
+                connection, packet, id, MqttInFlightStage.AwaitingPubRec, cancellationToken).ConfigureAwait(false);
 
             if (first is not MqttPublishAckPacket { PacketType: MqttPacketType.PubRec } pubRec)
             {
@@ -290,23 +317,203 @@ public sealed class RawMqttClient : IAsyncDisposable
 
             if ((byte)pubRec.ReasonCode >= 0x80)
             {
+                if (_session is { } rejectedSession)
+                {
+                    await rejectedSession.OutboundCompletedAsync(id, cancellationToken).ConfigureAwait(false);
+                }
+
+                settled = true;
                 return pubRec.ReasonCode;
             }
 
-            var release = new MqttPublishAckPacket
+            if (_session is { } advancedSession)
             {
-                PacketType = MqttPacketType.PubRel,
-                PacketIdentifier = id,
-                ProtocolVersion = _protocolVersion,
-            };
-            var second = await RequestAsync(connection, release, id, cancellationToken).ConfigureAwait(false);
-            return second is MqttPublishAckPacket { PacketType: MqttPacketType.PubComp } pubComp
-                ? pubComp.ReasonCode
-                : throw new MqttProtocolException($"Expected a PUBCOMP for {id} but received {second.GetType().Name}.");
+                await advancedSession.OutboundAdvancedAsync(id, cancellationToken).ConfigureAwait(false);
+            }
+
+            var reason = await ReleaseExchangeAsync(connection, id, cancellationToken).ConfigureAwait(false);
+            if (_session is { } completedSession)
+            {
+                await completedSession.OutboundCompletedAsync(id, cancellationToken).ConfigureAwait(false);
+            }
+
+            settled = true;
+            return reason;
+        }
+        catch (MqttPacketTooLargeException)
+        {
+            // Rejected before any byte reached the wire: the entry was removed and the id is free.
+            settled = true;
+            throw;
         }
         finally
         {
-            _packetIds.Return(id);
+            if (settled || _session is null)
+            {
+                _packetIds.Return(id);
+            }
+        }
+    }
+
+    // Sends an identified QoS 1/2 PUBLISH under the receive-maximum quota, recording it in the
+    // persistent session first so a mid-exchange loss can resume. The quota frees when the
+    // first acknowledgement (PUBACK or PUBREC) arrives, per the specification.
+    private async Task<MqttPacket> ExchangeUnderQuotaAsync(
+        MqttConnection connection,
+        MqttPublishPacket packet,
+        ushort id,
+        MqttInFlightStage stage,
+        CancellationToken cancellationToken)
+    {
+        var quota = _sendQuota;
+        if (quota is not null)
+        {
+            await quota.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            if (_session is { } session)
+            {
+                await session.OutboundSentAsync(packet, stage, cancellationToken).ConfigureAwait(false);
+            }
+
+            try
+            {
+                return await RequestAsync(connection, packet, id, cancellationToken).ConfigureAwait(false);
+            }
+            catch (MqttPacketTooLargeException)
+            {
+                // Never reached the wire: nothing to resume.
+                if (_session is { } oversized)
+                {
+                    await oversized.OutboundCompletedAsync(id, CancellationToken.None).ConfigureAwait(false);
+                }
+
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                // The caller cancelled, but the packet may be on the wire — the session keeps
+                // it and resumes it like any other interrupted exchange.
+                throw;
+            }
+            catch (Exception error) when (_session is not null)
+            {
+                throw new MqttPublishInFlightException(id, error);
+            }
+        }
+        finally
+        {
+            quota?.Release();
+        }
+    }
+
+    // The PUBREL → PUBCOMP tail of a QoS 2 exchange (outside the receive-maximum window).
+    private async Task<MqttReasonCode> ReleaseExchangeAsync(MqttConnection connection, ushort id, CancellationToken cancellationToken)
+    {
+        var release = new MqttPublishAckPacket
+        {
+            PacketType = MqttPacketType.PubRel,
+            PacketIdentifier = id,
+            ProtocolVersion = _protocolVersion,
+        };
+
+        MqttPacket second;
+        try
+        {
+            second = await RequestAsync(connection, release, id, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception error) when (_session is not null)
+        {
+            throw new MqttPublishInFlightException(id, error);
+        }
+
+        return second is MqttPublishAckPacket { PacketType: MqttPacketType.PubComp } pubComp
+            ? pubComp.ReasonCode
+            : throw new MqttProtocolException($"Expected a PUBCOMP for {id} but received {second.GetType().Name}.");
+    }
+
+    /// <summary>
+    /// Resumes the unfinished exchanges of a presented session, oldest first: interrupted
+    /// publishes re-send with DUP under their original identifiers, and exchanges that already
+    /// have their PUBREC re-send only the PUBREL. Call after a session-aware connect that
+    /// restored a session; without one this is a no-op.
+    /// </summary>
+    public async Task RedeliverAsync(CancellationToken cancellationToken)
+    {
+        if (_session is not { } session)
+        {
+            return;
+        }
+
+        var connection = ConnectedOrThrow();
+        foreach (var entry in session.Snapshot().Outbound)
+        {
+            var id = entry.Packet.PacketIdentifier!.Value;
+            try
+            {
+                switch (entry.Stage)
+                {
+                    case MqttInFlightStage.AwaitingPubAck:
+                    {
+                        var dup = entry.Packet with { Dup = true, ProtocolVersion = _protocolVersion };
+                        var response = await ExchangeUnderQuotaAsync(
+                            connection, dup, id, MqttInFlightStage.AwaitingPubAck, cancellationToken).ConfigureAwait(false);
+                        if (response is not MqttPublishAckPacket { PacketType: MqttPacketType.PubAck })
+                        {
+                            throw new MqttProtocolException($"Expected a PUBACK for {id} but received {response.GetType().Name}.");
+                        }
+
+                        await session.OutboundCompletedAsync(id, cancellationToken).ConfigureAwait(false);
+                        break;
+                    }
+
+                    case MqttInFlightStage.AwaitingPubRec:
+                    {
+                        var dup = entry.Packet with { Dup = true, ProtocolVersion = _protocolVersion };
+                        var first = await ExchangeUnderQuotaAsync(
+                            connection, dup, id, MqttInFlightStage.AwaitingPubRec, cancellationToken).ConfigureAwait(false);
+                        if (first is not MqttPublishAckPacket { PacketType: MqttPacketType.PubRec } pubRec)
+                        {
+                            throw new MqttProtocolException($"Expected a PUBREC for {id} but received {first.GetType().Name}.");
+                        }
+
+                        if ((byte)pubRec.ReasonCode >= 0x80)
+                        {
+                            await session.OutboundCompletedAsync(id, cancellationToken).ConfigureAwait(false);
+                            break;
+                        }
+
+                        await session.OutboundAdvancedAsync(id, cancellationToken).ConfigureAwait(false);
+                        await ReleaseExchangeAsync(connection, id, cancellationToken).ConfigureAwait(false);
+                        await session.OutboundCompletedAsync(id, cancellationToken).ConfigureAwait(false);
+                        break;
+                    }
+
+                    case MqttInFlightStage.AwaitingPubComp:
+                        await ReleaseExchangeAsync(connection, id, cancellationToken).ConfigureAwait(false);
+                        await session.OutboundCompletedAsync(id, cancellationToken).ConfigureAwait(false);
+                        break;
+                }
+
+                _packetIds.Return(id);
+            }
+            catch (MqttPacketTooLargeException)
+            {
+                // This broker accepts smaller packets than the one being resumed. Retrying can
+                // never succeed, so the exchange is already dropped from the session by
+                // ExchangeUnderQuotaAsync; free its id and keep redelivering the rest in order
+                // rather than aborting the whole pass (which would re-loop the supervisor).
+                _packetIds.Return(id);
+            }
+
+            // Any other failure here is a connection drop mid-redelivery: leave the id reserved
+            // and the remaining entries in the session so the next resume continues, in order.
         }
     }
 
@@ -574,6 +781,11 @@ public sealed class RawMqttClient : IAsyncDisposable
                             break;
                         case MqttPublishAckPacket { PacketType: MqttPacketType.PubRel } pubRel:
                             _inboundQos2.Remove(pubRel.PacketIdentifier);
+                            if (_session is { } pubRelSession)
+                            {
+                                await pubRelSession.InboundReleasedAsync(pubRel.PacketIdentifier, cancellationToken).ConfigureAwait(false);
+                            }
+
                             await SendThroughAsync(
                                 connection,
                                 new MqttPublishAckPacket
@@ -659,6 +871,13 @@ public sealed class RawMqttClient : IAsyncDisposable
                 var id = RequiredId(publish);
                 if (_inboundQos2.Add(id))
                 {
+                    // Record before delivering: a crash after delivery but before the PUBREL
+                    // must still suppress the broker's redelivery on resume.
+                    if (_session is { } session)
+                    {
+                        await session.InboundReceivedAsync(id, cancellationToken).ConfigureAwait(false);
+                    }
+
                     await DeliverAsync(publish, cancellationToken).ConfigureAwait(false);
                 }
 
