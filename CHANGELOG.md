@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+_Nothing yet._
+
 ## 0.4.0
 
 - Receive-maximum flow control: outbound QoS 1/2 publishes never exceed the broker's CONNACK
