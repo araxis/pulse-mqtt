@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 (unreleased)
+
+_Nothing yet._
+
 ## 0.5.0
 
 - In-flight redelivery on session resume: with a persistent session (`CleanStart = false`)
