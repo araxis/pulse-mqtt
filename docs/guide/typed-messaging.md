@@ -56,23 +56,31 @@ fault isolation.
 The typed [RPC APIs](./request-response) serialize requests and responses through the same
 serializer on both sides.
 
-## Bring your own format
+## MessagePack
 
-`IMqttSerializer` is one small interface:
+For a compact binary wire format, add the `Pulse.Mqtt.Serialization.MessagePack` package. Like the
+JSON serializer it stays reflection-free: hand it `MessagePackSerializerOptions` built from a
+[source-generated resolver](https://github.com/MessagePack-CSharp/MessagePack-CSharp#aot-code-generation-to-support-unityxamarin-and-native-aot)
+(annotate your types with `[MessagePackObject]`), so there is no dynamic codegen and it is Native
+AOT safe:
 
 ```csharp
-public sealed class MessagePackMqttSerializer : IMqttSerializer
-{
-    public string ContentType => "application/x-msgpack";
-    public MqttPayloadFormatIndicator PayloadFormat => MqttPayloadFormatIndicator.Unspecified;
+var options = MessagePackSerializerOptions.Standard.WithResolver(
+    CompositeResolver.Create(GeneratedMessagePackResolver.Instance, StandardResolver.Instance));
 
-    public ReadOnlyMemory<byte> Serialize<T>(T value) => MessagePackSerializer.Serialize(value);
-    public T Deserialize<T>(ReadOnlyMemory<byte> payload) => MessagePackSerializer.Deserialize<T>(payload);
-}
+new ResilientMqttClientOptions { Serializer = new MessagePackMqttSerializer(options), ... }
 ```
 
+It stamps `ContentType` (`application/x-msgpack`) and a binary `PayloadFormatIndicator`
+(`Unspecified`). The payloads are materially smaller than JSON.
+
+## Bring your own format
+
+`IMqttSerializer` is one small interface — `ContentType`, `PayloadFormat`, `Serialize<T>`,
+`Deserialize<T>`. Implement it for Protobuf, CBOR, or anything else, then:
+
 ```csharp
-.UseSerializer(_ => new MessagePackMqttSerializer())
+.UseSerializer(_ => new MyFormatSerializer())
 ```
 
 Every typed API — publish, routes, streams, RPC — picks it up. Nothing else changes.
