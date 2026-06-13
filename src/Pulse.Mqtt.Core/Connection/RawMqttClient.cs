@@ -25,6 +25,10 @@ public sealed class RawMqttClient : IAsyncDisposable
     private readonly HashSet<ushort> _inboundQos2 = []; // touched only by the single-threaded pump
 
     private MqttConnection? _connection;
+    private SemaphoreSlim? _sendQuota;
+    private string?[]? _inboundAliasTopics;   // index = alias - 1; touched only by the pump
+    private Dictionary<string, ushort>? _outboundAliases;   // touched only inside the send lock
+    private ushort _outboundAliasMaximum;
     private MqttProtocolVersion _protocolVersion = MqttProtocolVersion.V500;
     private Task? _pump;
     private Task? _keepAliveLoop;
@@ -131,6 +135,28 @@ public sealed class RawMqttClient : IAsyncDisposable
             // is only known once the CONNACK arrives.
             connection.MaximumOutboundPacketSize = connAck.MaximumPacketSize;
 
+            // The broker's receive maximum caps concurrent unacknowledged QoS > 0 publishes.
+            // Per the specification the quota frees on PUBACK (QoS 1) or PUBREC (QoS 2).
+            if (connAck.ReceiveMaximum is { } receiveMaximum and > 0)
+            {
+                _sendQuota = new SemaphoreSlim(receiveMaximum, receiveMaximum);
+            }
+
+            // Topic aliases, both directions, reset with every connection. Inbound resolution
+            // is mandatory the moment this client advertised a maximum; outbound assignment is
+            // opt-in and bounded by the broker's advertised maximum.
+            if (connect.TopicAliasMaximum is { } inboundAliasMaximum and > 0)
+            {
+                _inboundAliasTopics = new string?[inboundAliasMaximum];
+            }
+
+            if (_options.UseOutboundTopicAliases && connAck.TopicAliasMaximum is { } outboundAliasMaximum and > 0)
+            {
+                _outboundAliases = new Dictionary<string, ushort>();
+                _outboundAliasMaximum = outboundAliasMaximum;
+                connection.OutboundTransform = ApplyOutboundTopicAlias;
+            }
+
             // Acknowledgements complete their waiters on the receive loop itself; only packets
             // that need queue semantics or trigger sends flow through the pump.
             connection.InboundFilter = TryHandleInline;
@@ -181,13 +207,45 @@ public sealed class RawMqttClient : IAsyncDisposable
 
             if (packet.QualityOfService == MqttQualityOfService.AtLeastOnce)
             {
-                var response = await RequestAsync(connection, packet, id, cancellationToken).ConfigureAwait(false);
+                MqttPacket response;
+                var quota = _sendQuota;
+                if (quota is not null)
+                {
+                    await quota.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                try
+                {
+                    response = await RequestAsync(connection, packet, id, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    quota?.Release();
+                }
+
                 return response is MqttPublishAckPacket { PacketType: MqttPacketType.PubAck } pubAck
                     ? pubAck.ReasonCode
                     : throw new MqttProtocolException($"Expected a PUBACK for {id} but received {response.GetType().Name}.");
             }
 
-            var first = await RequestAsync(connection, packet, id, cancellationToken).ConfigureAwait(false);
+            MqttPacket first;
+            var qos2Quota = _sendQuota;
+            if (qos2Quota is not null)
+            {
+                await qos2Quota.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            try
+            {
+                // The quota frees at PUBREC: the broker has the message from that point on,
+                // and PUBREL/PUBCOMP complete outside the receive-maximum window.
+                first = await RequestAsync(connection, packet, id, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                qos2Quota?.Release();
+            }
+
             if (first is not MqttPublishAckPacket { PacketType: MqttPacketType.PubRec } pubRec)
             {
                 throw new MqttProtocolException($"Expected a PUBREC for {id} but received {first.GetType().Name}.");
@@ -458,6 +516,8 @@ public sealed class RawMqttClient : IAsyncDisposable
         MqttPublishPacket publish,
         CancellationToken cancellationToken)
     {
+        publish = ResolveInboundTopicAlias(publish);
+
         switch (publish.QualityOfService)
         {
             case MqttQualityOfService.AtMostOnce:
@@ -510,6 +570,67 @@ public sealed class RawMqttClient : IAsyncDisposable
         MessageSink is { } sink
             ? sink(publish, cancellationToken)
             : _messages.Writer.WriteAsync(publish, cancellationToken);
+
+    // Runs inside the connection's send lock, so assignment order and wire order always agree:
+    // the packet that establishes an alias reaches the broker before any packet that uses it.
+    private MqttPacket ApplyOutboundTopicAlias(MqttPacket packet)
+    {
+        if (packet is not MqttPublishPacket publish
+            || publish.TopicAlias is not null
+            || _outboundAliases is not { } aliases)
+        {
+            return packet;
+        }
+
+        if (aliases.TryGetValue(publish.Topic, out var alias))
+        {
+            return publish with { Topic = string.Empty, TopicAlias = alias };
+        }
+
+        if (aliases.Count < _outboundAliasMaximum)
+        {
+            alias = (ushort)(aliases.Count + 1);
+            aliases[publish.Topic] = alias;
+            return publish with { TopicAlias = alias };
+        }
+
+        return packet;
+    }
+
+    // Runs on the pump. The specification makes inbound resolution mandatory once the client
+    // advertised a topic-alias maximum; violations are protocol errors that fault the session.
+    private MqttPublishPacket ResolveInboundTopicAlias(MqttPublishPacket publish)
+    {
+        if (publish.TopicAlias is not { } alias)
+        {
+            if (publish.Topic.Length == 0)
+            {
+                throw new MqttProtocolException("A PUBLISH without a topic must carry a topic alias.");
+            }
+
+            return publish;
+        }
+
+        if (_inboundAliasTopics is not { } aliasTopics)
+        {
+            throw new MqttProtocolException("The broker sent a topic alias, but none were negotiated.");
+        }
+
+        if (alias == 0 || alias > aliasTopics.Length)
+        {
+            throw new MqttProtocolException($"Topic alias {alias} is outside the negotiated range of 1-{aliasTopics.Length}.");
+        }
+
+        if (publish.Topic.Length > 0)
+        {
+            aliasTopics[alias - 1] = publish.Topic;
+            return publish;
+        }
+
+        return aliasTopics[alias - 1] is { } topic
+            ? publish with { Topic = topic }
+            : throw new MqttProtocolException($"Topic alias {alias} was used before it was established.");
+    }
 
     private void CompletePending(ushort id, MqttPacket response)
     {

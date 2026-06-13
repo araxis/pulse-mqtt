@@ -51,11 +51,15 @@ public sealed class ObservabilityTests
         listener.RecordObservableInstruments();
         lock (measurements)
         {
-            var published = measurements.Where(m => m.Instrument == "pulse.mqtt.client.messages.published").ToList();
+            // The meter is process-global and other test classes publish in parallel; filter
+            // to this test's client id.
+            var published = measurements
+                .Where(m => m.Instrument == "pulse.mqtt.client.messages.published"
+                    && Equals(m.Tags["client.id"], "observed"))
+                .ToList();
             var entry = published.ShouldHaveSingleItem();
             entry.Value.ShouldBe(1);
             entry.Tags["disposition"].ShouldBe("Queued");
-            entry.Tags["client.id"].ShouldBe("observed");
         }
     }
 
@@ -99,17 +103,19 @@ public sealed class ObservabilityTests
         var factory = new SequencedTransportFactory();
         await using var client = new ResilientMqttClient(factory, NewOptions());
 
+        // The listener is process-global and other test classes publish in parallel, so the
+        // topic is unique and the assertions filter to it.
+        var topic = $"observed/{Guid.NewGuid():N}";
         await client.PublishAsync(
-            new MqttPublishPacket { Topic = "plant/1", QualityOfService = MqttQualityOfService.AtLeastOnce },
+            new MqttPublishPacket { Topic = topic, QualityOfService = MqttQualityOfService.AtLeastOnce },
             CancellationToken.None);
 
         lock (activities)
         {
-            var activity = activities.ShouldHaveSingleItem();
-            activity.DisplayName.ShouldBe("publish plant/1");
+            var activity = activities.Where(a => a.DisplayName == $"publish {topic}").ShouldHaveSingleItem();
             activity.Kind.ShouldBe(ActivityKind.Producer);
             activity.GetTagItem("messaging.system").ShouldBe("mqtt");
-            activity.GetTagItem("messaging.destination.name").ShouldBe("plant/1");
+            activity.GetTagItem("messaging.destination.name").ShouldBe(topic);
             activity.GetTagItem("pulse.mqtt.disposition").ShouldBe("Queued");
         }
     }

@@ -14,14 +14,24 @@ with `dotnet run -c Release --project bench/Pulse.Mqtt.ComparisonBenchmarks` (re
 | Broker | eclipse-mosquitto:2 in Docker Desktop (WSL2), loopback TCP via the Docker port proxy |
 | Pulse.Mqtt | this repository, Release build |
 | MQTTnet | 5.1.0.1559 from NuGet |
-| Benchmark tooling | BenchmarkDotNet 0.14.0, ShortRun, in-process toolchain, MemoryDiagnoser |
+| Benchmark tooling | BenchmarkDotNet 0.15.8, 15 iterations, in-process toolchain, MemoryDiagnoser |
+
+::: warning Numbers move with the environment
+These tables were re-baselined after the container tooling update (Testcontainers 4.12)
+changed the Docker networking path — latencies shifted for **both** libraries relative to
+earlier revisions of this page. Compare numbers within one table, not across page revisions;
+allocation numbers are exact and stable, wall-clock numbers carry the proxied-loopback noise.
+:::
 
 ## Methodology
 
 Both libraries use their user-facing clients (`ResilientMqttClient` vs `MqttClient`), the same
-broker instance, the same 64-byte payloads, and the same topics per scenario. Three passes:
+broker instance, the same 64-byte payloads, and the same topics per scenario. The broker runs
+with `max_inflight_messages 0` (unlimited) so the throughput pass measures the clients rather
+than Mosquitto's default 20-message receive maximum — relevant because **Pulse honors the
+broker's receive maximum and MQTTnet does not** (see the compliance note below). Three passes:
 
-1. **Connect latency** — ten connect/disconnect cycles per library, wall-clock from client
+1. **Connect latency** — thirty connect/disconnect cycles per library, wall-clock from client
    construction to the connected state, median reported.
 2. **Sustained throughput** — 20,000 QoS 1 publishes with 200 concurrent in-flight operations.
    Wall clock, `GC.GetTotalAllocatedBytes` delta per message, and GC collection counts measured
@@ -46,62 +56,71 @@ Fairness rules baked into the harness:
 
 | Library | Median (30 cycles) |
 | --- | --- |
-| Pulse.Mqtt | 1.83 ms |
-| MQTTnet | 1.93 ms |
+| Pulse.Mqtt | 2.85 ms |
+| MQTTnet | 2.27 ms |
 
-An earlier revision lost this by about a millisecond: `StartAsync` queued the whole supervisor
-through the thread pool, so even the TCP connect waited for a scheduler slot. The supervisor now
-starts inline and reaches the socket connect on the calling task, which removed the gap while
-keeping `StartAsync` non-blocking.
+MQTTnet connects faster on this path by roughly half a millisecond. Pulse's supervised design
+crosses one more task boundary on the way to the connected state; for long-lived connections
+this is irrelevant, for connect-per-operation patterns it is a real difference. (An earlier
+supervisor fix already removed a full thread-pool hop here; the remaining gap is the price of
+the always-supervised architecture.)
 
 ## Sustained throughput — 20,000 QoS 1 publishes, 200 in flight
 
 | Library | Throughput | Wall clock | Allocated per message | GC gen0/gen1/gen2 |
 | --- | --- | --- | --- | --- |
-| Pulse.Mqtt | 4,009 msg/s | 4,989 ms | 1,494 B | 2 / 0 / 0 |
-| MQTTnet (defaults) | 2,239 msg/s | 8,932 ms | 1,590 B | 2 / 2 / 0 |
-| MQTTnet (`WithoutPacketFragmentation`) | 3,772 msg/s | 5,302 ms | 1,763 B | 2 / 2 / 0 |
+| Pulse.Mqtt | 3,734 msg/s | 5,356 ms | **1,440 B** | **2 / 0 / 0** |
+| MQTTnet (defaults) | 3,869 msg/s | 5,170 ms | 1,645 B | 2 / 2 / 0 |
+| MQTTnet (`WithoutPacketFragmentation`) | 4,091 msg/s | 4,889 ms | 1,728 B | 2 / 2 / 0 |
 
-Pulse is 79% faster than MQTTnet as configured out of the box and 6% faster than MQTTnet after
-tuning, with the lowest bytes per message of the three configurations and no generation 1
-collections — MQTTnet's gen 1 collections show survivors under load that Pulse does not produce.
+Throughput is within ~4–9% across the three configurations — call it parity on this
+environment — while Pulse allocates 12–17% less per message and produces **no generation 1
+collections**; MQTTnet's gen 1 collections show survivors under load that Pulse does not
+produce.
+
+**The compliance asymmetry matters more than the percentages.** Pulse enforces the broker's
+CONNACK receive maximum; MQTTnet does not. Against an out-of-the-box Mosquitto (which
+advertises a receive maximum of 20), Pulse correctly holds 20 publishes in flight while
+MQTTnet runs 200 — exceeding a broker's receive maximum is a protocol violation the broker may
+answer with a disconnect. The table above intentionally removes the broker's cap to compare
+raw client throughput on equal terms.
 
 ## Per-operation latency and allocation
 
 Fifteen iterations in-process, 64-byte payloads, MQTTnet fragmentation-free. Latency on this
-path is dominated by the broker round trip through the Docker proxy, so medians are the robust
-statistic; allocations are stable and exact.
+path is dominated by the broker round trip through the Docker proxy and carries wide error
+bars; allocations are stable and exact.
 
-| Operation | Pulse.Mqtt median | MQTTnet median | Pulse allocated | MQTTnet allocated |
+| Operation | Pulse.Mqtt mean | MQTTnet mean | Pulse allocated | MQTTnet allocated |
 | --- | --- | --- | --- | --- |
-| QoS 0 round trip | 408 µs | 529 µs | 892 B | 2,802 B |
-| QoS 1 publish to PUBACK | 471 µs | 525 µs | 1,547 B | 2,156 B |
-| QoS 2 publish to PUBCOMP | 924 µs | 909 µs | 2,161 B | 3,717 B |
+| QoS 0 round trip | 888 µs | 604 µs | **925 B** | 2,807 B |
+| QoS 1 publish to PUBACK | **857 µs** | 886 µs | **1,497 B** | 2,156 B |
+| QoS 2 publish to PUBCOMP | **1,577 µs** | 1,680 µs | **2,147 B** | 3,720 B |
 
 Reading it honestly:
 
-- **QoS 0**: Pulse's median is 23% lower and it allocates 68% less per round trip. The earlier
-  revision trailed here; completing acknowledgements on the receive loop and delivering
-  messages without an intermediate forwarding queue removed two task wake-ups per message.
-- **QoS 1**: Pulse's median is 10% lower with 28% less allocation.
-- **QoS 2**: medians are within 1.6% of each other — inside the noise (the standard error is
-  several times that) — with Pulse ahead on minimum, first quartile, and allocating 42% less.
-  The four-packet exchange is two full broker round trips, so the wire dominates both clients
-  equally.
+- **Allocations are the stable result**: Pulse allocates 31–67% less in every scenario, and
+  that holds across every run and environment this comparison has been executed on.
+- **Latency means overlap heavily** (standard deviations of 90–250 µs on means under 1.7 ms).
+  On this run Pulse leads QoS 1 and QoS 2 and trails QoS 0; earlier runs on the previous
+  Docker networking stack showed Pulse leading all three medians. Treat per-operation latency
+  as parity-within-noise on a proxied loopback, and benchmark on your own network for
+  decisions that depend on it.
 
 ## Summary
 
-- Pulse delivers higher sustained throughput than MQTTnet in both MQTTnet configurations: 79%
-  ahead of out-of-the-box MQTTnet, 6% ahead of the tuned configuration, with the lowest
-  per-message allocation of the three.
-- Pulse connects faster (1.83 ms vs 1.93 ms median over 30 cycles).
-- Pulse's per-operation medians lead at QoS 0 (−23%) and QoS 1 (−10%) and are statistically
-  tied at QoS 2.
-- Pulse allocates 28–68% less in every per-operation scenario and produces no generation 1
-  collections under load, where MQTTnet does — less GC pressure on long-running processes.
-- MQTTnet's default packet fragmentation is a real-world footgun on any path with a Nagle hop
-  (container proxies, some gateways): it cost 40 ms per operation here until disabled. Pulse
-  has no equivalent failure mode.
+- **Stable across every environment tested**: Pulse allocates 12–17% less per message under
+  sustained load and 31–67% less per operation, with zero generation 1 collections where
+  MQTTnet incurs them — materially less GC pressure on long-running processes.
+- **Throughput is parity within single-digit percent** on an uncapped broker; against an
+  out-of-the-box Mosquitto, Pulse is the only one of the two that honors the broker's
+  receive maximum (MQTTnet exceeds it, which is a protocol violation).
+- **Latency is broker-path-bound** with overlapping error bars; leads trade places between
+  runs and Docker networking stacks. MQTTnet held connect latency and QoS 0 on this baseline;
+  Pulse held QoS 1 and QoS 2.
+- MQTTnet's default packet fragmentation cost ~40 ms per operation on the previous Docker
+  networking stack until disabled; the current stack masks it. Pulse writes one buffer per
+  packet and has no configuration-dependent failure mode either way.
 
 Wire-codec micro-benchmarks (encode/decode without a broker: 60 ns and zero allocation per
 PUBLISH encode, 96 ns per decode) live in `bench/Pulse.Mqtt.Benchmarks` and are documented in

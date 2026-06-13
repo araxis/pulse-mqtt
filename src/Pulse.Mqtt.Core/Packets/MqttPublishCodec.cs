@@ -64,8 +64,9 @@ public static class MqttPublishCodec
         output.Advance(body.WrittenCount);
     }
 
-    // The dominant shape — no MQTT 5 properties — sizes the body up front and writes it in one
-    // pass, with no intermediate buffer and a single copy of the payload.
+    // The dominant shapes — no MQTT 5 properties, or only a topic alias (the hot pattern when
+    // aliasing is enabled) — size the body up front and write it in one pass, with no
+    // intermediate buffer and a single copy of the payload.
     private static void EncodeWithoutProperties(IBufferWriter<byte> output, MqttPublishPacket packet, bool hasPacketId, bool isV5)
     {
         var topicLength = Encoding.UTF8.GetByteCount(packet.Topic);
@@ -74,9 +75,11 @@ public static class MqttPublishCodec
             throw new ArgumentException($"String exceeds the {ushort.MaxValue}-byte protocol limit.", nameof(packet));
         }
 
+        // A topic alias is a 3-byte property: identifier 0x23 plus the two-byte alias.
+        var propertiesLength = isV5 && packet.TopicAlias is not null ? 3 : 0;
         var remaining = 2 + topicLength
             + (hasPacketId ? 2 : 0)
-            + (isV5 ? 1 : 0)
+            + (isV5 ? 1 + propertiesLength : 0)
             + packet.Payload.Length;
 
         MqttFrameWriter.WriteHeader(output, new MqttFixedHeader(MqttPacketType.Publish, Flags(packet), remaining));
@@ -93,7 +96,13 @@ public static class MqttPublishCodec
 
         if (isV5)
         {
-            span[written++] = 0; // empty property section
+            span[written++] = (byte)propertiesLength;
+            if (packet.TopicAlias is { } topicAlias)
+            {
+                span[written++] = (byte)MqttPropertyId.TopicAlias;
+                BinaryPrimitives.WriteUInt16BigEndian(span[written..], topicAlias);
+                written += 2;
+            }
         }
 
         packet.Payload.Span.CopyTo(span[written..]);
@@ -105,10 +114,10 @@ public static class MqttPublishCodec
         | ((byte)packet.QualityOfService << 1)
         | (packet.Retain ? RetainFlag : 0));
 
+    // TopicAlias is absent here on purpose: the single-pass path encodes it directly.
     private static bool HasProperties(MqttPublishPacket packet) =>
         packet.PayloadFormatIndicator != MqttPayloadFormatIndicator.Unspecified
         || packet.MessageExpiryInterval is not null
-        || packet.TopicAlias is not null
         || packet.ResponseTopic is not null
         || packet.CorrelationData is not null
         || packet.ContentType is not null

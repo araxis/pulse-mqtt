@@ -7,23 +7,23 @@ Windows 11, .NET 10, workstation GC.
 ## Head to head with MQTTnet
 
 Both libraries driving their user-facing clients against the same real Mosquitto broker,
-identical payloads, topics, and QoS. Full methodology and tables:
+identical payloads, topics, and QoS, with the broker's inflight cap removed so the clients are
+measured rather than the cap. Full methodology, tables, and the honest caveats:
 [the MQTTnet comparison](/Benchmark-vs-MQTTnet).
 
 | Metric | Pulse.Mqtt | MQTTnet 5.1 |
 | --- | --- | --- |
-| Sustained throughput (20k QoS 1, 200 in flight) | **4,009 msg/s** | 2,239 default / 3,772 tuned |
-| Allocated per message under that load | **1,494 B** | 1,590 / 1,763 B |
+| Allocated per message, sustained QoS 1 load | **1,440 B** | 1,645 / 1,728 B |
 | GC under that load (gen0/1/2) | **2 / 0 / 0** | 2 / 2 / 0 |
-| Connect latency (median of 30) | **1.83 ms** | 1.93 ms |
-| QoS 0 round trip (median) | **408 µs** | 529 µs |
-| QoS 1 publish→PUBACK (median) | **471 µs** | 525 µs |
-| QoS 2 publish→PUBCOMP (median) | 924 µs (tie within noise) | 909 µs |
-| Allocation per operation | **28–68% less** in every scenario | — |
+| Allocation per operation (QoS 0/1/2) | **31–67% less** in every scenario | — |
+| Sustained throughput (20k QoS 1, 200 in flight) | 3,734 msg/s | 3,869 / 4,091 msg/s |
+| Receive-maximum compliance | **enforced** | not enforced |
+| Per-operation latency | parity within noise; leads trade places between runs | — |
 
-Read honestly: QoS 2 medians are statistically indistinguishable — that exchange is two full
-broker round trips, which bound both clients equally; Pulse leads its minimum, first quartile,
-and allocates 42% less.
+The allocation and GC rows are stable across every environment this has run on; wall-clock
+rows move with the Docker networking stack (the page notes the re-baseline). Against an
+out-of-the-box Mosquitto, Pulse correctly holds the advertised 20-message in-flight window
+while MQTTnet exceeds it — a protocol violation a broker may answer with a disconnect.
 
 ## Micro-benchmarks
 

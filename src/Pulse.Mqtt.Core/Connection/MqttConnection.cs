@@ -61,6 +61,13 @@ public sealed class MqttConnection : IAsyncDisposable
     /// </summary>
     public uint? MaximumOutboundPacketSize { get; set; }
 
+    /// <summary>
+    /// An optional rewrite applied to each outbound packet inside the send lock — wire order
+    /// matches transform order exactly, which stateful rewrites like topic-alias assignment
+    /// depend on. Keep it fast; it runs under the lock that serializes all sends.
+    /// </summary>
+    public Func<MqttPacket, MqttPacket>? OutboundTransform { get; set; }
+
     /// <summary>Completes when the receive loop has stopped, for orderly shutdown.</summary>
     public Task Completion => _receiveLoop ?? Task.CompletedTask;
 
@@ -85,6 +92,11 @@ public sealed class MqttConnection : IAsyncDisposable
         await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (OutboundTransform is { } transform)
+            {
+                packet = transform(packet);
+            }
+
             if (MaximumOutboundPacketSize is { } limit)
             {
                 // The broker bounded what it accepts: stage the packet to learn its encoded

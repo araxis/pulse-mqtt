@@ -107,8 +107,31 @@ cost the send path nothing.
 
 `PublishAsync` is safe to call from any number of tasks concurrently. Sends are serialized on
 the connection in call order; QoS 1/2 acknowledgements complete out of order as the broker
-answers, so a slow acknowledgement never blocks the pipe. The in-flight window is bounded by
-packet-identifier availability (65,535) and the broker's receive maximum.
+answers, so a slow acknowledgement never blocks the pipe.
+
+The in-flight window honors the broker's CONNACK **receive maximum**: QoS 1/2 publishes beyond
+the limit wait (cancellable) until an acknowledgement frees a slot — PUBACK for QoS 1, PUBREC
+for QoS 2, exactly as the specification counts the quota. The limit re-arms on every
+reconnect from the new CONNACK; brokers that advertise none leave the window bounded only by
+packet-identifier availability (65,535).
+
+## Topic aliases
+
+MQTT 5 topic aliases replace a repeated topic string with a two-byte alias. Both directions
+are covered:
+
+- **Inbound** is automatic: advertise a capacity by setting `TopicAliasMaximum` on the CONNECT
+  packet, and publishes the broker compresses are resolved back to their full topic before
+  your handlers see them. Violations (an unestablished or out-of-range alias) are protocol
+  errors that fault the session, per the specification.
+- **Outbound** is opt-in — set `RawMqttClientOptions.UseOutboundTopicAliases = true`
+  (`ResilientMqttClientOptions.Raw`). Within the maximum the broker advertises, the first
+  publish to a topic establishes an alias and every repeat sends two bytes instead of the
+  topic string. Assignment is first come, first served; topics beyond the broker's maximum
+  simply go plain. Aliases reset on every reconnect, automatically.
+
+On a 60-character topic the alias form is both smaller on the wire and faster to encode —
+see the benchmark suite's topic-alias comparison.
 
 ## Performance notes
 

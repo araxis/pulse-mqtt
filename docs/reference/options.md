@@ -45,6 +45,7 @@ For direct construction; with DI these come from `PulseMqttClientOptions` plus b
 | `PingResponseTimeout` | 30 s | PINGRESP wait before faulting |
 | `AcknowledgementTimeout` | 30 s | Publish/subscribe/unsubscribe acknowledgement wait |
 | `InboundMessageCapacity` | `256` | Bound of the received-message queue |
+| `UseOutboundTopicAliases` | `false` | Compress repeated publish topics into MQTT 5 aliases, within the broker's maximum |
 
 ## MqttConnectionOptions
 

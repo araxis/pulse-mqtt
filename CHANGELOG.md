@@ -2,7 +2,16 @@
 
 ## 0.4.0 (unreleased)
 
-_Nothing yet._
+- Receive-maximum flow control: outbound QoS 1/2 publishes never exceed the broker's CONNACK
+  `ReceiveMaximum`. Excess publishers wait — bounded and cancellable — until an
+  acknowledgement frees a slot (PUBACK for QoS 1, PUBREC for QoS 2, per the specification).
+  The limit re-arms per connection; brokers that advertise none cost the publish path
+  nothing.
+- Topic aliases: inbound resolution is automatic once the CONNECT advertises a
+  `TopicAliasMaximum` (violations fault the session per the specification); outbound
+  compression is opt-in via `RawMqttClientOptions.UseOutboundTopicAliases`, first come, first
+  served within the broker's maximum, reset on every reconnect. The alias-only publish shape
+  encodes on the zero-allocation fast path.
 
 ## 0.3.0
 

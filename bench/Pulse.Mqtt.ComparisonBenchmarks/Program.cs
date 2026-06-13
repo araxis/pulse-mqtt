@@ -14,8 +14,17 @@ using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Resilience;
 using Pulse.Mqtt.Transport;
 
+// Unlimited in-flight: Mosquitto's default receive maximum is 20, and a spec-honoring client
+// gates on it. The throughput comparison should measure the clients, not that cap.
+var brokerConfig = """
+    listener 1883
+    allow_anonymous true
+    max_inflight_messages 0
+    """u8.ToArray();
+
 var container = new ContainerBuilder("eclipse-mosquitto:2")
-    .WithCommand("mosquitto", "-c", "/mosquitto-no-auth.conf")
+    .WithResourceMapping(brokerConfig, "/mosquitto/config/benchmark.conf")
+    .WithCommand("mosquitto", "-c", "/mosquitto/config/benchmark.conf")
     .WithPortBinding(1883, assignRandomHostPort: true)
     .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(1883))
     .Build();
