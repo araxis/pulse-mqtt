@@ -55,6 +55,7 @@ export default defineConfig({
         {
           text: 'Going deeper',
           items: [
+            { text: 'Migrating from MQTTnet', link: '/guide/migrating-from-mqttnet' },
             { text: 'Extending the client', link: '/guide/extending' },
             { text: 'The raw client', link: '/guide/raw-client' },
             { text: 'Native AOT', link: '/guide/native-aot' },

@@ -269,10 +269,15 @@ extracts an incoming `traceparent` and parents on it, so the routed handler's `A
 remote child of the producer's span. Verified by tests for inject, off-by-default, and remote
 parenting.
 
-### N5 — MQTTnet migration guide
+### N5 — MQTTnet migration guide ✅
 
 **DoD:** a docs page mapping every common MQTTnet pattern (factory/options/builders, handlers,
 managed client behaviors) to the Pulse equivalent, with before/after code.
+
+Done in 0.7.0: [Migrating from MQTTnet](guide/migrating-from-mqttnet.md) maps the factory/options
+builders, the managed client (reconnect/queue/storage), message and topic-filter builders, the
+received-message event, last will/birth, request/response, and TLS/WebSocket to their Pulse
+equivalents, with before/after code, and is linked in the guide sidebar.
 
 ### N6 — `IAsyncEnumerable` request streaming ✅
 
