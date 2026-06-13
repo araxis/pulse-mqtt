@@ -2,7 +2,13 @@
 
 ## 0.7.0 (unreleased)
 
-_Nothing yet._
+- Durable storage: a new **`Pulse.Mqtt.Storage.Sqlite`** package provides `SqliteSessionStore` and
+  `SqliteMessageStore` — SQLite-backed implementations of `ISessionStore` and `IMessageStore` so
+  subscriptions, the offline queue, and in-flight QoS state survive a process restart, not just a
+  reconnect. Hand-written SQL over Microsoft.Data.Sqlite (no reflection ORM, AOT-safe); the queue
+  preserves FIFO order and the peek/remove-head at-least-once contract, so a crash between flushing
+  and removing the head re-sends rather than loses. The overflow policy matches the in-memory
+  default, and a corrupt or unreadable database fails fast with a clear `SqliteStorageException`.
 
 ## 0.6.0
 
