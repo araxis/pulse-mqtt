@@ -2,6 +2,12 @@
 
 ## 0.7.0 (unreleased)
 
+- Server-streamed RPC: `RequestStreamAsync` (raw and typed) consumes an `IAsyncEnumerable` of
+  correlated responses until the responder publishes an end-of-stream marker, the idle timeout
+  elapses, or the enumeration is cancelled; `OnRequestStreamAsync` is the responder side — yield a
+  sequence and each item plus the marker is published automatically. Backpressure is bounded by
+  `MqttRequestStreamOptions.Capacity`, and abandoning the stream early cleans up and drops later
+  responses.
 - WebSocket proxy and headers: `WebSocketTransportOptions` gains first-class `Proxy` and `Headers`
   for reaching a broker behind a reverse proxy or gateway — an `Authorization` token, a routing
   header, a corporate proxy — without dropping to `ConfigureClient` (which still runs last and can

@@ -41,6 +41,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     private readonly string _clientId;
     private readonly PulseMqttDiagnostics.IOfflineQueueProbe _offlineProbe;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<MqttPublishPacket>> _pendingRequests = new();
+    private readonly ConcurrentDictionary<string, StreamSink> _pendingStreams = new();
     private readonly object _rpcGate = new();
     private Task? _rpcRoute;
     private CancellationTokenSource? _lifetime;
@@ -475,6 +476,173 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     }
 
     /// <summary>
+    /// Sends a request and streams the correlated responses as they arrive, until the responder
+    /// publishes the end-of-stream marker, the idle timeout elapses between responses, or the
+    /// enumeration is cancelled. The client assigns the response topic and correlation data; the
+    /// responder publishes each answer to the request's response topic (see
+    /// <see cref="OnRequestStreamAsync{TRequest, TResponse}"/>). Backpressure is bounded: a slow
+    /// consumer throttles delivery rather than buffering without limit.
+    /// </summary>
+    /// <exception cref="MqttException">The client is offline, or no response arrived within the idle timeout.</exception>
+    public async IAsyncEnumerable<MqttPublishPacket> RequestStreamAsync(
+        MqttPublishPacket request,
+        MqttRequestStreamOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.ResponseTopic is not null || request.CorrelationData is not null)
+        {
+            throw new ArgumentException("The client assigns the response topic and correlation data.", nameof(request));
+        }
+
+        var streamOptions = options ?? new MqttRequestStreamOptions();
+        await EnsureResponseRouteAsync(cancellationToken).ConfigureAwait(false);
+
+        var correlation = Guid.NewGuid().ToString("N");
+        var channel = Channel.CreateBounded<MqttPublishPacket>(new BoundedChannelOptions(streamOptions.Capacity)
+        {
+            SingleWriter = true,
+            SingleReader = true,
+            FullMode = BoundedChannelFullMode.Wait,
+        });
+        var sink = new StreamSink(channel.Writer);
+        _pendingStreams[correlation] = sink;
+
+        try
+        {
+            var outgoing = request with
+            {
+                QualityOfService = streamOptions.QualityOfService,
+                ResponseTopic = $"pulse-rpc/{_clientId}/{correlation}",
+                CorrelationData = Encoding.UTF8.GetBytes(correlation),
+            };
+
+            var outcome = await PublishAsync(outgoing, cancellationToken).ConfigureAwait(false);
+            if (outcome.Disposition != PublishDisposition.Delivered)
+            {
+                throw new MqttException("The request could not be delivered: the client is offline.");
+            }
+
+            while (true)
+            {
+                MqttPublishPacket response;
+                var closed = false;
+
+                // A per-read timeout that the TimeProvider drives (so it is testable) and that
+                // cancels the read itself — the read is awaited directly, so nothing is left dangling.
+                using var idle = new CancellationTokenSource(streamOptions.IdleTimeout, _time);
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, idle.Token);
+                try
+                {
+                    response = await channel.Reader.ReadAsync(linked.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (idle.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                {
+                    throw new MqttException($"No stream response arrived within {streamOptions.IdleTimeout}.");
+                }
+                catch (ChannelClosedException)
+                {
+                    closed = true;
+                    response = null!;
+                }
+
+                if (closed)
+                {
+                    if (sink.Overflowed)
+                    {
+                        throw new MqttException("The request stream overflowed: the consumer fell behind the configured capacity.");
+                    }
+
+                    yield break;
+                }
+
+                if (IsEndOfStream(response))
+                {
+                    yield break;
+                }
+
+                yield return response;
+            }
+        }
+        finally
+        {
+            _pendingStreams.TryRemove(correlation, out _);
+            channel.Writer.TryComplete();
+        }
+    }
+
+    /// <summary>Sends a typed request and streams the typed responses, using the configured serializer.</summary>
+    public async IAsyncEnumerable<TResponse> RequestStreamAsync<TRequest, TResponse>(
+        string topic,
+        TRequest request,
+        MqttRequestStreamOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(topic);
+        var serializer = SerializerOrThrow();
+
+        var packet = new MqttPublishPacket
+        {
+            Topic = topic,
+            Payload = serializer.Serialize(request),
+            ContentType = serializer.ContentType,
+            PayloadFormatIndicator = serializer.PayloadFormat,
+        };
+
+        await foreach (var response in RequestStreamAsync(packet, options, cancellationToken).ConfigureAwait(false))
+        {
+            yield return serializer.Deserialize<TResponse>(response.Payload);
+        }
+    }
+
+    /// <summary>
+    /// Registers a typed streaming responder: each request's handler yields a sequence of
+    /// responses, every one published to the request's response topic with its correlation echoed,
+    /// followed by the end-of-stream marker. Requests without a response topic are ignored.
+    /// </summary>
+    public Task<IDisposable> OnRequestStreamAsync<TRequest, TResponse>(
+        string template,
+        Func<TRequest, MqttRoutedMessage, CancellationToken, IAsyncEnumerable<TResponse>> handler,
+        MqttRouteOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        var serializer = SerializerOrThrow();
+
+        return OnAsync(
+            template,
+            async (message, values, token) =>
+            {
+                if (message.ResponseTopic is not { } responseTopic)
+                {
+                    return;
+                }
+
+                var request = serializer.Deserialize<TRequest>(message.Payload);
+                await foreach (var item in handler(request, new MqttRoutedMessage(message, values), token).ConfigureAwait(false))
+                {
+                    await PublishAsync(
+                        new MqttPublishPacket
+                        {
+                            Topic = responseTopic,
+                            Payload = serializer.Serialize(item),
+                            QualityOfService = message.QualityOfService,
+                            ContentType = serializer.ContentType,
+                            PayloadFormatIndicator = serializer.PayloadFormat,
+                            CorrelationData = message.CorrelationData,
+                        },
+                        token).ConfigureAwait(false);
+                }
+
+                await PublishAsync(
+                    EndOfStreamMarker(responseTopic, message.CorrelationData, message.QualityOfService),
+                    token).ConfigureAwait(false);
+            },
+            options,
+            cancellationToken);
+    }
+
+    /// <summary>
     /// Registers a typed responder for a route template: each request is deserialized, handled,
     /// and the response published to the request's response topic with its correlation data
     /// echoed. Requests without a response topic are ignored.
@@ -523,9 +691,19 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 $"pulse-rpc/{_clientId}/{{correlation}}",
                 (message, values, _) =>
                 {
-                    if (_pendingRequests.TryGetValue(values["correlation"], out var pending))
+                    var correlation = values["correlation"];
+                    if (_pendingRequests.TryGetValue(correlation, out var pending))
                     {
                         pending.TrySetResult(message);
+                    }
+                    else if (_pendingStreams.TryGetValue(correlation, out var sink) && !sink.Writer.TryWrite(message))
+                    {
+                        // Non-blocking: never stall the shared dispatch loop on a slow stream
+                        // consumer. A full buffer means the consumer fell behind its capacity, so
+                        // fail that one stream explicitly rather than block the client or drop
+                        // silently.
+                        sink.Overflowed = true;
+                        sink.Writer.TryComplete();
                     }
 
                     return ValueTask.CompletedTask;
@@ -538,6 +716,40 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     internal IMqttSerializer SerializerOrThrow() =>
         _options.Serializer
         ?? throw new InvalidOperationException("Configure a serializer in the options to use typed messaging.");
+
+    // One open request-stream's delivery target: the channel the route handler writes responses to,
+    // plus a flag set when a full buffer forced the stream to fail rather than block or drop.
+    private sealed class StreamSink(ChannelWriter<MqttPublishPacket> writer)
+    {
+        public ChannelWriter<MqttPublishPacket> Writer { get; } = writer;
+
+        public volatile bool Overflowed;
+    }
+
+    // The user property that marks the final message of a streamed response. The marker carries no
+    // payload; it tells the consumer the sequence is complete.
+    private const string EndOfStreamProperty = "pulse.eos";
+
+    private static MqttPublishPacket EndOfStreamMarker(string topic, ReadOnlyMemory<byte>? correlation, MqttQualityOfService qualityOfService) => new()
+    {
+        Topic = topic,
+        QualityOfService = qualityOfService,
+        CorrelationData = correlation,
+        UserProperties = [new MqttUserProperty(EndOfStreamProperty, "true")],
+    };
+
+    private static bool IsEndOfStream(MqttPublishPacket message)
+    {
+        foreach (var property in message.UserProperties)
+        {
+            if (property.Name == EndOfStreamProperty)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Streams state transitions. Late subscribers see transitions from subscription onward.</summary>
     public async IAsyncEnumerable<ConnectionStateChanged> WatchState(

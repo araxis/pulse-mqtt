@@ -268,13 +268,18 @@ parenting.
 **DoD:** a docs page mapping every common MQTTnet pattern (factory/options/builders, handlers,
 managed client behaviors) to the Pulse equivalent, with before/after code.
 
-### N6 — `IAsyncEnumerable` request streaming
+### N6 — `IAsyncEnumerable` request streaming ✅
 
 Server-streamed RPC: one request, many correlated responses.
 
 **DoD:** `RequestStreamAsync` yields responses until an end-of-stream marker or timeout;
 responder-side helper publishes the marker; backpressure bounded; tests cover early consumer
 abandonment.
+
+Done in 0.7.0: `RequestStreamAsync` (raw + typed) yields correlated responses via a bounded
+channel (`MqttRequestStreamOptions.Capacity`) until the end-of-stream user-property marker, the
+per-item `IdleTimeout`, or cancellation; `OnRequestStreamAsync` publishes each yielded item and
+the marker. Tests cover the happy path, the responder, early abandonment, and the idle timeout.
 
 ### N7 — WebSocket proxy and header options ✅
 

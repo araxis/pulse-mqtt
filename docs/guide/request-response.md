@@ -62,6 +62,34 @@ isolation all apply. For each request it:
 Messages **without** a response topic are ignored rather than failed — plain publishes to the
 same topic stay harmless.
 
+## Streaming responses
+
+When one request has *many* answers — a query that pages, a job that reports progress — stream
+them. The caller consumes an `IAsyncEnumerable<TResponse>` that ends when the responder publishes
+an end-of-stream marker, the idle timeout elapses between items, or the enumeration is cancelled:
+
+```csharp
+await foreach (var row in client.RequestStreamAsync<Query, Row>("reports/run", query, cancellationToken: token))
+{
+    Render(row);
+    if (EnoughForNow()) break;   // abandoning early cleans up; later responses are dropped
+}
+```
+
+The responder yields its results and Pulse publishes each one, then the marker, automatically:
+
+```csharp
+using IDisposable responder = await client.OnRequestStreamAsync<Query, Row>(
+    "reports/run",
+    (query, message, token) => RunReportAsync(query, token));   // returns IAsyncEnumerable<Row>
+```
+
+Each stream buffers up to `MqttRequestStreamOptions.Capacity` responses. Delivery is non-blocking,
+so a slow consumer never holds up other requests or the client's inbound pipeline — but a consumer
+that falls *behind* its capacity fails that one stream with an `MqttException` rather than blocking
+or dropping silently. Size `Capacity` for your consumer's pace, and use `IdleTimeout` to bound how
+long an idle stream waits for the next response before giving up.
+
 ## Failure behavior
 
 - **No responder / responder offline**: the caller times out with `MqttException`. Choose
