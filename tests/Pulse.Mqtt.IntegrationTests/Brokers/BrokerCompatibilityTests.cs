@@ -41,4 +41,10 @@ public abstract class BrokerCompatibilitySuite(IMqttBroker broker)
 
     [Fact]
     public Task Persistent_session_resumes() => BrokerScenarios.PersistentSessionResumesAsync(broker);
+
+    [Fact]
+    public Task Receive_maximum_flow_control() => BrokerScenarios.ReceiveMaximumFlowControlAsync(broker);
+
+    [Fact]
+    public Task Topic_aliases() => BrokerScenarios.TopicAliasesAsync(broker);
 }

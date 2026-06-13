@@ -29,6 +29,12 @@ Each broker passes all of the following:
 | Shared subscription | `$share/<group>/<topic>` delivers each message to exactly one group member. |
 | Large payload | A 64 KB payload round-trips intact. |
 | Persistent session resume | Reconnecting with `CleanStart = false` and a non-zero session expiry resumes the session (`SessionPresent = true`) and still routes its earlier subscription. |
+| Receive-maximum flow control | A QoS 2 burst larger than the broker's receive maximum completes and arrives exactly once — the client holds a send-quota slot per exchange until PUBCOMP, so it never exceeds the broker's limit. |
+| Topic aliases | A repeated topic is compressed into an MQTT 5 topic alias after the first publish; the broker accepts the alias and still routes every message to the full topic. |
+
+TLS is covered separately by a dedicated integration test (`TlsIntegrationTests`) that round-trips a
+message over a real TLS connection to a Mosquitto broker configured with a generated self-signed
+certificate.
 
 ## How the matrix is gated in CI
 
