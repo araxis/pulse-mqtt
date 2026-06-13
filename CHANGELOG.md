@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0-rc.1 (unreleased)
+## 1.0.0-rc.1
 
 - Stress and soak validation: a deterministic chaos test runs in CI — random disconnects under
   sustained QoS 1 load against Mosquitto with a persistent session, proving zero message loss and

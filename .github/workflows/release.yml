@@ -29,8 +29,12 @@ jobs:
       - name: Resolve the version
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+            version="${GITHUB_REF_NAME#v}"
+            echo "VERSION=${version}" >> "$GITHUB_ENV"
             echo "STABLE=true" >> "$GITHUB_ENV"
+            # A version with a prerelease suffix (e.g. 1.0.0-rc.1) is a NuGet prerelease and a
+            # GitHub pre-release, not the "latest" stable.
+            [[ "$version" == *-* ]] && echo "PRERELEASE=true" >> "$GITHUB_ENV" || echo "PRERELEASE=false" >> "$GITHUB_ENV"
           else
             prefix=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props | head -1)
             echo "VERSION=${prefix}-preview.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
@@ -41,7 +45,9 @@ jobs:
         run: dotnet build -c Release -p:Version=$VERSION -p:ContinuousIntegrationBuild=true
 
       - name: Test
-        run: dotnet test -c Release --no-build --logger "console;verbosity=minimal"
+        # The EMQX/HiveMQ matrix and the long soak already gate on PRs/main; the release run just
+        # confirms the packaged build, so it skips the heavy/long categories.
+        run: dotnet test -c Release --no-build --logger "console;verbosity=minimal" --filter "Category!=BrokerMatrix&Category!=Soak"
 
       - name: Pack
         run: dotnet pack -c Release --no-build -p:Version=$VERSION -o packages
@@ -85,7 +91,9 @@ jobs:
               Pulse.Mqtt.Client \
               Pulse.Mqtt.DependencyInjection \
               Pulse.Mqtt.Serialization.Json \
+              Pulse.Mqtt.Serialization.MessagePack \
               Pulse.Mqtt.Resilience.Polly \
+              Pulse.Mqtt.Storage.Sqlite \
               Pulse.Mqtt.Transport.WebSocket \
               Pulse.Mqtt.Testing; do
               echo "- [\`$id\`](https://www.nuget.org/packages/$id/$VERSION)"
@@ -96,8 +104,13 @@ jobs:
         if: env.STABLE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >
-          gh release create "$GITHUB_REF_NAME"
-          packages/*.nupkg
-          --title "$GITHUB_REF_NAME"
-          --notes-file release-notes.md
+        run: |
+          flags=()
+          if [ "${PRERELEASE:-false}" = "true" ]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            packages/*.nupkg \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            "${flags[@]}"
