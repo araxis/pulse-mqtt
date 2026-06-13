@@ -45,6 +45,13 @@ public sealed class PulseMqttClientBuilder
     private IMqttSerializer? _serializer;
     private ILogger? _logger;
     private TimeProvider? _timeProvider;
+    private MqttWillMessage? _will;
+    private Func<CancellationToken, ValueTask<MqttWillMessage>>? _willFactory;
+    private Func<IMqttSerializer, MqttWillMessage>? _typedWill;
+    private MqttPublishPacket? _birth;
+    private Func<int, CancellationToken, ValueTask<MqttPublishPacket>>? _birthFactory;
+    private Func<IMqttSerializer, MqttPublishPacket>? _typedBirth;
+    private BirthFailurePolicy _birthFailure = BirthFailurePolicy.FailConnection;
 
     /// <summary>Connects over TCP, optionally with TLS on the default settings.</summary>
     public PulseMqttClientBuilder WithTcp(string host, int port = 1883, bool useTls = false)
@@ -197,6 +204,150 @@ public sealed class PulseMqttClientBuilder
         return this;
     }
 
+    /// <summary>Registers a last-will message: the broker publishes it on ungraceful loss.</summary>
+    public PulseMqttClientBuilder WithWill(
+        string topic,
+        ReadOnlyMemory<byte> payload,
+        MqttQualityOfService qualityOfService = MqttQualityOfService.AtMostOnce,
+        bool retain = false,
+        TimeSpan? delay = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(topic);
+        return WithWill(new MqttWillMessage(topic)
+        {
+            Payload = payload,
+            QualityOfService = qualityOfService,
+            Retain = retain,
+            DelayInterval = delay is { } d ? (uint)d.TotalSeconds : null,
+        });
+    }
+
+    /// <summary>Registers a UTF-8 text last-will message.</summary>
+    public PulseMqttClientBuilder WithWill(
+        string topic,
+        string payload,
+        MqttQualityOfService qualityOfService = MqttQualityOfService.AtMostOnce,
+        bool retain = false,
+        TimeSpan? delay = null)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        return WithWill(topic, System.Text.Encoding.UTF8.GetBytes(payload), qualityOfService, retain, delay);
+    }
+
+    /// <summary>Registers a fully-specified last-will message (v5 properties included).</summary>
+    public PulseMqttClientBuilder WithWill(MqttWillMessage will)
+    {
+        ArgumentNullException.ThrowIfNull(will);
+        _will = will;
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a typed last-will payload, serialized through the configured serializer with
+    /// its content type stamped. Requires <see cref="WithSerializer"/>.
+    /// </summary>
+    public PulseMqttClientBuilder WithWill<T>(
+        string topic,
+        T value,
+        MqttQualityOfService qualityOfService = MqttQualityOfService.AtMostOnce,
+        bool retain = false,
+        TimeSpan? delay = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(topic);
+        _typedWill = serializer => new MqttWillMessage(topic)
+        {
+            Payload = serializer.Serialize(value),
+            QualityOfService = qualityOfService,
+            Retain = retain,
+            DelayInterval = delay is { } d ? (uint)d.TotalSeconds : null,
+            ContentType = serializer.ContentType,
+            PayloadFormatIndicator = serializer.PayloadFormat,
+        };
+        return this;
+    }
+
+    /// <summary>Computes the will fresh for every connection attempt.</summary>
+    public PulseMqttClientBuilder WithWill(Func<CancellationToken, ValueTask<MqttWillMessage>> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        _willFactory = factory;
+        return this;
+    }
+
+    /// <summary>Publishes a birth message on every connection-up — the will's "online" mirror.</summary>
+    public PulseMqttClientBuilder WithBirth(
+        string topic,
+        ReadOnlyMemory<byte> payload,
+        MqttQualityOfService qualityOfService = MqttQualityOfService.AtMostOnce,
+        bool retain = false)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(topic);
+        return WithBirth(new MqttPublishPacket
+        {
+            Topic = topic,
+            Payload = payload,
+            QualityOfService = qualityOfService,
+            Retain = retain,
+        });
+    }
+
+    /// <summary>Publishes a UTF-8 text birth message on every connection-up.</summary>
+    public PulseMqttClientBuilder WithBirth(
+        string topic,
+        string payload,
+        MqttQualityOfService qualityOfService = MqttQualityOfService.AtMostOnce,
+        bool retain = false)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        return WithBirth(topic, System.Text.Encoding.UTF8.GetBytes(payload), qualityOfService, retain);
+    }
+
+    /// <summary>Publishes a fully-specified birth message on every connection-up.</summary>
+    public PulseMqttClientBuilder WithBirth(MqttPublishPacket birth)
+    {
+        ArgumentNullException.ThrowIfNull(birth);
+        _birth = birth;
+        return this;
+    }
+
+    /// <summary>
+    /// Publishes a typed birth payload on every connection-up, serialized through the
+    /// configured serializer. Requires <see cref="WithSerializer"/>.
+    /// </summary>
+    public PulseMqttClientBuilder WithBirth<T>(
+        string topic,
+        T value,
+        MqttQualityOfService qualityOfService = MqttQualityOfService.AtMostOnce,
+        bool retain = false)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(topic);
+        _typedBirth = serializer => new MqttPublishPacket
+        {
+            Topic = topic,
+            Payload = serializer.Serialize(value),
+            QualityOfService = qualityOfService,
+            Retain = retain,
+            ContentType = serializer.ContentType,
+            PayloadFormatIndicator = serializer.PayloadFormat,
+        };
+        return this;
+    }
+
+    /// <summary>Computes the birth message fresh for every connection-up; the argument is the attempt counter.</summary>
+    public PulseMqttClientBuilder WithBirth(Func<int, CancellationToken, ValueTask<MqttPublishPacket>> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        _birthFactory = factory;
+        return this;
+    }
+
+    /// <summary>What happens when the birth publish fails. Default: the connection-up fails and retries.</summary>
+    public PulseMqttClientBuilder WithBirthFailurePolicy(BirthFailurePolicy policy)
+    {
+        _birthFailure = policy;
+        return this;
+    }
+
     /// <summary>Sets the serializer for typed messaging.</summary>
     public PulseMqttClientBuilder WithSerializer(IMqttSerializer serializer)
     {
@@ -230,6 +381,11 @@ public sealed class PulseMqttClientBuilder
             throw new InvalidOperationException("Configure a transport: WithTcp(...) or WithTransport(...).");
         }
 
+        if ((_typedWill is not null || _typedBirth is not null) && _serializer is null)
+        {
+            throw new InvalidOperationException("Typed will and birth payloads need WithSerializer(...).");
+        }
+
         var options = new ResilientMqttClientOptions
         {
             Connect = BuildConnect(),
@@ -243,6 +399,11 @@ public sealed class PulseMqttClientBuilder
             MessageStore = _messageStore,
             Serializer = _serializer,
             Logger = _logger,
+            Will = _typedWill is { } typedWill ? typedWill(_serializer!) : _will,
+            WillFactory = _willFactory,
+            Birth = _typedBirth is { } typedBirth ? typedBirth(_serializer!) : _birth,
+            BirthFactory = _birthFactory,
+            BirthFailure = _birthFailure,
         };
 
         return new ResilientMqttClient(_transportFactory, options, _timeProvider);

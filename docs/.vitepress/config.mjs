@@ -44,6 +44,7 @@ export default defineConfig({
           text: 'Operations',
           items: [
             { text: 'Resilience', link: '/guide/resilience' },
+            { text: 'Presence', link: '/guide/presence' },
             { text: 'Lifecycle and state', link: '/guide/lifecycle' },
             { text: 'Dependency injection', link: '/guide/dependency-injection' },
             { text: 'Health checks', link: '/guide/health-checks' },

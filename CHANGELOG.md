@@ -2,7 +2,13 @@
 
 ## 0.5.0 (unreleased)
 
-_Nothing yet._
+- Presence: first-class last-will configuration (options, configuration binding, and the
+  fluent builder — text, bytes, typed, and full v5 forms) plus a will **factory** invoked on
+  every connection attempt for fresh topics and payloads. A **birth message** — the will's
+  "online" mirror — publishes automatically on every connection-up, after re-subscription and
+  before the offline queue flushes, in static, typed, and per-attempt factory forms, with a
+  configurable failure policy. The retained online/offline cycle is verified end to end
+  against a real broker.
 
 ## 0.4.0
 

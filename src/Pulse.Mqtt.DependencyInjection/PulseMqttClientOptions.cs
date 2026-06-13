@@ -44,4 +44,48 @@ public sealed class PulseMqttClientOptions
     /// time. Host shutdown still stops a running client either way.
     /// </summary>
     public bool StartWithHost { get; set; } = true;
+
+    /// <summary>
+    /// The last-will message the broker publishes when the connection dies ungracefully —
+    /// bindable from configuration. Pair with <see cref="Birth"/> for the presence pattern.
+    /// </summary>
+    public PulseMqttWillOptions? Will { get; set; }
+
+    /// <summary>The birth message published automatically on every connection-up — bindable from configuration.</summary>
+    public PulseMqttBirthOptions? Birth { get; set; }
+}
+
+/// <summary>A configuration-bindable last-will message.</summary>
+public sealed class PulseMqttWillOptions
+{
+    /// <summary>The topic the broker publishes the will to.</summary>
+    public string Topic { get; set; } = string.Empty;
+
+    /// <summary>The UTF-8 will payload.</summary>
+    public string Payload { get; set; } = string.Empty;
+
+    /// <summary>The QoS the will is published at.</summary>
+    public MqttQualityOfService QualityOfService { get; set; } = MqttQualityOfService.AtMostOnce;
+
+    /// <summary>Whether the will is retained.</summary>
+    public bool Retain { get; set; }
+
+    /// <summary>The MQTT 5 will delay, in seconds, if set.</summary>
+    public uint? DelaySeconds { get; set; }
+}
+
+/// <summary>A configuration-bindable birth message.</summary>
+public sealed class PulseMqttBirthOptions
+{
+    /// <summary>The topic the birth message is published to.</summary>
+    public string Topic { get; set; } = string.Empty;
+
+    /// <summary>The UTF-8 birth payload.</summary>
+    public string Payload { get; set; } = string.Empty;
+
+    /// <summary>The QoS the birth is published at.</summary>
+    public MqttQualityOfService QualityOfService { get; set; } = MqttQualityOfService.AtMostOnce;
+
+    /// <summary>Whether the birth is retained.</summary>
+    public bool Retain { get; set; }
 }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Pulse.Mqtt.Client;
+using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Resilience;
 using Pulse.Mqtt.Serialization;
 using Pulse.Mqtt.Transport;
@@ -52,6 +53,22 @@ public sealed class PulseMqttBuilder
 
     /// <summary>Sets the payload serializer for typed messaging (no default).</summary>
     public PulseMqttBuilder UseSerializer(Func<IServiceProvider, IMqttSerializer> factory) =>
+        AddKeyed(factory);
+
+    /// <summary>
+    /// Computes the last-will message fresh for every connection attempt — wins over the
+    /// static will in the options.
+    /// </summary>
+    public PulseMqttBuilder UseWillFactory(
+        Func<IServiceProvider, Func<CancellationToken, ValueTask<MqttWillMessage>>> factory) =>
+        AddKeyed(factory);
+
+    /// <summary>
+    /// Computes the birth message fresh for every connection-up — wins over the static birth
+    /// in the options. The delegate's first argument is the connection attempt counter.
+    /// </summary>
+    public PulseMqttBuilder UseBirthFactory(
+        Func<IServiceProvider, Func<int, CancellationToken, ValueTask<MqttPublishPacket>>> factory) =>
         AddKeyed(factory);
 
     /// <summary>Registers a health check named <c>pulse-mqtt-&lt;name&gt;</c> for this client.</summary>
