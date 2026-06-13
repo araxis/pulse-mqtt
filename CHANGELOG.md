@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 (unreleased)
+## 0.4.0
 
 - Receive-maximum flow control: outbound QoS 1/2 publishes never exceed the broker's CONNACK
   `ReceiveMaximum`. Excess publishers wait — bounded and cancellable — until an
