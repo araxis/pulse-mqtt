@@ -50,6 +50,14 @@ public sealed record ResilientMqttClientOptions
     public ILogger? Logger { get; init; }
 
     /// <summary>
+    /// When enabled, the active span's W3C trace context (<c>traceparent</c>/<c>tracestate</c>) is
+    /// written onto the user properties of outbound publishes, so a consumer's receive span links
+    /// to the producer's span across processes. Off by default; receive spans always honor an
+    /// incoming <c>traceparent</c> regardless of this flag.
+    /// </summary>
+    public bool PropagateTraceContext { get; init; }
+
+    /// <summary>
     /// The last-will message registered with every CONNECT — the broker publishes it when the
     /// connection dies ungracefully. Overrides <see cref="MqttConnectPacket.Will"/> on
     /// <see cref="Connect"/> when set; <see cref="WillFactory"/> wins over both.

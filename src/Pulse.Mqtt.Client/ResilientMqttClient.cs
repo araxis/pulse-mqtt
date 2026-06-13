@@ -39,6 +39,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     private readonly Lazy<MqttRouter> _router;
     private readonly string _clientId;
+    private readonly PulseMqttDiagnostics.IOfflineQueueProbe _offlineProbe;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<MqttPublishPacket>> _pendingRequests = new();
     private readonly object _rpcGate = new();
     private Task? _rpcRoute;
@@ -84,6 +85,8 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         });
 
         _clientId = options.Connect.ClientId;
+        _offlineProbe = new OfflineQueueProbe(_clientId, _messageStore);
+        PulseMqttDiagnostics.RegisterOfflineQueue(_offlineProbe);
         _router = new Lazy<MqttRouter>(
             () =>
             {
@@ -98,6 +101,13 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             },
             LazyThreadSafetyMode.ExecutionAndPublication);
     }
+
+    /// <summary>
+    /// Backstop for a client abandoned without <see cref="DisposeAsync"/>: removing the probe from
+    /// the process-global diagnostics registry lets its message store (and any queued payloads) be
+    /// collected. <see cref="DisposeAsync"/> suppresses this finalizer on the normal path.
+    /// </summary>
+    ~ResilientMqttClient() => PulseMqttDiagnostics.UnregisterOfflineQueue(_offlineProbe);
 
     /// <summary>The current connection state.</summary>
     public ConnectionState State { get; private set; } = ConnectionState.Disconnected;
@@ -176,13 +186,22 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             activity.SetTag("messaging.operation.type", "send");
         }
 
-        var outcome = await PublishCoreAsync(packet, cancellationToken).ConfigureAwait(false);
+        // Inject the active span (ours, or an ambient one the caller already started) so a consumer
+        // can parent its receive span on this publish. Off unless the caller opts in.
+        if (_options.PropagateTraceContext && Activity.Current is { } current)
+        {
+            packet = TraceContextPropagation.Inject(packet, current.Context);
+        }
 
+        var start = _time.GetTimestamp();
+        var outcome = await PublishCoreAsync(packet, cancellationToken).ConfigureAwait(false);
+        var elapsed = _time.GetElapsedTime(start).TotalSeconds;
+
+        var clientIdTag = new KeyValuePair<string, object?>("client.id", _clientId);
+        var dispositionTag = new KeyValuePair<string, object?>("disposition", outcome.Disposition.ToString());
         activity?.SetTag("pulse.mqtt.disposition", outcome.Disposition.ToString());
-        PulseMqttDiagnostics.MessagesPublished.Add(
-            1,
-            new KeyValuePair<string, object?>("client.id", _clientId),
-            new KeyValuePair<string, object?>("disposition", outcome.Disposition.ToString()));
+        PulseMqttDiagnostics.MessagesPublished.Add(1, clientIdTag, dispositionTag);
+        PulseMqttDiagnostics.PublishDuration.Record(elapsed, clientIdTag, dispositionTag);
         return outcome;
     }
 
@@ -587,6 +606,8 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         }
 
         _disposed = true;
+        GC.SuppressFinalize(this);
+        PulseMqttDiagnostics.UnregisterOfflineQueue(_offlineProbe);
         await StopAsync(CancellationToken.None).ConfigureAwait(false);
         _messages.Writer.TryComplete();
         if (_router.IsValueCreated)
@@ -595,6 +616,15 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         }
 
         _lifetime?.Dispose();
+    }
+
+    private sealed class OfflineQueueProbe(string clientId, IMessageStore store) : PulseMqttDiagnostics.IOfflineQueueProbe
+    {
+        public string ClientId => clientId;
+
+        public long Depth => store.Count;
+
+        public long Dropped => store.DroppedCount;
     }
 
     private async Task SuperviseAsync(CancellationToken cancellationToken)
@@ -621,6 +651,12 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                                 PulseMqttDiagnostics.MessagesReceived.Add(1, new KeyValuePair<string, object?>("client.id", _clientId));
                                 return _messages.Writer.WriteAsync(message, sinkToken);
                             };
+
+                            var clientIdTag = new KeyValuePair<string, object?>("client.id", _clientId);
+                            var connectStart = _time.GetTimestamp();
+                            using var connectActivity = PulseMqttDiagnostics.ActivitySource.StartActivity("connect", ActivityKind.Client);
+                            connectActivity?.SetTag("messaging.system", "mqtt");
+                            connectActivity?.SetTag("client.id", _clientId);
                             try
                             {
                                 // The will is computed per attempt: a factory produces a fresh
@@ -652,11 +688,22 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                                     PulseMqttLog.InFlightDiscarded(discardLogger, _clientId, heldInFlight);
                                 }
 
+                                connectActivity?.SetTag("pulse.mqtt.session_present", ack.SessionPresent);
+                                PulseMqttDiagnostics.ConnectDuration.Record(
+                                    _time.GetElapsedTime(connectStart).TotalSeconds,
+                                    clientIdTag,
+                                    new KeyValuePair<string, object?>("outcome", "success"));
+
                                 raw = candidate;
                                 connAck = ack;
                             }
-                            catch
+                            catch (Exception error)
                             {
+                                connectActivity?.SetStatus(ActivityStatusCode.Error, error.Message);
+                                PulseMqttDiagnostics.ConnectDuration.Record(
+                                    _time.GetElapsedTime(connectStart).TotalSeconds,
+                                    clientIdTag,
+                                    new KeyValuePair<string, object?>("outcome", "error"));
                                 await candidate.DisposeAsync().ConfigureAwait(false);
                                 throw;
                             }
