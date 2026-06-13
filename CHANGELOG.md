@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 (unreleased)
+## 0.7.0
 
 - MQTTnet migration guide: a new docs page maps the common MQTTnet patterns — factory and options
   builders, the managed client, message and topic-filter builders, the received-message event,
