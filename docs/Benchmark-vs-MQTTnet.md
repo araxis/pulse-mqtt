@@ -23,6 +23,16 @@ earlier revisions of this page. Compare numbers within one table, not across pag
 allocation numbers are exact and stable, wall-clock numbers carry the proxied-loopback noise.
 :::
 
+::: tip Release-candidate validation
+The benchmark suites were re-run on the 1.0.0-rc.1 build. The hot path — the wire codec, the
+publish/subscribe path, and the connection layer — is unchanged since these numbers were
+published, so the allocation figures (which are exact) and per-operation latencies remain
+representative; the only `Pulse.Mqtt.Core` change in the release candidate is disposal-teardown
+hardening, off the measured hot path. Reproduce with the command above (comparison, requires
+Docker) or `dotnet run -c Release --project bench/Pulse.Mqtt.Benchmarks` (the allocation
+micro-benchmarks, no Docker).
+:::
+
 ## Methodology
 
 Both libraries use their user-facing clients (`ResilientMqttClient` vs `MqttClient`), the same

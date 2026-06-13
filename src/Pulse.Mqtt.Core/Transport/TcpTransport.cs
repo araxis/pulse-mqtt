@@ -34,14 +34,17 @@ public sealed class TcpTransport : IMqttTransport
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        // Teardown path: a peer that already closed the connection can fault the final flush of
-        // buffered bytes. That is expected during disconnect and not worth surfacing from disposal.
+        // Teardown path: completing the pipes is best-effort. A peer that already closed the
+        // connection can fault the final flush; an abrupt disposal that races an in-flight flush
+        // can corrupt the pipe writer's internal state (a null array returned to the pool). Both
+        // are expected during a disconnect and not worth surfacing from disposal — the stream and
+        // socket are still torn down below.
         try
         {
             await Output.CompleteAsync().ConfigureAwait(false);
             await Input.CompleteAsync().ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException or SocketException)
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or SocketException or InvalidOperationException or ArgumentException)
         {
         }
 

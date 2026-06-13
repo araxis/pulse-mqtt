@@ -2,6 +2,12 @@
 
 ## 1.0.0-rc.1 (unreleased)
 
+- Stress and soak validation: a deterministic chaos test runs in CI — random disconnects under
+  sustained QoS 1 load against Mosquitto with a persistent session, proving zero message loss and
+  guaranteed reconnect recovery — and a configurable soak harness (`PULSE_SOAK_DURATION`) drives
+  endless disconnects while asserting zero loss and a bounded managed heap. The chaos run hardened
+  `TcpTransport.DisposeAsync` so an abrupt disposal racing an in-flight flush tears down cleanly
+  instead of throwing. The benchmark suites were re-validated on the release-candidate build.
 - API freeze: `Microsoft.CodeAnalysis.PublicApiAnalyzers` now guards every shipped package against
   an unintended public-surface change, with committed `PublicAPI.Shipped.txt` baselines. A
   documented API-review pass cleaned the surface ahead of the freeze: the orphaned

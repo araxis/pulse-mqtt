@@ -25,8 +25,9 @@ jobs:
         run: dotnet build -c Release
 
       - name: Test
-        # The heavier EMQX/HiveMQ broker-matrix images run in broker-matrix.yml, not on every push.
-        run: dotnet test -c Release --no-build --logger "console;verbosity=minimal" --filter "Category!=BrokerMatrix"
+        # The heavier EMQX/HiveMQ broker-matrix images run in broker-matrix.yml; the long-running
+        # soak harness (Category=Soak) is operational and run on demand, not on every push.
+        run: dotnet test -c Release --no-build --logger "console;verbosity=minimal" --filter "Category!=BrokerMatrix&Category!=Soak"
 
       - name: Pack
         run: dotnet pack -c Release --no-build -o packages
