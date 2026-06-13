@@ -16,19 +16,30 @@ the `Meter` is internal but its instruments are collected by meter name.
 
 ## Metrics
 
-Four counters, all `Counter<long>`, all emitted from the client. The instrument name is the
-metric; the tags are the dimensions you group and alert by.
+All instruments are emitted from the client. The instrument name is the metric; the tags are the
+dimensions you group and alert by.
 
-| Instrument | Type | Tags | Incremented when |
+| Instrument | Type | Tags | Recorded when |
 | --- | --- | --- | --- |
 | `pulse.mqtt.client.connect.attempts` | `Counter<long>` | `client.id` | Each connection attempt starts (including every retry) |
+| `pulse.mqtt.client.connect.duration` | `Histogram<double>` (s) | `client.id`, `outcome` | A connection attempt finishes; `outcome` is `success` \| `error` |
 | `pulse.mqtt.client.state.transitions` | `Counter<long>` | `client.id`, `state` | The connection state changes; `state` is the new state |
-| `pulse.mqtt.client.messages.published` | `Counter<long>` | `client.id`, `disposition` | A publish completes; `disposition` is `Delivered` \| `Queued` \| `DroppedOffline` |
+| `pulse.mqtt.client.messages.published` | `Counter<long>` | `client.id`, `disposition` | A publish completes; `disposition` is `Delivered` \| `Queued` \| `DroppedOffline` \| `InFlight` |
+| `pulse.mqtt.client.publish.duration` | `Histogram<double>` (s) | `client.id`, `disposition` | A publish completes (same dispositions) |
 | `pulse.mqtt.client.messages.received` | `Counter<long>` | `client.id` | An application message is delivered to the client |
+| `pulse.mqtt.client.offline.queue.depth` | `ObservableGauge<long>` | `client.id` | Observed on collection: publishes currently waiting in the offline queue |
+| `pulse.mqtt.client.offline.queue.dropped` | `ObservableCounter<long>` | `client.id` | Observed on collection: publishes the overflow policy has dropped |
 
-`client.id` is the client's MQTT client identifier. `state` takes the
+`client.id` is the client's MQTT client identifier — keep it unique per live client, since the
+observable gauges report one measurement per client tagged only by `client.id`, and two live
+clients sharing an id collide on the same series. `state` takes the
 [`ConnectionState`](/reference/connection-states) values; `disposition` takes the
-[`PublishDisposition`](./publishing#outcomes--no-silent-loss) values.
+[`PublishDisposition`](./publishing#outcomes--no-silent-loss) values (`Delivered`, `Queued`,
+`DroppedOffline`, `InFlight`), plus two background-publish outcomes that share the
+`messages.published` counter: `BirthFailed` (a [birth message](./presence) that failed under
+`LogAndContinue`) and `DroppedTooLarge` (a queued publish dropped on reconnect because it exceeds
+the broker's maximum packet size). The two histograms record seconds, so a percentile view
+(p50/p95/p99) of connect and publish latency comes for free.
 
 ### Collect them with OpenTelemetry
 
@@ -58,16 +69,20 @@ pulse_mqtt_client_connect_attempts_total{client_id="svc-1"} 11
 
 ## Traces
 
-One span, from the publish path:
+Three spans cover the connect, publish, and receive paths:
 
 | Span | Kind | Display name | Tags |
 | --- | --- | --- | --- |
+| `connect` | `Client` | `connect` | `messaging.system=mqtt`, `client.id=<id>`, `pulse.mqtt.session_present=<bool>` |
 | `publish` | `Producer` | `publish <topic>` | `messaging.system=mqtt`, `messaging.destination.name=<topic>`, `messaging.operation.type=send`, `pulse.mqtt.disposition=<disposition>` |
+| `receive` | `Consumer` | `receive <topic>` | `messaging.system=mqtt`, `messaging.destination.name=<topic>`, `messaging.operation.type=process` |
 
-The three `messaging.*` tags follow the OpenTelemetry messaging semantic conventions, so any
-trace UI that understands them renders the span correctly. The span participates in the ambient
-`Activity` context, so a publish made inside an incoming request or consumer span is parented to
-it automatically — you get end-to-end traces across the broker boundary for free.
+The `connect` span wraps a single connection attempt (one per retry), so its duration matches the
+`connect.duration` histogram and its status is set to error on a failed attempt. The `receive`
+span wraps a [routed handler](./routing) invocation. The `messaging.*` tags follow the
+OpenTelemetry messaging semantic conventions, so any trace UI that understands them renders the
+spans correctly. The `publish` span participates in the ambient `Activity` context, so a publish
+made inside an incoming request or consumer span is parented to it automatically.
 
 ```csharp
 builder.Services.AddOpenTelemetry()
@@ -77,8 +92,27 @@ builder.Services.AddOpenTelemetry()
         .AddOtlpExporter());                          // or Jaeger, Zipkin, console
 ```
 
-Receive and connect paths are not yet spanned — use the `messages.received` /
-`connect.attempts` metrics and the logs below for those.
+### Trace context across the broker
+
+To connect a producer's `publish` span to a consumer's `receive` span across processes, opt the
+producer in to W3C trace-context propagation:
+
+```csharp
+var options = new ResilientMqttClientOptions
+{
+    Connect = connect,
+    PropagateTraceContext = true,   // off by default
+};
+```
+
+When enabled, the active span's `traceparent` (and `tracestate`) is written onto the user
+properties of each outbound publish. On the other side the `receive` span **always** honors an
+incoming `traceparent` — regardless of its own `PropagateTraceContext` setting — so the handler's
+work, and any spans it starts, become children of the original `publish` span. The result is one
+continuous distributed trace from producer through the broker to consumer. With propagation off
+(the default) no `traceparent` is added and `receive` spans are local roots. Because extraction is
+passive, the consumer also links correctly to non-Pulse producers that set a standard
+`traceparent`.
 
 ## Logs
 
@@ -140,7 +174,8 @@ Built straight from the instruments above:
 | Broker link flapping | `rate(pulse_mqtt_client_messages_published_total{disposition="Queued"}[5m]) > 0` |
 | Broker down or rejecting | `rate(pulse_mqtt_client_connect_attempts_total[5m])` rising with no `state="Connected"` transition |
 | Client gave up (terminal) | any `pulse_mqtt_client_state_transitions_total{state="Faulted"}` — page immediately; it stopped retrying for a reason |
-| Offline drops | `IMessageStore.DroppedCount` climbing (expose it as a gauge from your own meter if you need it on a dashboard) |
+| Offline drops | `increase(pulse_mqtt_client_offline_queue_dropped_total[5m]) > 0` — the overflow policy is shedding load |
+| Offline backlog growing | `pulse_mqtt_client_offline_queue_depth` trending up while disconnected |
 | Consumer stalled | `messages.received` flat while the broker is known to be publishing |
 
 ## Health checks

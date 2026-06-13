@@ -237,19 +237,31 @@ loses; corruption test recovers with a clear error; AOT-safe (no reflection-base
 (generated resolvers, no dynamic codegen at runtime); round-trip and interop tests; documented
 in Typed messaging.
 
-### N3 — Observability completion
+### N3 — Observability completion ✅
 
 **DoD:** a `receive` span (Consumer kind, linked to the producer context when the publish
 carried trace propagation), a `connect` span around connection attempts, histogram instruments
 for publish duration and connect duration, and gauges for offline-queue depth and dropped
 count; docs updated; overhead measured and negligible with no listener.
 
-### N4 — Trace context propagation
+Done in 0.6.0: `connect`/`receive` spans alongside `publish`; `connect.duration` and
+`publish.duration` histograms (seconds); `offline.queue.depth` observable gauge and
+`offline.queue.dropped` observable counter, one measurement per live client. Spans and
+instruments are no-ops with no listener (`StartActivity` returns null). Documented in the
+observability guide.
+
+### N4 — Trace context propagation ✅
 
 W3C `traceparent` in user properties, producer-side inject + consumer-side extract, opt-in.
 
 **DoD:** a publish inside an active span produces a routed handler whose `Activity` is a child
 across two clients; off by default; documented.
+
+Done in 0.6.0: `ResilientMqttClientOptions.PropagateTraceContext` (off by default) injects the
+active span's `traceparent`/`tracestate` onto outbound publishes; the `receive` span always
+extracts an incoming `traceparent` and parents on it, so the routed handler's `Activity` is a
+remote child of the producer's span. Verified by tests for inject, off-by-default, and remote
+parenting.
 
 ### N5 — MQTTnet migration guide
 

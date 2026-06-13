@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Channels;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Routing;
@@ -127,6 +128,42 @@ public sealed class MqttRouter : IAsyncDisposable
 
     private void RaiseHandlerFaulted(string template, Exception error) => HandlerFaulted?.Invoke(template, error);
 
+    // Wraps each handler invocation in a Consumer span. When the message carries a W3C traceparent
+    // (a producer with trace propagation enabled), the span is parented on the producer's span, so
+    // the handler's work is a child across processes; otherwise it starts a fresh root.
+    private static Activity? StartReceiveActivity(MqttPublishPacket message)
+    {
+        var activity = TraceContextPropagation.Extract(message.UserProperties) is { } remote
+            ? PulseMqttDiagnostics.ActivitySource.StartActivity("receive", ActivityKind.Consumer, remote)
+            : StartRootReceive();
+
+        if (activity is not null)
+        {
+            activity.DisplayName = $"receive {message.Topic}";
+            activity.SetTag("messaging.system", "mqtt");
+            activity.SetTag("messaging.destination.name", message.Topic);
+            activity.SetTag("messaging.operation.type", "process");
+        }
+
+        return activity;
+    }
+
+    // Starts a parentless receive span. A default ActivityContext still falls back to
+    // Activity.Current, so the ambient is suppressed first — the consumer task captures whatever
+    // Activity was current when the route was registered, and the receive span must not inherit it.
+    private static Activity? StartRootReceive()
+    {
+        var previous = Activity.Current;
+        Activity.Current = null;
+        var activity = PulseMqttDiagnostics.ActivitySource.StartActivity("receive", ActivityKind.Consumer);
+        if (activity is null)
+        {
+            Activity.Current = previous;
+        }
+
+        return activity;
+    }
+
     private async Task DispatchAsync(CancellationToken cancellationToken)
     {
         try
@@ -247,6 +284,7 @@ public sealed class MqttRouter : IAsyncDisposable
                 {
                     while (_channel.Reader.TryRead(out var routed))
                     {
+                        using var activity = StartReceiveActivity(routed.Message);
                         try
                         {
                             await handler(routed.Message, routed.Values, cancellationToken).ConfigureAwait(false);
@@ -257,6 +295,7 @@ public sealed class MqttRouter : IAsyncDisposable
                         }
                         catch (Exception error)
                         {
+                            activity?.SetStatus(ActivityStatusCode.Error, error.Message);
                             _router.RaiseHandlerFaulted(Template.Template, error);
                         }
                     }

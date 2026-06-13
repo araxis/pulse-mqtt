@@ -2,6 +2,14 @@
 
 ## 0.6.0 (unreleased)
 
+- Observability completion: `connect` (Client) and `receive` (Consumer) spans join the existing
+  `publish` span; new `connect.duration` and `publish.duration` histograms (seconds) and
+  `offline.queue.depth` / `offline.queue.dropped` observable instruments round out the metrics.
+  All stay nearly free with no listener attached.
+- Trace context propagation: opt in with `ResilientMqttClientOptions.PropagateTraceContext` and the
+  active span's W3C `traceparent`/`tracestate` rides on each publish's user properties; the
+  `receive` span always honors an incoming `traceparent`, so a producer's span and a consumer's
+  handler join one distributed trace across the broker. Off by default.
 - Broker interop matrix: a shared `BrokerScenarios` conformance suite now runs the same scenarios
   — handshake, QoS 0/1/2 round trips, retained messages, shared subscriptions, 64 KB payloads,
   and persistent-session resume — against **Mosquitto 2, EMQX 5.8, and HiveMQ CE 2024.3** as
