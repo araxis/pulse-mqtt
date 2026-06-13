@@ -231,11 +231,17 @@ F5) in-flight state survive restarts.
 peek/remove-head at-least-once contract; crash-mid-flush integration test re-sends rather than
 loses; corruption test recovers with a clear error; AOT-safe (no reflection-based ORM).
 
-### N2 — MessagePack serializer package (`Pulse.Mqtt.Serialization.MessagePack`)
+### N2 — MessagePack serializer package (`Pulse.Mqtt.Serialization.MessagePack`) ✅
 
 **DoD:** `IMqttSerializer` over MessagePack with correct content type; AOT-compatible
 (generated resolvers, no dynamic codegen at runtime); round-trip and interop tests; documented
 in Typed messaging.
+
+Done in 0.7.0: `MessagePackMqttSerializer` takes `MessagePackSerializerOptions`, so a
+source-generated resolver keeps it AOT-safe (the package builds with `IsAotCompatible`); content
+type `application/x-msgpack`. Tests round-trip through the generated resolver, verify the bytes
+are valid MessagePack (interop via `ConvertToJson`) and smaller than JSON, and check the error
+path. Documented in Typed messaging.
 
 ### N3 — Observability completion ✅
 

@@ -2,6 +2,10 @@
 
 ## 0.7.0 (unreleased)
 
+- MessagePack serialization: a new **`Pulse.Mqtt.Serialization.MessagePack`** package provides
+  `MessagePackMqttSerializer`, an `IMqttSerializer` over MessagePack for a compact binary wire
+  format. It takes `MessagePackSerializerOptions`, so a source-generated resolver keeps it
+  reflection-free and Native AOT safe; payloads are stamped `application/x-msgpack`.
 - Server-streamed RPC: `RequestStreamAsync` (raw and typed) consumes an `IAsyncEnumerable` of
   correlated responses until the responder publishes an end-of-stream marker, the idle timeout
   elapses, or the enumeration is cancelled; `OnRequestStreamAsync` is the responder side — yield a

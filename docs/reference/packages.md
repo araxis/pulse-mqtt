@@ -9,6 +9,7 @@ compatible. MIT licensed.
 | `Pulse.Mqtt.Client` | `ResilientMqttClient`: supervision, topic routing, typed messaging, request/response, diagnostics | Core, `Microsoft.Extensions.Logging.Abstractions` |
 | `Pulse.Mqtt.DependencyInjection` | `AddPulseMqttClient`, named clients, options binding, hosted lifecycle, health checks | Client + `Microsoft.Extensions.*` abstractions |
 | `Pulse.Mqtt.Serialization.Json` | Source-generated `System.Text.Json` serializer | Client |
+| `Pulse.Mqtt.Serialization.MessagePack` | MessagePack serializer (compact binary, source-generated resolvers) | Core, `MessagePack` |
 | `Pulse.Mqtt.Resilience.Polly` | `PollyReconnectStrategy` over a Polly v8 `ResiliencePipeline` | Core, `Polly.Core` |
 | `Pulse.Mqtt.Storage.Sqlite` | `SqliteSessionStore` + `SqliteMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `Microsoft.Data.Sqlite` |
 | `Pulse.Mqtt.Transport.WebSocket` | MQTT over `ws`/`wss` | Core |
