@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0 (unreleased)
+
+_Nothing yet._
+
 ## 0.6.0
 
 - Observability completion: `connect` (Client) and `receive` (Consumer) spans join the existing
