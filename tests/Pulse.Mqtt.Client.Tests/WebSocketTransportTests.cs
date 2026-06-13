@@ -94,6 +94,51 @@ public sealed class WebSocketTransportTests
         Should.Throw<ArgumentException>(() => new WebSocketTransportOptions { Uri = new Uri("http://broker") });
     }
 
+    [Fact]
+    public async Task Custom_headers_are_sent_on_the_handshake()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var (listener, uri) = StartListener();
+        using var ownedListener = listener;
+
+        var headerSeen = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var acceptTask = Task.Run(async () =>
+        {
+            var context = await listener.GetContextAsync();
+            headerSeen.TrySetResult(context.Request.Headers["Authorization"]);
+            var webSocketContext = await context.AcceptWebSocketAsync(subProtocol: "mqtt");
+            return webSocketContext.WebSocket;
+        }, timeout.Token);
+
+        var factory = new WebSocketTransportFactory(new WebSocketTransportOptions
+        {
+            Uri = uri,
+            Headers = new Dictionary<string, string> { ["Authorization"] = "Bearer token-123" },
+        });
+
+        await using var transport = await factory.ConnectAsync(timeout.Token);
+        using var server = await acceptTask.WaitAsync(timeout.Token);
+
+        (await headerSeen.Task.WaitAsync(timeout.Token)).ShouldBe("Bearer token-123");
+    }
+
+    [Fact]
+    public async Task An_unreachable_proxy_fails_the_connection()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var (listener, uri) = StartListener();
+        using var ownedListener = listener;
+
+        // Routing through a dead proxy must fail, which proves the proxy is actually applied.
+        var factory = new WebSocketTransportFactory(new WebSocketTransportOptions
+        {
+            Uri = uri,
+            Proxy = new WebProxy($"http://127.0.0.1:{FreePort()}"),
+        });
+
+        await Should.ThrowAsync<WebSocketException>(() => factory.ConnectAsync(timeout.Token).AsTask());
+    }
+
     private static (HttpListener Listener, Uri Uri) StartListener()
     {
         var port = FreePort();

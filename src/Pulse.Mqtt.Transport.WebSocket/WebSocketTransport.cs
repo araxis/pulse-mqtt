@@ -174,6 +174,17 @@ public sealed class WebSocketTransportFactory : IMqttTransportFactory
         try
         {
             socket.Options.AddSubProtocol(_options.SubProtocol);
+            if (_options.Proxy is { } proxy)
+            {
+                socket.Options.Proxy = proxy;
+            }
+
+            foreach (var header in _options.Headers)
+            {
+                socket.Options.SetRequestHeader(header.Key, header.Value);
+            }
+
+            // The escape hatch runs last so it can override the structured options above.
             _options.ConfigureClient?.Invoke(socket.Options);
             await socket.ConnectAsync(_options.Uri, cancellationToken).ConfigureAwait(false);
             return new WebSocketTransport(socket);

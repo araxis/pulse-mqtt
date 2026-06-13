@@ -276,10 +276,15 @@ Server-streamed RPC: one request, many correlated responses.
 responder-side helper publishes the marker; backpressure bounded; tests cover early consumer
 abandonment.
 
-### N7 — WebSocket proxy and header options
+### N7 — WebSocket proxy and header options ✅
 
 **DoD:** explicit proxy configuration and per-connect headers on `WebSocketTransportOptions`
 (today reachable only via `ConfigureClient`); documented with a reverse-proxy example.
+
+Done in 0.7.0: `WebSocketTransportOptions.Proxy` and `.Headers` apply to the opening handshake
+before `ConfigureClient` (which still runs last and can override). Tests verify a custom header
+reaches the server and that an unreachable proxy fails the connection; documented with a
+reverse-proxy example.
 
 ---
 
