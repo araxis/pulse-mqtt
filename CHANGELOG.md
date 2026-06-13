@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0 (unreleased)
+## 0.6.0
 
 - Observability completion: `connect` (Client) and `receive` (Consumer) spans join the existing
   `publish` span; new `connect.duration` and `publish.duration` histograms (seconds) and
@@ -14,9 +14,11 @@
   — handshake, QoS 0/1/2 round trips, retained messages, shared subscriptions, 64 KB payloads,
   and persistent-session resume — against **Mosquitto 2, EMQX 5.8, and HiveMQ CE 2024.3** as
   Testcontainers images, so a failure names the broker and the capability. EMQX and HiveMQ carry
-  a `BrokerMatrix` category and run on `main` (and on demand) via `broker-matrix.yml`; every PR
-  still runs the Mosquitto suite. A [compatibility table](docs/reference/broker-compatibility.md)
-  documents the brokers, versions, and verified scenarios.
+  a `BrokerMatrix` category; `broker-matrix.yml` runs them on PRs that touch the source, the
+  integration tests, or shared build inputs (and on `main` and on demand), while the fast `ci.yml`
+  lane keeps running the Mosquitto suite on every PR. A
+  [compatibility table](docs/reference/broker-compatibility.md) documents the brokers, versions,
+  and verified scenarios.
 
 ## 0.5.0
 
