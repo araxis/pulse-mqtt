@@ -71,6 +71,7 @@ export default defineConfig({
             { text: 'Options', link: '/reference/options' },
             { text: 'Connection states', link: '/reference/connection-states' },
             { text: 'Errors', link: '/reference/errors' },
+            { text: 'Broker compatibility', link: '/reference/broker-compatibility' },
           ],
         },
         {

@@ -1,5 +1,6 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using Pulse.Mqtt.IntegrationTests.Brokers;
 using Xunit;
 
 namespace Pulse.Mqtt.IntegrationTests;
@@ -8,13 +9,15 @@ namespace Pulse.Mqtt.IntegrationTests;
 /// Owns one Mosquitto broker container for the whole test collection: image, anonymous-access
 /// configuration, random host port, readiness wait, and cleanup.
 /// </summary>
-public sealed class MosquittoFixture : IAsyncLifetime
+public sealed class MosquittoFixture : IMqttBroker, IAsyncLifetime
 {
     private readonly IContainer _container = new ContainerBuilder("eclipse-mosquitto:2")
         .WithCommand("mosquitto", "-c", "/mosquitto-no-auth.conf")
         .WithPortBinding(1883, assignRandomHostPort: true)
         .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(1883))
         .Build();
+
+    public string Name => "Mosquitto 2";
 
     public string Host => _container.Hostname;
 

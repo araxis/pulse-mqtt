@@ -1,0 +1,44 @@
+using Pulse.Mqtt.Protocol;
+using Xunit;
+
+namespace Pulse.Mqtt.IntegrationTests.Brokers;
+
+// One thin class per broker so xunit starts each container only when its tests run. The shared
+// scenarios live in BrokerScenarios. EMQX and HiveMQ carry the "BrokerMatrix" category so the
+// per-PR build can exclude their heavier images and run them only on main.
+
+[Collection("mosquitto")]
+public sealed class MosquittoCompatibilityTests(MosquittoFixture broker) : BrokerCompatibilitySuite(broker);
+
+[Trait("Category", "BrokerMatrix")]
+[Collection("emqx")]
+public sealed class EmqxCompatibilityTests(EmqxBroker broker) : BrokerCompatibilitySuite(broker);
+
+[Trait("Category", "BrokerMatrix")]
+[Collection("hivemq")]
+public sealed class HiveMqCompatibilityTests(HiveMqBroker broker) : BrokerCompatibilitySuite(broker);
+
+/// <summary>The conformance suite each broker runs, delegating to <see cref="BrokerScenarios"/>.</summary>
+public abstract class BrokerCompatibilitySuite(IMqttBroker broker)
+{
+    [Fact]
+    public Task Handshake() => BrokerScenarios.HandshakeAsync(broker);
+
+    [Theory]
+    [InlineData(MqttQualityOfService.AtMostOnce)]
+    [InlineData(MqttQualityOfService.AtLeastOnce)]
+    [InlineData(MqttQualityOfService.ExactlyOnce)]
+    public Task Round_trip(MqttQualityOfService qos) => BrokerScenarios.RoundTripAsync(broker, qos);
+
+    [Fact]
+    public Task Retained_message() => BrokerScenarios.RetainedMessageAsync(broker);
+
+    [Fact]
+    public Task Large_payload() => BrokerScenarios.LargePayloadAsync(broker);
+
+    [Fact]
+    public Task Shared_subscription() => BrokerScenarios.SharedSubscriptionAsync(broker);
+
+    [Fact]
+    public Task Persistent_session_resumes() => BrokerScenarios.PersistentSessionResumesAsync(broker);
+}

@@ -2,7 +2,13 @@
 
 ## 0.6.0 (unreleased)
 
-_Nothing yet._
+- Broker interop matrix: a shared `BrokerScenarios` conformance suite now runs the same scenarios
+  — handshake, QoS 0/1/2 round trips, retained messages, shared subscriptions, 64 KB payloads,
+  and persistent-session resume — against **Mosquitto 2, EMQX 5.8, and HiveMQ CE 2024.3** as
+  Testcontainers images, so a failure names the broker and the capability. EMQX and HiveMQ carry
+  a `BrokerMatrix` category and run on `main` (and on demand) via `broker-matrix.yml`; every PR
+  still runs the Mosquitto suite. A [compatibility table](docs/reference/broker-compatibility.md)
+  documents the brokers, versions, and verified scenarios.
 
 ## 0.5.0
 
