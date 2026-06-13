@@ -2,6 +2,9 @@
 
 ## 0.7.0 (unreleased)
 
+- MQTTnet migration guide: a new docs page maps the common MQTTnet patterns — factory and options
+  builders, the managed client, message and topic-filter builders, the received-message event,
+  last will — to their Pulse equivalents, with before/after code.
 - MessagePack serialization: a new **`Pulse.Mqtt.Serialization.MessagePack`** package provides
   `MessagePackMqttSerializer`, an `IMqttSerializer` over MessagePack for a compact binary wire
   format. It takes `MessagePackSerializerOptions`, so a source-generated resolver keeps it
