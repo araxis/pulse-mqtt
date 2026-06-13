@@ -184,14 +184,19 @@ freezing them at startup.
 Mosquitto alone proves too little for a 1.0 interop claim.
 
 **Definition of done**
-- [ ] The Testcontainers integration suite runs the same scenario set against **Mosquitto,
-      EMQX, and HiveMQ CE**: connect/TLS, QoS 0/1/2 round trips, persistent-session resume
-      with redelivery (F5), receive-maximum behavior (F2), topic aliases (F4), retained
-      messages, shared subscriptions, and large payloads.
-- [ ] CI runs the full matrix at least on main merges (per-PR may run Mosquitto only, for
-      speed); a failure names the broker and scenario.
-- [ ] A compatibility table in the docs lists each broker, version tested, and any documented
-      deviations.
+- [x] The Testcontainers integration suite runs the same scenario set against **Mosquitto 2,
+      EMQX 5.8, and HiveMQ CE 2024.3**: handshake, QoS 0/1/2 round trips, persistent-session
+      resume, retained messages, shared subscriptions, and large (64 KB) payloads. The shared
+      `BrokerScenarios` helper drives every broker, so a failure names the broker and the
+      scenario. (Receive-maximum (F2) and topic aliases (F4) keep their dedicated single-broker
+      tests; TLS interop is tracked separately.)
+- [x] `broker-matrix.yml` runs the EMQX/HiveMQ matrix on PRs that touch the source, the
+      integration tests, or shared build inputs (gating before merge), and again on `main` and
+      on demand; a failure on `main` opens a tracking issue. The fast `ci.yml` lane filters
+      `Category!=BrokerMatrix`, so Mosquitto runs on every PR while the heavy images stay off
+      unrelated PRs.
+- [x] A [compatibility table](reference/broker-compatibility.md) in the docs lists each broker,
+      the version tested, and the verified scenarios.
 
 ### F9 — Stable toolchain and targets
 

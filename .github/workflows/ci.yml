@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# Supersede in-flight runs for the same ref (e.g. rapid PR pushes) to save runner time.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -20,7 +25,8 @@ jobs:
         run: dotnet build -c Release
 
       - name: Test
-        run: dotnet test -c Release --no-build --logger "console;verbosity=minimal"
+        # The heavier EMQX/HiveMQ broker-matrix images run in broker-matrix.yml, not on every push.
+        run: dotnet test -c Release --no-build --logger "console;verbosity=minimal" --filter "Category!=BrokerMatrix"
 
       - name: Pack
         run: dotnet pack -c Release --no-build -o packages

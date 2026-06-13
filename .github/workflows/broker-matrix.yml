@@ -1,0 +1,71 @@
+name: Broker matrix
+
+# Runs the cross-broker conformance suite (EMQX and HiveMQ, tagged Category=BrokerMatrix)
+# against their containers. Kept off the fast per-push CI loop because the images are heavy,
+# so it triggers only on changes that can affect broker behavior: the source, the integration
+# tests, the shared build inputs, or this workflow. It runs on PRs (to gate before merge) and
+# on main (to catch anything that slips through), plus on demand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/Pulse.Mqtt.IntegrationTests/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - '.github/workflows/broker-matrix.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/Pulse.Mqtt.IntegrationTests/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - '.github/workflows/broker-matrix.yml'
+  workflow_dispatch:
+
+# One run per ref. PR pushes supersede each other; main runs do not cancel, so back-to-back
+# merges don't spin up overlapping heavy container runs.
+concurrency:
+  group: broker-matrix-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  broker-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build tests/Pulse.Mqtt.IntegrationTests/Pulse.Mqtt.IntegrationTests.csproj -c Release
+
+      - name: Broker matrix
+        run: >
+          dotnet test tests/Pulse.Mqtt.IntegrationTests/Pulse.Mqtt.IntegrationTests.csproj
+          -c Release --no-build --logger "console;verbosity=normal"
+          --filter "Category=BrokerMatrix"
+
+      # A failure on main can't block the merge that caused it, so raise (or update) an issue.
+      - name: Report failure on main
+        if: failure() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Broker matrix failing on main"
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -z "$existing" ]; then
+            gh issue create --title "$title" --body "The broker matrix failed on \`${{ github.sha }}\`. Run: $RUN_URL"
+          else
+            gh issue comment "$existing" --body "Still failing on \`${{ github.sha }}\`. Run: $RUN_URL"
+          fi
