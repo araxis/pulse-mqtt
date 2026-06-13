@@ -190,8 +190,9 @@ Mosquitto alone proves too little for a 1.0 interop claim.
       EMQX 5.8, and HiveMQ CE 2024.3**: handshake, QoS 0/1/2 round trips, persistent-session
       resume, retained messages, shared subscriptions, and large (64 KB) payloads. The shared
       `BrokerScenarios` helper drives every broker, so a failure names the broker and the
-      scenario. (Receive-maximum (F2) and topic aliases (F4) keep their dedicated single-broker
-      tests; TLS interop is tracked separately.)
+      scenario. Since 1.1.0 the matrix also runs receive-maximum flow control (F2) and topic
+      aliases (F4) against all three brokers, and a dedicated TLS integration test round-trips a
+      message over a real TLS Mosquitto connection.
 - [x] `broker-matrix.yml` runs the EMQX/HiveMQ matrix on PRs that touch the source, the
       integration tests, or shared build inputs (gating before merge), and again on `main` and
       on demand; a failure on `main` opens a tracking issue. The fast `ci.yml` lane filters

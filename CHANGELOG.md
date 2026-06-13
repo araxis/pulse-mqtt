@@ -2,7 +2,15 @@
 
 ## 1.1.0 (unreleased)
 
-_Nothing yet._
+- Receive-maximum flow control now holds the send-quota slot for a QoS 2 message until **PUBCOMP**
+  (the final acknowledgement, per MQTT 5 §4.9) rather than freeing it at PUBREC. The previous
+  behavior could let a burst of QoS 2 publishes exceed the broker's advertised receive maximum,
+  which strict brokers (Mosquitto, HiveMQ) reject — a real interop bug surfaced by the expanded
+  broker matrix below.
+- Broker interop matrix expanded: receive-maximum flow control (a QoS 2 burst larger than the
+  broker's limit) and topic-alias compression now run across **Mosquitto 2, EMQX 5.8, and
+  HiveMQ CE 2024.3**, alongside the existing scenarios. A new TLS integration test round-trips a
+  message over a real TLS connection to a Mosquitto broker with a generated self-signed certificate.
 
 ## 1.0.0
 

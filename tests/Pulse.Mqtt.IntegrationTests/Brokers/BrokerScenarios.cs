@@ -217,8 +217,95 @@ public static class BrokerScenarios
         Encoding.UTF8.GetString((await second.Messages.ReadAsync(cancellation.Token)).Payload.Span).ShouldBe("resumed");
     }
 
+    public static async Task ReceiveMaximumFlowControlAsync(IMqttBroker broker)
+    {
+        using var cancellation = new CancellationTokenSource(Timeout);
+        var topic = $"matrix/receive-max/{Guid.NewGuid():N}";
+        const int messageCount = 30;
+
+        await using var subscriber = Connect(broker);
+        await subscriber.ConnectAsync(NewConnect(), cancellation.Token);
+        await subscriber.SubscribeAsync(
+            [new MqttTopicFilter(topic) { MaximumQualityOfService = MqttQualityOfService.ExactlyOnce }],
+            cancellation.Token);
+
+        // A burst of QoS 2 publishes larger than a typical broker receive-maximum: the client holds
+        // a send-quota slot for each exchange until PUBCOMP, so it never exceeds the broker's
+        // advertised limit. Every message must still complete and arrive exactly once.
+        await using var publisher = Connect(broker);
+        await publisher.ConnectAsync(NewConnect(), cancellation.Token);
+
+        var publishes = Enumerable.Range(0, messageCount)
+            .Select(i => publisher.PublishAsync(
+                new MqttPublishPacket
+                {
+                    Topic = topic,
+                    Payload = Encoding.UTF8.GetBytes(i.ToString(CultureInfo.InvariantCulture)),
+                    QualityOfService = MqttQualityOfService.ExactlyOnce,
+                },
+                cancellation.Token))
+            .ToList();
+
+        var received = new List<int>(messageCount);
+        for (var i = 0; i < messageCount; i++)
+        {
+            received.Add(int.Parse(Encoding.UTF8.GetString((await subscriber.Messages.ReadAsync(cancellation.Token)).Payload.Span), CultureInfo.InvariantCulture));
+        }
+
+        foreach (var publish in publishes)
+        {
+            (await publish).ShouldBe(MqttReasonCode.Success);
+        }
+
+        received.OrderBy(n => n).ShouldBe(Enumerable.Range(0, messageCount));
+    }
+
+    public static async Task TopicAliasesAsync(IMqttBroker broker)
+    {
+        using var cancellation = new CancellationTokenSource(Timeout);
+        var topic = $"matrix/topic-alias/{Guid.NewGuid():N}";
+        const int messageCount = 5;
+
+        await using var subscriber = Connect(broker);
+        await subscriber.ConnectAsync(NewConnect() with { TopicAliasMaximum = 10 }, cancellation.Token);
+        await subscriber.SubscribeAsync(
+            [new MqttTopicFilter(topic) { MaximumQualityOfService = MqttQualityOfService.AtLeastOnce }],
+            cancellation.Token);
+
+        // The publisher compresses the repeated topic into a topic alias after the first publish;
+        // the broker must accept the alias and still route every message to the full topic.
+        await using var publisher = Connect(broker, new RawMqttClientOptions { UseOutboundTopicAliases = true });
+        var connAck = await publisher.ConnectAsync(NewConnect(), cancellation.Token);
+        connAck.TopicAliasMaximum.ShouldNotBeNull("the broker must offer topic aliases for this scenario");
+
+        for (var sequence = 0; sequence < messageCount; sequence++)
+        {
+            await publisher.PublishAsync(
+                new MqttPublishPacket
+                {
+                    Topic = topic,
+                    Payload = Encoding.UTF8.GetBytes(sequence.ToString(CultureInfo.InvariantCulture)),
+                    QualityOfService = MqttQualityOfService.AtLeastOnce,
+                },
+                cancellation.Token);
+        }
+
+        var received = new List<int>(messageCount);
+        for (var i = 0; i < messageCount; i++)
+        {
+            var message = await subscriber.Messages.ReadAsync(cancellation.Token);
+            message.Topic.ShouldBe(topic);
+            received.Add(int.Parse(Encoding.UTF8.GetString(message.Payload.Span), CultureInfo.InvariantCulture));
+        }
+
+        received.ShouldBe(Enumerable.Range(0, messageCount));
+    }
+
     private static RawMqttClient Connect(IMqttBroker broker) =>
         new(new TcpTransportFactory(new TcpTransportOptions { Host = broker.Host, Port = broker.Port }));
+
+    private static RawMqttClient Connect(IMqttBroker broker, RawMqttClientOptions options) =>
+        new(new TcpTransportFactory(new TcpTransportOptions { Host = broker.Host, Port = broker.Port }), options);
 
     private static MqttConnectPacket NewConnect() => new()
     {

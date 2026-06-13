@@ -83,7 +83,7 @@ public sealed class ReceiveMaximumTests
     }
 
     [Fact]
-    public async Task A_qos2_slot_frees_at_pubrec_not_at_pubcomp()
+    public async Task A_qos2_slot_frees_at_pubcomp_not_at_pubrec()
     {
         var (client, broker, timeout) = await ConnectedAsync(receiveMaximum: 1);
 
@@ -97,23 +97,26 @@ public sealed class ReceiveMaximumTests
         await Task.Delay(100, timeout.Token);
         gatedRead.IsCompleted.ShouldBeFalse("the QoS 1 publish must wait while the QoS 2 exchange holds the only slot");
 
-        // PUBREC frees the quota per the specification — before PUBREL/PUBCOMP complete.
+        // PUBREC advances the exchange — the client sends PUBREL — but does NOT free the slot. Per
+        // MQTT 5 section 4.9 the send quota frees only at PUBCOMP, the final acknowledgement, so the
+        // QoS 1 publish keeps waiting.
         await broker.SendAsync(
             new MqttPublishAckPacket { PacketType = MqttPacketType.PubRec, PacketIdentifier = seenQos2.PacketIdentifier!.Value },
             timeout.Token);
 
-        // The next packets can arrive in either order (PUBREL from the QoS 2 flow, PUBLISH
-        // from the freed QoS 1) — collect both.
-        var nextA = await gatedRead;
-        var nextB = await broker.ReadPacketAsync(timeout.Token);
-        var packets = new[] { nextA, nextB };
-        var pubRel = packets.OfType<MqttPublishAckPacket>().ShouldHaveSingleItem();
+        var pubRel = (await gatedRead).ShouldBeOfType<MqttPublishAckPacket>();
         pubRel.PacketType.ShouldBe(MqttPacketType.PubRel);
-        var qos1Publish = packets.OfType<MqttPublishPacket>().ShouldHaveSingleItem();
 
+        var stillGated = broker.ReadPacketAsync(timeout.Token);
+        await Task.Delay(100, timeout.Token);
+        stillGated.IsCompleted.ShouldBeFalse("the slot is still held by the QoS 2 exchange until its PUBCOMP");
+
+        // PUBCOMP frees the slot; the QoS 1 publish now flows.
         await broker.SendAsync(
             new MqttPublishAckPacket { PacketType = MqttPacketType.PubComp, PacketIdentifier = pubRel.PacketIdentifier },
             timeout.Token);
+
+        var qos1Publish = (await stillGated).ShouldBeOfType<MqttPublishPacket>();
         await broker.SendAsync(
             new MqttPublishAckPacket { PacketType = MqttPacketType.PubAck, PacketIdentifier = qos1Publish.PacketIdentifier!.Value },
             timeout.Token);
