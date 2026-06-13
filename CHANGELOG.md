@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 (unreleased)
+## 0.5.0
 
 - In-flight redelivery on session resume: with a persistent session (`CleanStart = false`)
   and a broker that preserves it, unacknowledged QoS 1/2 exchanges retransmit in order after a
