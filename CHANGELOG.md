@@ -2,6 +2,10 @@
 
 ## 0.5.0 (unreleased)
 
+- Enhanced authentication: an `IMqttAuthenticator` swap point drives the MQTT 5 AUTH
+  exchange — method and initial data on CONNECT, challenge/response rounds until the broker's
+  CONNACK, and client-initiated re-authentication on a live connection via
+  `ReAuthenticateAsync`. With none configured, no AUTH is ever sent.
 - Presence: first-class last-will configuration (options, configuration binding, and the
   fluent builder — text, bytes, typed, and full v5 forms) plus a will **factory** invoked on
   every connection attempt for fresh topics and payloads. A **birth message** — the will's

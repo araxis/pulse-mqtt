@@ -526,6 +526,15 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Starts a client-initiated re-authentication on the live connection (requires an
+    /// authenticator on <see cref="RawMqttClientOptions.Authenticator"/>).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The client is not connected, or no authenticator is configured.</exception>
+    public Task ReAuthenticateAsync(CancellationToken cancellationToken = default) =>
+        (_raw ?? throw new InvalidOperationException("The client is not connected."))
+            .ReAuthenticateAsync(cancellationToken);
+
     /// <summary>Stops the supervisor and closes any live connection.</summary>
     public async Task StopAsync(CancellationToken cancellationToken)
     {
