@@ -31,6 +31,9 @@
     <!-- Resilience add-on -->
     <PackageVersion Include="Polly.Core" Version="8.7.0" />
 
+    <!-- Durable storage add-on -->
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+
     <!-- Integration tests -->
     <PackageVersion Include="Testcontainers" Version="4.12.0" />
 

@@ -152,6 +152,31 @@ new ResilientMqttClientOptions
 };
 ```
 
+## Durable storage with SQLite
+
+The defaults keep everything for the lifetime of the process. To carry the subscription set, the
+offline queue, and the in-flight QoS state across a **process restart**, add the
+[`Pulse.Mqtt.Storage.Sqlite`](/reference/packages) package and point both stores at a file:
+
+```csharp
+using Pulse.Mqtt.Storage.Sqlite;
+
+var options = new ResilientMqttClientOptions
+{
+    Connect = new MqttConnectPacket { ClientId = "device-7", CleanStart = false, SessionExpiryInterval = 300 },
+    SessionStore = new SqliteSessionStore("device-7-session.db"),
+    MessageStore = new SqliteMessageStore("device-7-queue.db", new OfflineQueueOptions { Capacity = 1024 }),
+};
+```
+
+Both stores accept a plain file path or a full Microsoft.Data.Sqlite connection string, create the
+file and schema on first use, and dispose with the client. The message store preserves FIFO order
+and the same overflow policy as the in-memory default; because the flush loop peeks then removes
+the head, a crash between sending and removing re-sends the message rather than losing it. A
+missing, locked, or corrupt database fails fast with a clear `SqliteStorageException` instead of
+silently starting empty. The package is hand-written SQL over SQLite — no reflection ORM — so it
+stays Native AOT compatible.
+
 ## Sessions and re-subscription
 
 The durable subscription set lives in an `ISessionStore` (in-memory by default). On
