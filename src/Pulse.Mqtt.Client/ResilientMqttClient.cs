@@ -198,13 +198,25 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         var outcome = await PublishCoreAsync(packet, cancellationToken).ConfigureAwait(false);
         var elapsed = _time.GetElapsedTime(start).TotalSeconds;
 
+        // Interned name, computed once: the enum's own ToString() would allocate a string on every
+        // publish — measurable on the hot path even with no telemetry listener attached.
+        var disposition = DispositionName(outcome.Disposition);
         var clientIdTag = new KeyValuePair<string, object?>("client.id", _clientId);
-        var dispositionTag = new KeyValuePair<string, object?>("disposition", outcome.Disposition.ToString());
-        activity?.SetTag("pulse.mqtt.disposition", outcome.Disposition.ToString());
+        var dispositionTag = new KeyValuePair<string, object?>("disposition", disposition);
+        activity?.SetTag("pulse.mqtt.disposition", disposition);
         PulseMqttDiagnostics.MessagesPublished.Add(1, clientIdTag, dispositionTag);
         PulseMqttDiagnostics.PublishDuration.Record(elapsed, clientIdTag, dispositionTag);
         return outcome;
     }
+
+    private static string DispositionName(PublishDisposition disposition) => disposition switch
+    {
+        PublishDisposition.Delivered => "Delivered",
+        PublishDisposition.Queued => "Queued",
+        PublishDisposition.DroppedOffline => "DroppedOffline",
+        PublishDisposition.InFlight => "InFlight",
+        _ => disposition.ToString(),
+    };
 
     private async Task<PublishOutcome> PublishCoreAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
     {
