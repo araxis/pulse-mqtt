@@ -2,6 +2,14 @@
 
 ## 0.5.0 (unreleased)
 
+- In-flight redelivery on session resume: with a persistent session (`CleanStart = false`)
+  and a broker that preserves it, unacknowledged QoS 1/2 exchanges retransmit in order after a
+  reconnect — PUBLISH packets with the DUP flag and their original identifiers, PUBREL alone
+  once PUBREC was received — before the offline queue flushes. Inbound QoS 2 duplicate
+  suppression survives the reconnect, and a fresh session discards the state per spec. The
+  tracked state lives behind `ISessionStore` (`SaveInFlightAsync`/`LoadInFlightAsync`) so
+  durable stores carry it across restarts; clean-start clients skip the tracking entirely. A
+  publish interrupted mid-exchange returns the new `PublishDisposition.InFlight`.
 - Enhanced authentication: an `IMqttAuthenticator` swap point drives the MQTT 5 AUTH
   exchange — method and initial data on CONNECT, challenge/response rounds until the broker's
   CONNACK, and client-initiated re-authentication on a live connection via

@@ -13,6 +13,15 @@ public enum PublishDisposition
 
     /// <summary>The client is offline and QoS 0 messages are configured to drop.</summary>
     DroppedOffline,
+
+    /// <summary>
+    /// The connection dropped mid-exchange while a persistent session was tracking this QoS 1/2
+    /// publish. The session holds it and redelivers it (with DUP) <em>if the broker preserves the
+    /// session</em>. If the broker reports a fresh session on reconnect, the held message is
+    /// discarded per the specification (a <c>Warning</c> log records how many) — so
+    /// <see cref="InFlight"/> is "held for redelivery on resume," not an unconditional guarantee.
+    /// </summary>
+    InFlight,
 }
 
 /// <summary>The result of a resilient publish.</summary>
