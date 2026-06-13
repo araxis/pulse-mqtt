@@ -13,4 +13,8 @@
     <PackageReference Include="System.IO.Pipelines" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pulse.Mqtt.Core.Tests" />
+  </ItemGroup>
+
 </Project>

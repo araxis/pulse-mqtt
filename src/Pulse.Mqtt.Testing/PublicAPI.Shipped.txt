@@ -1,0 +1,7 @@
+#nullable enable
+Pulse.Mqtt.Testing.PulseMqttTestBroker
+Pulse.Mqtt.Testing.PulseMqttTestBroker.ClientPublishes.get -> System.Threading.Channels.ChannelReader<Pulse.Mqtt.Packets.MqttPublishPacket!>!
+Pulse.Mqtt.Testing.PulseMqttTestBroker.ConnectAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Transport.IMqttTransport!>
+Pulse.Mqtt.Testing.PulseMqttTestBroker.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Testing.PulseMqttTestBroker.PublishAsync(Pulse.Mqtt.Packets.MqttPublishPacket! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Testing.PulseMqttTestBroker.PulseMqttTestBroker() -> void

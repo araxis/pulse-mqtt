@@ -1,0 +1,13 @@
+<Project>
+
+  <!--
+    Public API surface guard. Imported after each project body, so $(IsPackable) is resolved:
+    every shipped package tracks its public API in PublicAPI.Shipped.txt, and an unintended
+    public-surface change fails the build (RS0016/RS0017). New API lands in PublicAPI.Unshipped.txt
+    and is promoted to Shipped on release.
+  -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

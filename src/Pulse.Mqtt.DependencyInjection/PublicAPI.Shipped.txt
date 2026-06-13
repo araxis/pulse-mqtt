@@ -1,0 +1,69 @@
+#nullable enable
+Pulse.Mqtt.DependencyInjection.IPulseMqttClientFactory
+Pulse.Mqtt.DependencyInjection.IPulseMqttClientFactory.GetClient(string! name) -> Pulse.Mqtt.Client.ResilientMqttClient!
+Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions
+Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions.Payload.get -> string!
+Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions.Payload.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions.PulseMqttBirthOptions() -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions.QualityOfService.get -> Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions.QualityOfService.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions.Retain.get -> bool
+Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions.Retain.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions.Topic.get -> string!
+Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions.Topic.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.AddHealthCheck() -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.Name.get -> string!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseBirthFactory(System.Func<System.IServiceProvider!, System.Func<int, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<Pulse.Mqtt.Packets.MqttPublishPacket!>>!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseLifecycle(System.Func<System.IServiceProvider!, Pulse.Mqtt.Resilience.IConnectionLifecycle!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseMessageStore(System.Func<System.IServiceProvider!, Pulse.Mqtt.Resilience.IMessageStore!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseReconnectDecision(System.Func<System.IServiceProvider!, Pulse.Mqtt.Resilience.IReconnectDecision!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseReconnectStrategy(System.Func<System.IServiceProvider!, Pulse.Mqtt.Resilience.IReconnectStrategy!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseSerializer(System.Func<System.IServiceProvider!, Pulse.Mqtt.Serialization.IMqttSerializer!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseSessionStore(System.Func<System.IServiceProvider!, Pulse.Mqtt.Resilience.ISessionStore!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseTransportFactory(System.Func<System.IServiceProvider!, Pulse.Mqtt.Transport.IMqttTransportFactory!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseWillFactory(System.Func<System.IServiceProvider!, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<Pulse.Mqtt.Packets.MqttWillMessage!>>!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Birth.get -> Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions?
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Birth.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.CleanStart.get -> bool
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.CleanStart.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.ClientId.get -> string!
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.ClientId.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Host.get -> string!
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Host.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.KeepAliveSeconds.get -> ushort
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.KeepAliveSeconds.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Password.get -> string?
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Password.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Port.get -> int
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Port.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.ProtocolVersion.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.PulseMqttClientOptions() -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.StartWithHost.get -> bool
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.StartWithHost.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Username.get -> string?
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Username.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.UseTls.get -> bool
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.UseTls.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Will.get -> Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions?
+Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Will.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheck
+Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheck.CheckHealthAsync(Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult>!
+Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheck.PulseMqttHealthCheck(Pulse.Mqtt.Client.ResilientMqttClient! client) -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.DelaySeconds.get -> uint?
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.DelaySeconds.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.Payload.get -> string!
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.Payload.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.PulseMqttWillOptions() -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.QualityOfService.get -> Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.QualityOfService.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.Retain.get -> bool
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.Retain.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.Topic.get -> string!
+Pulse.Mqtt.DependencyInjection.PulseMqttWillOptions.Topic.set -> void
+Pulse.Mqtt.DependencyInjection.ServiceCollectionExtensions
+static Pulse.Mqtt.DependencyInjection.ServiceCollectionExtensions.AddPulseMqttClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, System.Action<Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions!>! configure) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!

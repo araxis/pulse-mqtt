@@ -1,0 +1,4 @@
+#nullable enable
+Pulse.Mqtt.Resilience.Polly.PollyReconnectStrategy
+Pulse.Mqtt.Resilience.Polly.PollyReconnectStrategy.PollyReconnectStrategy(Polly.ResiliencePipeline! pipeline) -> void
+Pulse.Mqtt.Resilience.Polly.PollyReconnectStrategy.RunAsync(Pulse.Mqtt.Resilience.ConnectOnceAsync! connectOnce, Pulse.Mqtt.Resilience.IReconnectContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-rc.1 (unreleased)
+
+- API freeze: `Microsoft.CodeAnalysis.PublicApiAnalyzers` now guards every shipped package against
+  an unintended public-surface change, with committed `PublicAPI.Shipped.txt` baselines. A
+  documented API-review pass cleaned the surface ahead of the freeze: the orphaned
+  `MqttApplicationMessage` (a duplicate of `MqttPublishPacket` that no API used) was removed,
+  `MqttPacketIdAllocator` and the SQLite code-sharing base became internal (so no
+  Microsoft.Data.Sqlite type leaks into Pulse's contract), and `CancellationToken` is now optional
+  uniformly across `ResilientMqttClient`. A new `BREAKING-CHANGES.md` states the semantic-versioning
+  commitment.
+
 ## 0.7.0
 
 - MQTTnet migration guide: a new docs page maps the common MQTTnet patterns — factory and options

@@ -166,18 +166,20 @@ freezing them at startup.
       the automatic reconnect — the full presence cycle without application code.
 - [ ] Documented as a presence guide page with the retained online/offline pattern.
 
-### F7 — API freeze and review
+### F7 — API freeze and review ✅
 
 **Definition of done**
-- [ ] `Microsoft.CodeAnalysis.PublicApiAnalyzers` is enabled on every shipped package with
+- [x] `Microsoft.CodeAnalysis.PublicApiAnalyzers` is enabled on every shipped package with
       committed `PublicAPI.Shipped.txt` baselines; an unintended public-surface change fails
-      the build.
-- [ ] One documented API review pass over the whole surface: naming consistency, parameter
-      ordering, nullability, `CancellationToken` on every async public method, no
-      accidentally-public types. Findings fixed **before** the freeze.
-- [ ] XML documentation exists for 100% of public members (already enforced by warnings —
-      kept).
-- [ ] A `BREAKING-CHANGES.md` policy note states the semantic-versioning commitment.
+      the build (RS0016/RS0017, verified).
+- [x] One documented API review pass over the whole surface (an adversarial multi-agent review):
+      it found and the freeze fixed four issues — the orphaned `MqttApplicationMessage` duplicate
+      removed, the internal `MqttPacketIdAllocator` and the SQLite code-sharing base made
+      internal (the base now composed, so no `Microsoft.Data.Sqlite` type leaks into the surface),
+      and `CancellationToken = default` made uniform across `ResilientMqttClient`.
+- [x] XML documentation for 100% of public members (enforced by `GenerateDocumentationFile` +
+      warnings-as-errors).
+- [x] A `BREAKING-CHANGES.md` policy note states the semantic-versioning commitment.
 
 ### F8 — Broker interop matrix
 
