@@ -131,7 +131,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     /// <summary>Starts the supervisor. Connection happens in the background; watch <see cref="State"/>.</summary>
     /// <exception cref="InvalidOperationException">The client is already running.</exception>
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         lock (_stateGate)
@@ -173,7 +173,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// Publishes through the live connection when available; otherwise queues (QoS &gt; 0, or QoS 0
     /// when configured) or drops QoS 0 — always explicitly, never silently.
     /// </summary>
-    public async Task<PublishOutcome> PublishAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
+    public async Task<PublishOutcome> PublishAsync(MqttPublishPacket packet, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(packet);
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -248,7 +248,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// </summary>
     public async Task<IReadOnlyList<MqttReasonCode>> SubscribeAsync(
         IReadOnlyList<MqttTopicFilter> topicFilters,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(topicFilters);
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -281,7 +281,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// <summary>Removes subscriptions from the durable set and from the live connection when one exists.</summary>
     public async Task<IReadOnlyList<MqttReasonCode>> UnsubscribeAsync(
         IReadOnlyList<string> topicFilters,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(topicFilters);
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -791,7 +791,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             .ReAuthenticateAsync(cancellationToken);
 
     /// <summary>Stops the supervisor and closes any live connection.</summary>
-    public async Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         if (_lifetime is { } lifetime)
         {

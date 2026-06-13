@@ -1,0 +1,750 @@
+#nullable enable
+const Pulse.Mqtt.Codec.MqttVarInt.MaxEncodedLength = 4 -> int
+const Pulse.Mqtt.Codec.MqttVarInt.MaxValue = 268435455 -> int
+Pulse.Mqtt.AppError
+Pulse.Mqtt.AppError.AppError(string! Code, string! Message) -> void
+Pulse.Mqtt.AppError.Code.get -> string!
+Pulse.Mqtt.AppError.Code.init -> void
+Pulse.Mqtt.AppError.Message.get -> string!
+Pulse.Mqtt.AppError.Message.init -> void
+Pulse.Mqtt.Buffers.PooledBufferWriter
+Pulse.Mqtt.Buffers.PooledBufferWriter.Advance(int count) -> void
+Pulse.Mqtt.Buffers.PooledBufferWriter.Dispose() -> void
+Pulse.Mqtt.Buffers.PooledBufferWriter.GetMemory(int sizeHint = 0) -> System.Memory<byte>
+Pulse.Mqtt.Buffers.PooledBufferWriter.GetSpan(int sizeHint = 0) -> System.Span<byte>
+Pulse.Mqtt.Buffers.PooledBufferWriter.PooledBufferWriter(int initialCapacity = 256) -> void
+Pulse.Mqtt.Buffers.PooledBufferWriter.Reset() -> void
+Pulse.Mqtt.Buffers.PooledBufferWriter.WrittenCount.get -> int
+Pulse.Mqtt.Buffers.PooledBufferWriter.WrittenSpan.get -> System.ReadOnlySpan<byte>
+Pulse.Mqtt.Codec.MqttBufferReader
+Pulse.Mqtt.Codec.MqttBufferReader.Consumed.get -> int
+Pulse.Mqtt.Codec.MqttBufferReader.MqttBufferReader() -> void
+Pulse.Mqtt.Codec.MqttBufferReader.MqttBufferReader(System.ReadOnlySpan<byte> buffer) -> void
+Pulse.Mqtt.Codec.MqttBufferReader.ReadBinary() -> System.ReadOnlySpan<byte>
+Pulse.Mqtt.Codec.MqttBufferReader.ReadByte() -> byte
+Pulse.Mqtt.Codec.MqttBufferReader.ReadSpan(int length) -> System.ReadOnlySpan<byte>
+Pulse.Mqtt.Codec.MqttBufferReader.ReadString() -> string!
+Pulse.Mqtt.Codec.MqttBufferReader.ReadUInt16() -> ushort
+Pulse.Mqtt.Codec.MqttBufferReader.ReadUInt32() -> uint
+Pulse.Mqtt.Codec.MqttBufferReader.ReadVarInt() -> uint
+Pulse.Mqtt.Codec.MqttBufferReader.Remaining.get -> int
+Pulse.Mqtt.Codec.MqttBufferWriter
+Pulse.Mqtt.Codec.MqttBufferWriter.MqttBufferWriter() -> void
+Pulse.Mqtt.Codec.MqttBufferWriter.MqttBufferWriter(System.Buffers.IBufferWriter<byte>! output) -> void
+Pulse.Mqtt.Codec.MqttBufferWriter.WriteBinary(System.ReadOnlySpan<byte> value) -> void
+Pulse.Mqtt.Codec.MqttBufferWriter.WriteByte(byte value) -> void
+Pulse.Mqtt.Codec.MqttBufferWriter.WriteString(string! value) -> void
+Pulse.Mqtt.Codec.MqttBufferWriter.WriteUInt16(ushort value) -> void
+Pulse.Mqtt.Codec.MqttBufferWriter.WriteUInt32(uint value) -> void
+Pulse.Mqtt.Codec.MqttBufferWriter.WriteVarInt(uint value) -> void
+Pulse.Mqtt.Codec.MqttFixedHeader
+Pulse.Mqtt.Codec.MqttFixedHeader.FirstByte.get -> byte
+Pulse.Mqtt.Codec.MqttFixedHeader.Flags.get -> byte
+Pulse.Mqtt.Codec.MqttFixedHeader.Flags.init -> void
+Pulse.Mqtt.Codec.MqttFixedHeader.MqttFixedHeader() -> void
+Pulse.Mqtt.Codec.MqttFixedHeader.MqttFixedHeader(Pulse.Mqtt.Codec.MqttPacketType PacketType, byte Flags, int RemainingLength) -> void
+Pulse.Mqtt.Codec.MqttFixedHeader.PacketType.get -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttFixedHeader.PacketType.init -> void
+Pulse.Mqtt.Codec.MqttFixedHeader.RemainingLength.get -> int
+Pulse.Mqtt.Codec.MqttFixedHeader.RemainingLength.init -> void
+Pulse.Mqtt.Codec.MqttFrameReader
+Pulse.Mqtt.Codec.MqttFrameStatus
+Pulse.Mqtt.Codec.MqttFrameStatus.Complete = 0 -> Pulse.Mqtt.Codec.MqttFrameStatus
+Pulse.Mqtt.Codec.MqttFrameStatus.Incomplete = 1 -> Pulse.Mqtt.Codec.MqttFrameStatus
+Pulse.Mqtt.Codec.MqttFrameStatus.Malformed = 2 -> Pulse.Mqtt.Codec.MqttFrameStatus
+Pulse.Mqtt.Codec.MqttFrameWriter
+Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.Auth = 15 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.ConnAck = 2 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.Connect = 1 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.Disconnect = 14 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.PingReq = 12 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.PingResp = 13 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.PubAck = 4 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.PubComp = 7 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.Publish = 3 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.PubRec = 5 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.PubRel = 6 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.SubAck = 9 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.Subscribe = 8 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.UnsubAck = 11 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPacketType.Unsubscribe = 10 -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Codec.MqttPropertiesReader
+Pulse.Mqtt.Codec.MqttPropertiesReader.HasRemaining.get -> bool
+Pulse.Mqtt.Codec.MqttPropertiesReader.MqttPropertiesReader() -> void
+Pulse.Mqtt.Codec.MqttPropertiesReader.MqttPropertiesReader(System.ReadOnlySpan<byte> section) -> void
+Pulse.Mqtt.Codec.MqttPropertiesReader.ReadBinary() -> System.ReadOnlySpan<byte>
+Pulse.Mqtt.Codec.MqttPropertiesReader.ReadByte() -> byte
+Pulse.Mqtt.Codec.MqttPropertiesReader.ReadId() -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertiesReader.ReadString() -> string!
+Pulse.Mqtt.Codec.MqttPropertiesReader.ReadStringPair() -> (string! Name, string! Value)
+Pulse.Mqtt.Codec.MqttPropertiesReader.ReadUInt16() -> ushort
+Pulse.Mqtt.Codec.MqttPropertiesReader.ReadUInt32() -> uint
+Pulse.Mqtt.Codec.MqttPropertiesReader.ReadVarInt() -> uint
+Pulse.Mqtt.Codec.MqttPropertiesWriter
+Pulse.Mqtt.Codec.MqttPropertiesWriter.MqttPropertiesWriter() -> void
+Pulse.Mqtt.Codec.MqttPropertiesWriter.MqttPropertiesWriter(System.Buffers.IBufferWriter<byte>! body) -> void
+Pulse.Mqtt.Codec.MqttPropertiesWriter.WriteBinary(Pulse.Mqtt.Codec.MqttPropertyId id, System.ReadOnlySpan<byte> value) -> void
+Pulse.Mqtt.Codec.MqttPropertiesWriter.WriteByte(Pulse.Mqtt.Codec.MqttPropertyId id, byte value) -> void
+Pulse.Mqtt.Codec.MqttPropertiesWriter.WriteString(Pulse.Mqtt.Codec.MqttPropertyId id, string! value) -> void
+Pulse.Mqtt.Codec.MqttPropertiesWriter.WriteStringPair(Pulse.Mqtt.Codec.MqttPropertyId id, string! name, string! value) -> void
+Pulse.Mqtt.Codec.MqttPropertiesWriter.WriteUInt16(Pulse.Mqtt.Codec.MqttPropertyId id, ushort value) -> void
+Pulse.Mqtt.Codec.MqttPropertiesWriter.WriteUInt32(Pulse.Mqtt.Codec.MqttPropertyId id, uint value) -> void
+Pulse.Mqtt.Codec.MqttPropertiesWriter.WriteVarInt(Pulse.Mqtt.Codec.MqttPropertyId id, uint value) -> void
+Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.AssignedClientIdentifier = 18 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.AuthenticationData = 22 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.AuthenticationMethod = 21 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.ContentType = 3 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.CorrelationData = 9 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.MaximumPacketSize = 39 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.MaximumQoS = 36 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.MessageExpiryInterval = 2 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.PayloadFormatIndicator = 1 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.ReasonString = 31 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.ReceiveMaximum = 33 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.RequestProblemInformation = 23 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.RequestResponseInformation = 25 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.ResponseInformation = 26 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.ResponseTopic = 8 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.RetainAvailable = 37 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.ServerKeepAlive = 19 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.ServerReference = 28 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.SessionExpiryInterval = 17 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.SharedSubscriptionAvailable = 42 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.SubscriptionIdentifier = 11 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.SubscriptionIdentifierAvailable = 41 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.TopicAlias = 35 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.TopicAliasMaximum = 34 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.UserProperty = 38 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.WildcardSubscriptionAvailable = 40 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertyId.WillDelayInterval = 24 -> Pulse.Mqtt.Codec.MqttPropertyId
+Pulse.Mqtt.Codec.MqttPropertySection
+Pulse.Mqtt.Codec.MqttPropertyType
+Pulse.Mqtt.Codec.MqttPropertyType.BinaryData = 6 -> Pulse.Mqtt.Codec.MqttPropertyType
+Pulse.Mqtt.Codec.MqttPropertyType.Byte = 0 -> Pulse.Mqtt.Codec.MqttPropertyType
+Pulse.Mqtt.Codec.MqttPropertyType.FourByteInteger = 2 -> Pulse.Mqtt.Codec.MqttPropertyType
+Pulse.Mqtt.Codec.MqttPropertyType.TwoByteInteger = 1 -> Pulse.Mqtt.Codec.MqttPropertyType
+Pulse.Mqtt.Codec.MqttPropertyType.Utf8String = 4 -> Pulse.Mqtt.Codec.MqttPropertyType
+Pulse.Mqtt.Codec.MqttPropertyType.Utf8StringPair = 5 -> Pulse.Mqtt.Codec.MqttPropertyType
+Pulse.Mqtt.Codec.MqttPropertyType.VariableByteInteger = 3 -> Pulse.Mqtt.Codec.MqttPropertyType
+Pulse.Mqtt.Codec.MqttPropertyTypes
+Pulse.Mqtt.Codec.MqttVarInt
+Pulse.Mqtt.Codec.MqttVarIntStatus
+Pulse.Mqtt.Codec.MqttVarIntStatus.Incomplete = 1 -> Pulse.Mqtt.Codec.MqttVarIntStatus
+Pulse.Mqtt.Codec.MqttVarIntStatus.Malformed = 2 -> Pulse.Mqtt.Codec.MqttVarIntStatus
+Pulse.Mqtt.Codec.MqttVarIntStatus.Success = 0 -> Pulse.Mqtt.Codec.MqttVarIntStatus
+Pulse.Mqtt.Connection.IMqttAuthenticator
+Pulse.Mqtt.Connection.IMqttAuthenticator.Method.get -> string!
+Pulse.Mqtt.Connection.IMqttAuthenticator.NextDataAsync(System.ReadOnlyMemory<byte>? challenge, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.ReadOnlyMemory<byte>?>
+Pulse.Mqtt.Connection.MqttConnection
+Pulse.Mqtt.Connection.MqttConnection.Completion.get -> System.Threading.Tasks.Task!
+Pulse.Mqtt.Connection.MqttConnection.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Connection.MqttConnection.Inbound.get -> System.Threading.Channels.ChannelReader<Pulse.Mqtt.Packets.MqttPacket!>!
+Pulse.Mqtt.Connection.MqttConnection.InboundFilter.get -> System.Func<Pulse.Mqtt.Packets.MqttPacket!, bool>?
+Pulse.Mqtt.Connection.MqttConnection.InboundFilter.set -> void
+Pulse.Mqtt.Connection.MqttConnection.MaximumOutboundPacketSize.get -> uint?
+Pulse.Mqtt.Connection.MqttConnection.MaximumOutboundPacketSize.set -> void
+Pulse.Mqtt.Connection.MqttConnection.MqttConnection(Pulse.Mqtt.Transport.IMqttTransport! transport, Pulse.Mqtt.Connection.MqttConnectionOptions! options) -> void
+Pulse.Mqtt.Connection.MqttConnection.OutboundTransform.get -> System.Func<Pulse.Mqtt.Packets.MqttPacket!, Pulse.Mqtt.Packets.MqttPacket!>?
+Pulse.Mqtt.Connection.MqttConnection.OutboundTransform.set -> void
+Pulse.Mqtt.Connection.MqttConnection.SendAsync(Pulse.Mqtt.Packets.MqttPacket! packet, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Connection.MqttConnection.Start() -> void
+Pulse.Mqtt.Connection.MqttConnectionOptions
+Pulse.Mqtt.Connection.MqttConnectionOptions.InboundQueueCapacity.get -> int
+Pulse.Mqtt.Connection.MqttConnectionOptions.InboundQueueCapacity.init -> void
+Pulse.Mqtt.Connection.MqttConnectionOptions.MaxInboundPacketSize.get -> int
+Pulse.Mqtt.Connection.MqttConnectionOptions.MaxInboundPacketSize.init -> void
+Pulse.Mqtt.Connection.MqttConnectionOptions.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Connection.MqttConnectionOptions.ProtocolVersion.init -> void
+Pulse.Mqtt.Connection.RawMqttClient
+Pulse.Mqtt.Connection.RawMqttClient.Completion.get -> System.Threading.Tasks.Task!
+Pulse.Mqtt.Connection.RawMqttClient.ConnectAsync(Pulse.Mqtt.Packets.MqttConnectPacket! connect, Pulse.Mqtt.Resilience.MqttInFlightSession? session, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Pulse.Mqtt.Packets.MqttConnAckPacket!>!
+Pulse.Mqtt.Connection.RawMqttClient.ConnectAsync(Pulse.Mqtt.Packets.MqttConnectPacket! connect, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Pulse.Mqtt.Packets.MqttConnAckPacket!>!
+Pulse.Mqtt.Connection.RawMqttClient.DisconnectAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Pulse.Mqtt.Connection.RawMqttClient.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Connection.RawMqttClient.Messages.get -> System.Threading.Channels.ChannelReader<Pulse.Mqtt.Packets.MqttPublishPacket!>!
+Pulse.Mqtt.Connection.RawMqttClient.MessageSink.get -> System.Func<Pulse.Mqtt.Packets.MqttPublishPacket!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>?
+Pulse.Mqtt.Connection.RawMqttClient.MessageSink.set -> void
+Pulse.Mqtt.Connection.RawMqttClient.PublishAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Pulse.Mqtt.Protocol.MqttReasonCode>!
+Pulse.Mqtt.Connection.RawMqttClient.RawMqttClient(Pulse.Mqtt.Transport.IMqttTransportFactory! transportFactory, Pulse.Mqtt.Connection.RawMqttClientOptions? options = null, System.TimeProvider? timeProvider = null) -> void
+Pulse.Mqtt.Connection.RawMqttClient.ReAuthenticateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Pulse.Mqtt.Connection.RawMqttClient.RedeliverAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Pulse.Mqtt.Connection.RawMqttClient.ServerDisconnect.get -> Pulse.Mqtt.MqttServerDisconnectedException?
+Pulse.Mqtt.Connection.RawMqttClient.SubscribeAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!>!
+Pulse.Mqtt.Connection.RawMqttClient.UnsubscribeAsync(System.Collections.Generic.IReadOnlyList<string!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!>!
+Pulse.Mqtt.Connection.RawMqttClientOptions
+Pulse.Mqtt.Connection.RawMqttClientOptions.AcknowledgementTimeout.get -> System.TimeSpan
+Pulse.Mqtt.Connection.RawMqttClientOptions.AcknowledgementTimeout.init -> void
+Pulse.Mqtt.Connection.RawMqttClientOptions.Authenticator.get -> Pulse.Mqtt.Connection.IMqttAuthenticator?
+Pulse.Mqtt.Connection.RawMqttClientOptions.Authenticator.init -> void
+Pulse.Mqtt.Connection.RawMqttClientOptions.ConnAckTimeout.get -> System.TimeSpan
+Pulse.Mqtt.Connection.RawMqttClientOptions.ConnAckTimeout.init -> void
+Pulse.Mqtt.Connection.RawMqttClientOptions.Connection.get -> Pulse.Mqtt.Connection.MqttConnectionOptions!
+Pulse.Mqtt.Connection.RawMqttClientOptions.Connection.init -> void
+Pulse.Mqtt.Connection.RawMqttClientOptions.InboundMessageCapacity.get -> int
+Pulse.Mqtt.Connection.RawMqttClientOptions.InboundMessageCapacity.init -> void
+Pulse.Mqtt.Connection.RawMqttClientOptions.PingResponseTimeout.get -> System.TimeSpan
+Pulse.Mqtt.Connection.RawMqttClientOptions.PingResponseTimeout.init -> void
+Pulse.Mqtt.Connection.RawMqttClientOptions.UseOutboundTopicAliases.get -> bool
+Pulse.Mqtt.Connection.RawMqttClientOptions.UseOutboundTopicAliases.init -> void
+Pulse.Mqtt.MqttException
+Pulse.Mqtt.MqttException.MqttException() -> void
+Pulse.Mqtt.MqttException.MqttException(string! message) -> void
+Pulse.Mqtt.MqttException.MqttException(string! message, System.Exception! innerException) -> void
+Pulse.Mqtt.MqttPacketTooLargeException
+Pulse.Mqtt.MqttPacketTooLargeException.Limit.get -> uint
+Pulse.Mqtt.MqttPacketTooLargeException.MqttPacketTooLargeException(int packetSize, uint limit) -> void
+Pulse.Mqtt.MqttPacketTooLargeException.PacketSize.get -> int
+Pulse.Mqtt.MqttPayloadFormatIndicator
+Pulse.Mqtt.MqttPayloadFormatIndicator.Unspecified = 0 -> Pulse.Mqtt.MqttPayloadFormatIndicator
+Pulse.Mqtt.MqttPayloadFormatIndicator.Utf8 = 1 -> Pulse.Mqtt.MqttPayloadFormatIndicator
+Pulse.Mqtt.MqttProtocolException
+Pulse.Mqtt.MqttProtocolException.MqttProtocolException() -> void
+Pulse.Mqtt.MqttProtocolException.MqttProtocolException(string! message) -> void
+Pulse.Mqtt.MqttProtocolException.MqttProtocolException(string! message, System.Exception! innerException) -> void
+Pulse.Mqtt.MqttPublishInFlightException
+Pulse.Mqtt.MqttPublishInFlightException.MqttPublishInFlightException(ushort packetIdentifier, System.Exception! innerException) -> void
+Pulse.Mqtt.MqttPublishInFlightException.PacketIdentifier.get -> ushort
+Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.MqttQualityOfService.AtLeastOnce = 1 -> Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.MqttQualityOfService.AtMostOnce = 0 -> Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.MqttQualityOfService.ExactlyOnce = 2 -> Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.MqttRetainHandling
+Pulse.Mqtt.MqttRetainHandling.DoNotSendAtSubscribe = 2 -> Pulse.Mqtt.MqttRetainHandling
+Pulse.Mqtt.MqttRetainHandling.SendAtSubscribe = 0 -> Pulse.Mqtt.MqttRetainHandling
+Pulse.Mqtt.MqttRetainHandling.SendAtSubscribeIfNewSubscription = 1 -> Pulse.Mqtt.MqttRetainHandling
+Pulse.Mqtt.MqttServerDisconnectedException
+Pulse.Mqtt.MqttServerDisconnectedException.MqttServerDisconnectedException(Pulse.Mqtt.Protocol.MqttReasonCode reasonCode, string? reasonString = null, string? serverReference = null) -> void
+Pulse.Mqtt.MqttServerDisconnectedException.ReasonCode.get -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.MqttServerDisconnectedException.ReasonString.get -> string?
+Pulse.Mqtt.MqttServerDisconnectedException.ServerReference.get -> string?
+Pulse.Mqtt.MqttTopicFilter
+Pulse.Mqtt.MqttTopicFilter.MaximumQualityOfService.get -> Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.MqttTopicFilter.MaximumQualityOfService.init -> void
+Pulse.Mqtt.MqttTopicFilter.MqttTopicFilter(string! Topic) -> void
+Pulse.Mqtt.MqttTopicFilter.NoLocal.get -> bool
+Pulse.Mqtt.MqttTopicFilter.NoLocal.init -> void
+Pulse.Mqtt.MqttTopicFilter.RetainAsPublished.get -> bool
+Pulse.Mqtt.MqttTopicFilter.RetainAsPublished.init -> void
+Pulse.Mqtt.MqttTopicFilter.RetainHandling.get -> Pulse.Mqtt.MqttRetainHandling
+Pulse.Mqtt.MqttTopicFilter.RetainHandling.init -> void
+Pulse.Mqtt.MqttTopicFilter.Topic.get -> string!
+Pulse.Mqtt.MqttTopicFilter.Topic.init -> void
+Pulse.Mqtt.MqttTopicFilter.ToSubscriptionOptions() -> byte
+Pulse.Mqtt.MqttUserProperty
+Pulse.Mqtt.MqttUserProperty.MqttUserProperty(string! Name, string! Value) -> void
+Pulse.Mqtt.MqttUserProperty.Name.get -> string!
+Pulse.Mqtt.MqttUserProperty.Name.init -> void
+Pulse.Mqtt.MqttUserProperty.Value.get -> string!
+Pulse.Mqtt.MqttUserProperty.Value.init -> void
+Pulse.Mqtt.Packets.MqttAuthCodec
+Pulse.Mqtt.Packets.MqttAuthPacket
+Pulse.Mqtt.Packets.MqttAuthPacket.AuthenticationData.get -> System.ReadOnlyMemory<byte>?
+Pulse.Mqtt.Packets.MqttAuthPacket.AuthenticationData.init -> void
+Pulse.Mqtt.Packets.MqttAuthPacket.AuthenticationMethod.get -> string?
+Pulse.Mqtt.Packets.MqttAuthPacket.AuthenticationMethod.init -> void
+Pulse.Mqtt.Packets.MqttAuthPacket.ReasonCode.get -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Packets.MqttAuthPacket.ReasonCode.init -> void
+Pulse.Mqtt.Packets.MqttAuthPacket.ReasonString.get -> string?
+Pulse.Mqtt.Packets.MqttAuthPacket.ReasonString.init -> void
+Pulse.Mqtt.Packets.MqttAuthPacket.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttAuthPacket.UserProperties.init -> void
+Pulse.Mqtt.Packets.MqttConnAckCodec
+Pulse.Mqtt.Packets.MqttConnAckPacket
+Pulse.Mqtt.Packets.MqttConnAckPacket.AssignedClientIdentifier.get -> string?
+Pulse.Mqtt.Packets.MqttConnAckPacket.AssignedClientIdentifier.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.AuthenticationData.get -> System.ReadOnlyMemory<byte>?
+Pulse.Mqtt.Packets.MqttConnAckPacket.AuthenticationData.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.AuthenticationMethod.get -> string?
+Pulse.Mqtt.Packets.MqttConnAckPacket.AuthenticationMethod.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.MaximumPacketSize.get -> uint?
+Pulse.Mqtt.Packets.MqttConnAckPacket.MaximumPacketSize.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.MaximumQoS.get -> Pulse.Mqtt.MqttQualityOfService?
+Pulse.Mqtt.Packets.MqttConnAckPacket.MaximumQoS.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Packets.MqttConnAckPacket.ProtocolVersion.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.ReasonCode.get -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Packets.MqttConnAckPacket.ReasonCode.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.ReasonString.get -> string?
+Pulse.Mqtt.Packets.MqttConnAckPacket.ReasonString.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.ReceiveMaximum.get -> ushort?
+Pulse.Mqtt.Packets.MqttConnAckPacket.ReceiveMaximum.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.ResponseInformation.get -> string?
+Pulse.Mqtt.Packets.MqttConnAckPacket.ResponseInformation.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.RetainAvailable.get -> bool?
+Pulse.Mqtt.Packets.MqttConnAckPacket.RetainAvailable.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.ServerKeepAlive.get -> ushort?
+Pulse.Mqtt.Packets.MqttConnAckPacket.ServerKeepAlive.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.ServerReference.get -> string?
+Pulse.Mqtt.Packets.MqttConnAckPacket.ServerReference.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.SessionExpiryInterval.get -> uint?
+Pulse.Mqtt.Packets.MqttConnAckPacket.SessionExpiryInterval.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.SessionPresent.get -> bool
+Pulse.Mqtt.Packets.MqttConnAckPacket.SessionPresent.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.SharedSubscriptionAvailable.get -> bool?
+Pulse.Mqtt.Packets.MqttConnAckPacket.SharedSubscriptionAvailable.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.SubscriptionIdentifiersAvailable.get -> bool?
+Pulse.Mqtt.Packets.MqttConnAckPacket.SubscriptionIdentifiersAvailable.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.TopicAliasMaximum.get -> ushort?
+Pulse.Mqtt.Packets.MqttConnAckPacket.TopicAliasMaximum.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttConnAckPacket.UserProperties.init -> void
+Pulse.Mqtt.Packets.MqttConnAckPacket.WildcardSubscriptionAvailable.get -> bool?
+Pulse.Mqtt.Packets.MqttConnAckPacket.WildcardSubscriptionAvailable.init -> void
+Pulse.Mqtt.Packets.MqttConnectCodec
+Pulse.Mqtt.Packets.MqttConnectPacket
+Pulse.Mqtt.Packets.MqttConnectPacket.AuthenticationData.get -> System.ReadOnlyMemory<byte>?
+Pulse.Mqtt.Packets.MqttConnectPacket.AuthenticationData.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.AuthenticationMethod.get -> string?
+Pulse.Mqtt.Packets.MqttConnectPacket.AuthenticationMethod.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.CleanStart.get -> bool
+Pulse.Mqtt.Packets.MqttConnectPacket.CleanStart.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.ClientId.get -> string!
+Pulse.Mqtt.Packets.MqttConnectPacket.ClientId.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.KeepAliveSeconds.get -> ushort
+Pulse.Mqtt.Packets.MqttConnectPacket.KeepAliveSeconds.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.MaximumPacketSize.get -> uint?
+Pulse.Mqtt.Packets.MqttConnectPacket.MaximumPacketSize.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.Password.get -> System.ReadOnlyMemory<byte>?
+Pulse.Mqtt.Packets.MqttConnectPacket.Password.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Packets.MqttConnectPacket.ProtocolVersion.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.ReceiveMaximum.get -> ushort?
+Pulse.Mqtt.Packets.MqttConnectPacket.ReceiveMaximum.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.RequestProblemInformation.get -> bool
+Pulse.Mqtt.Packets.MqttConnectPacket.RequestProblemInformation.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.RequestResponseInformation.get -> bool
+Pulse.Mqtt.Packets.MqttConnectPacket.RequestResponseInformation.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.SessionExpiryInterval.get -> uint?
+Pulse.Mqtt.Packets.MqttConnectPacket.SessionExpiryInterval.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.TopicAliasMaximum.get -> ushort?
+Pulse.Mqtt.Packets.MqttConnectPacket.TopicAliasMaximum.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.Username.get -> string?
+Pulse.Mqtt.Packets.MqttConnectPacket.Username.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttConnectPacket.UserProperties.init -> void
+Pulse.Mqtt.Packets.MqttConnectPacket.Will.get -> Pulse.Mqtt.Packets.MqttWillMessage?
+Pulse.Mqtt.Packets.MqttConnectPacket.Will.init -> void
+Pulse.Mqtt.Packets.MqttDisconnectCodec
+Pulse.Mqtt.Packets.MqttDisconnectPacket
+Pulse.Mqtt.Packets.MqttDisconnectPacket.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Packets.MqttDisconnectPacket.ProtocolVersion.init -> void
+Pulse.Mqtt.Packets.MqttDisconnectPacket.ReasonCode.get -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Packets.MqttDisconnectPacket.ReasonCode.init -> void
+Pulse.Mqtt.Packets.MqttDisconnectPacket.ReasonString.get -> string?
+Pulse.Mqtt.Packets.MqttDisconnectPacket.ReasonString.init -> void
+Pulse.Mqtt.Packets.MqttDisconnectPacket.ServerReference.get -> string?
+Pulse.Mqtt.Packets.MqttDisconnectPacket.ServerReference.init -> void
+Pulse.Mqtt.Packets.MqttDisconnectPacket.SessionExpiryInterval.get -> uint?
+Pulse.Mqtt.Packets.MqttDisconnectPacket.SessionExpiryInterval.init -> void
+Pulse.Mqtt.Packets.MqttDisconnectPacket.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttDisconnectPacket.UserProperties.init -> void
+Pulse.Mqtt.Packets.MqttPacket
+Pulse.Mqtt.Packets.MqttPacketDecoder
+Pulse.Mqtt.Packets.MqttPacketWriter
+Pulse.Mqtt.Packets.MqttPingCodec
+Pulse.Mqtt.Packets.MqttPingReqPacket
+Pulse.Mqtt.Packets.MqttPingRespPacket
+Pulse.Mqtt.Packets.MqttPublishAckCodec
+Pulse.Mqtt.Packets.MqttPublishAckPacket
+Pulse.Mqtt.Packets.MqttPublishAckPacket.PacketIdentifier.get -> ushort
+Pulse.Mqtt.Packets.MqttPublishAckPacket.PacketIdentifier.init -> void
+Pulse.Mqtt.Packets.MqttPublishAckPacket.PacketType.get -> Pulse.Mqtt.Codec.MqttPacketType
+Pulse.Mqtt.Packets.MqttPublishAckPacket.PacketType.init -> void
+Pulse.Mqtt.Packets.MqttPublishAckPacket.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Packets.MqttPublishAckPacket.ProtocolVersion.init -> void
+Pulse.Mqtt.Packets.MqttPublishAckPacket.ReasonCode.get -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Packets.MqttPublishAckPacket.ReasonCode.init -> void
+Pulse.Mqtt.Packets.MqttPublishAckPacket.ReasonString.get -> string?
+Pulse.Mqtt.Packets.MqttPublishAckPacket.ReasonString.init -> void
+Pulse.Mqtt.Packets.MqttPublishAckPacket.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttPublishAckPacket.UserProperties.init -> void
+Pulse.Mqtt.Packets.MqttPublishCodec
+Pulse.Mqtt.Packets.MqttPublishPacket
+Pulse.Mqtt.Packets.MqttPublishPacket.ContentType.get -> string?
+Pulse.Mqtt.Packets.MqttPublishPacket.ContentType.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.CorrelationData.get -> System.ReadOnlyMemory<byte>?
+Pulse.Mqtt.Packets.MqttPublishPacket.CorrelationData.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.Dup.get -> bool
+Pulse.Mqtt.Packets.MqttPublishPacket.Dup.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.MessageExpiryInterval.get -> uint?
+Pulse.Mqtt.Packets.MqttPublishPacket.MessageExpiryInterval.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.PacketIdentifier.get -> ushort?
+Pulse.Mqtt.Packets.MqttPublishPacket.PacketIdentifier.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.Payload.get -> System.ReadOnlyMemory<byte>
+Pulse.Mqtt.Packets.MqttPublishPacket.Payload.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.PayloadFormatIndicator.get -> Pulse.Mqtt.MqttPayloadFormatIndicator
+Pulse.Mqtt.Packets.MqttPublishPacket.PayloadFormatIndicator.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Packets.MqttPublishPacket.ProtocolVersion.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.QualityOfService.get -> Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.Packets.MqttPublishPacket.QualityOfService.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.ResponseTopic.get -> string?
+Pulse.Mqtt.Packets.MqttPublishPacket.ResponseTopic.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.Retain.get -> bool
+Pulse.Mqtt.Packets.MqttPublishPacket.Retain.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.SubscriptionIdentifiers.get -> System.Collections.Generic.IReadOnlyList<uint>!
+Pulse.Mqtt.Packets.MqttPublishPacket.SubscriptionIdentifiers.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.Topic.get -> string!
+Pulse.Mqtt.Packets.MqttPublishPacket.Topic.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.TopicAlias.get -> ushort?
+Pulse.Mqtt.Packets.MqttPublishPacket.TopicAlias.init -> void
+Pulse.Mqtt.Packets.MqttPublishPacket.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttPublishPacket.UserProperties.init -> void
+Pulse.Mqtt.Packets.MqttSubAckCodec
+Pulse.Mqtt.Packets.MqttSubAckPacket
+Pulse.Mqtt.Packets.MqttSubAckPacket.PacketIdentifier.get -> ushort
+Pulse.Mqtt.Packets.MqttSubAckPacket.PacketIdentifier.init -> void
+Pulse.Mqtt.Packets.MqttSubAckPacket.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Packets.MqttSubAckPacket.ProtocolVersion.init -> void
+Pulse.Mqtt.Packets.MqttSubAckPacket.ReasonCodes.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!
+Pulse.Mqtt.Packets.MqttSubAckPacket.ReasonCodes.init -> void
+Pulse.Mqtt.Packets.MqttSubAckPacket.ReasonString.get -> string?
+Pulse.Mqtt.Packets.MqttSubAckPacket.ReasonString.init -> void
+Pulse.Mqtt.Packets.MqttSubAckPacket.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttSubAckPacket.UserProperties.init -> void
+Pulse.Mqtt.Packets.MqttSubscribeCodec
+Pulse.Mqtt.Packets.MqttSubscribePacket
+Pulse.Mqtt.Packets.MqttSubscribePacket.PacketIdentifier.get -> ushort
+Pulse.Mqtt.Packets.MqttSubscribePacket.PacketIdentifier.init -> void
+Pulse.Mqtt.Packets.MqttSubscribePacket.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Packets.MqttSubscribePacket.ProtocolVersion.init -> void
+Pulse.Mqtt.Packets.MqttSubscribePacket.SubscriptionIdentifier.get -> uint?
+Pulse.Mqtt.Packets.MqttSubscribePacket.SubscriptionIdentifier.init -> void
+Pulse.Mqtt.Packets.MqttSubscribePacket.TopicFilters.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>!
+Pulse.Mqtt.Packets.MqttSubscribePacket.TopicFilters.init -> void
+Pulse.Mqtt.Packets.MqttSubscribePacket.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttSubscribePacket.UserProperties.init -> void
+Pulse.Mqtt.Packets.MqttUnsubAckCodec
+Pulse.Mqtt.Packets.MqttUnsubAckPacket
+Pulse.Mqtt.Packets.MqttUnsubAckPacket.PacketIdentifier.get -> ushort
+Pulse.Mqtt.Packets.MqttUnsubAckPacket.PacketIdentifier.init -> void
+Pulse.Mqtt.Packets.MqttUnsubAckPacket.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Packets.MqttUnsubAckPacket.ProtocolVersion.init -> void
+Pulse.Mqtt.Packets.MqttUnsubAckPacket.ReasonCodes.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!
+Pulse.Mqtt.Packets.MqttUnsubAckPacket.ReasonCodes.init -> void
+Pulse.Mqtt.Packets.MqttUnsubAckPacket.ReasonString.get -> string?
+Pulse.Mqtt.Packets.MqttUnsubAckPacket.ReasonString.init -> void
+Pulse.Mqtt.Packets.MqttUnsubAckPacket.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttUnsubAckPacket.UserProperties.init -> void
+Pulse.Mqtt.Packets.MqttUnsubscribeCodec
+Pulse.Mqtt.Packets.MqttUnsubscribePacket
+Pulse.Mqtt.Packets.MqttUnsubscribePacket.PacketIdentifier.get -> ushort
+Pulse.Mqtt.Packets.MqttUnsubscribePacket.PacketIdentifier.init -> void
+Pulse.Mqtt.Packets.MqttUnsubscribePacket.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Packets.MqttUnsubscribePacket.ProtocolVersion.init -> void
+Pulse.Mqtt.Packets.MqttUnsubscribePacket.TopicFilters.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Pulse.Mqtt.Packets.MqttUnsubscribePacket.TopicFilters.init -> void
+Pulse.Mqtt.Packets.MqttUnsubscribePacket.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttUnsubscribePacket.UserProperties.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage
+Pulse.Mqtt.Packets.MqttWillMessage.ContentType.get -> string?
+Pulse.Mqtt.Packets.MqttWillMessage.ContentType.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage.CorrelationData.get -> System.ReadOnlyMemory<byte>?
+Pulse.Mqtt.Packets.MqttWillMessage.CorrelationData.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage.DelayInterval.get -> uint?
+Pulse.Mqtt.Packets.MqttWillMessage.DelayInterval.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage.MessageExpiryInterval.get -> uint?
+Pulse.Mqtt.Packets.MqttWillMessage.MessageExpiryInterval.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage.MqttWillMessage(string! Topic) -> void
+Pulse.Mqtt.Packets.MqttWillMessage.Payload.get -> System.ReadOnlyMemory<byte>
+Pulse.Mqtt.Packets.MqttWillMessage.Payload.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage.PayloadFormatIndicator.get -> Pulse.Mqtt.MqttPayloadFormatIndicator
+Pulse.Mqtt.Packets.MqttWillMessage.PayloadFormatIndicator.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage.QualityOfService.get -> Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.Packets.MqttWillMessage.QualityOfService.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage.ResponseTopic.get -> string?
+Pulse.Mqtt.Packets.MqttWillMessage.ResponseTopic.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage.Retain.get -> bool
+Pulse.Mqtt.Packets.MqttWillMessage.Retain.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage.Topic.get -> string!
+Pulse.Mqtt.Packets.MqttWillMessage.Topic.init -> void
+Pulse.Mqtt.Packets.MqttWillMessage.UserProperties.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttUserProperty!>!
+Pulse.Mqtt.Packets.MqttWillMessage.UserProperties.init -> void
+Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Protocol.MqttProtocolVersion.V311 = 4 -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Protocol.MqttProtocolVersion.V500 = 5 -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.AdministrativeAction = 152 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.BadAuthenticationMethod = 140 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.BadUserNameOrPassword = 134 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.Banned = 138 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.ClientIdentifierNotValid = 133 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.ConnectionRateExceeded = 159 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.ContinueAuthentication = 24 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.DisconnectWithWillMessage = 4 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.GrantedQualityOfService1 = 1 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.GrantedQualityOfService2 = 2 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.KeepAliveTimeout = 141 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.MalformedPacket = 129 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.MaximumConnectTime = 160 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.MessageRateTooHigh = 150 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.NotAuthorized = 135 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.PacketTooLarge = 149 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.PayloadFormatInvalid = 153 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.ProtocolError = 130 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.QualityOfServiceNotSupported = 155 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.QuotaExceeded = 151 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.ReAuthenticate = 25 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.ReceiveMaximumExceeded = 147 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.RetainNotSupported = 154 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.ServerBusy = 137 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.ServerMoved = 157 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.ServerShuttingDown = 139 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.ServerUnavailable = 136 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.SessionTakenOver = 142 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.SharedSubscriptionsNotSupported = 158 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.SubscriptionIdentifiersNotSupported = 161 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.Success = 0 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.TopicAliasInvalid = 148 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.TopicFilterInvalid = 143 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.TopicNameInvalid = 144 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.UnspecifiedError = 128 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.UseAnotherServer = 156 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Protocol.MqttReasonCode.WildcardSubscriptionsNotSupported = 162 -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Resilience.Backoff
+Pulse.Mqtt.Resilience.BackoffOptions
+Pulse.Mqtt.Resilience.BackoffOptions.BaseDelay.get -> System.TimeSpan
+Pulse.Mqtt.Resilience.BackoffOptions.BaseDelay.init -> void
+Pulse.Mqtt.Resilience.BackoffOptions.MaxAttempts.get -> int?
+Pulse.Mqtt.Resilience.BackoffOptions.MaxAttempts.init -> void
+Pulse.Mqtt.Resilience.BackoffOptions.MaxDelay.get -> System.TimeSpan
+Pulse.Mqtt.Resilience.BackoffOptions.MaxDelay.init -> void
+Pulse.Mqtt.Resilience.BackoffReconnectStrategy
+Pulse.Mqtt.Resilience.BackoffReconnectStrategy.BackoffReconnectStrategy(Pulse.Mqtt.Resilience.BackoffOptions! options, Pulse.Mqtt.Resilience.IReconnectDecision! decision, System.Random? random = null) -> void
+Pulse.Mqtt.Resilience.BackoffReconnectStrategy.RunAsync(Pulse.Mqtt.Resilience.ConnectOnceAsync! connectOnce, Pulse.Mqtt.Resilience.IReconnectContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Resilience.ConnectionState.Connected = 2 -> Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Resilience.ConnectionState.Connecting = 1 -> Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Resilience.ConnectionState.Disconnected = 0 -> Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Resilience.ConnectionState.Faulted = 5 -> Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Resilience.ConnectionState.Reconnecting = 3 -> Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Resilience.ConnectionState.Stopped = 6 -> Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Resilience.ConnectionState.WaitingRetry = 4 -> Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Resilience.ConnectionStateChanged
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Attempt.get -> int
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Attempt.init -> void
+Pulse.Mqtt.Resilience.ConnectionStateChanged.ConnectionStateChanged() -> void
+Pulse.Mqtt.Resilience.ConnectionStateChanged.ConnectionStateChanged(Pulse.Mqtt.Resilience.ConnectionState Previous, Pulse.Mqtt.Resilience.ConnectionState Current, int Attempt, Pulse.Mqtt.Protocol.MqttReasonCode? Reason = null) -> void
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Current.get -> Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Current.init -> void
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Previous.get -> Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Previous.init -> void
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Reason.get -> Pulse.Mqtt.Protocol.MqttReasonCode?
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Reason.init -> void
+Pulse.Mqtt.Resilience.ConnectOnceAsync
+Pulse.Mqtt.Resilience.DefaultConnectionLifecycle
+Pulse.Mqtt.Resilience.DefaultConnectionLifecycle.DefaultConnectionLifecycle(Pulse.Mqtt.Resilience.ISessionStore! sessionStore) -> void
+Pulse.Mqtt.Resilience.DefaultConnectionLifecycle.OnConnectionDownAsync(Pulse.Mqtt.Resilience.IConnectionDownContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.DefaultConnectionLifecycle.OnConnectionUpAsync(Pulse.Mqtt.Resilience.IConnectionUpContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.DefaultReconnectDecision
+Pulse.Mqtt.Resilience.DefaultReconnectDecision.DefaultReconnectDecision() -> void
+Pulse.Mqtt.Resilience.DefaultReconnectDecision.ShouldRetry(int attempt, System.Exception! error) -> bool
+Pulse.Mqtt.Resilience.IConnectionDownContext
+Pulse.Mqtt.Resilience.IConnectionDownContext.Error.get -> System.Exception?
+Pulse.Mqtt.Resilience.IConnectionDownContext.Reason.get -> Pulse.Mqtt.Protocol.MqttReasonCode?
+Pulse.Mqtt.Resilience.IConnectionDownContext.ReasonString.get -> string?
+Pulse.Mqtt.Resilience.IConnectionDownContext.ServerReference.get -> string?
+Pulse.Mqtt.Resilience.IConnectionLifecycle
+Pulse.Mqtt.Resilience.IConnectionLifecycle.OnConnectionDownAsync(Pulse.Mqtt.Resilience.IConnectionDownContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.IConnectionLifecycle.OnConnectionUpAsync(Pulse.Mqtt.Resilience.IConnectionUpContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.IConnectionUpContext
+Pulse.Mqtt.Resilience.IConnectionUpContext.Attempt.get -> int
+Pulse.Mqtt.Resilience.IConnectionUpContext.ConnAck.get -> Pulse.Mqtt.Packets.MqttConnAckPacket!
+Pulse.Mqtt.Resilience.IConnectionUpContext.Subscriptions.get -> Pulse.Mqtt.Resilience.ISubscriptionRegistrar!
+Pulse.Mqtt.Resilience.IMessageStore
+Pulse.Mqtt.Resilience.IMessageStore.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.IMessageStore.Count.get -> int
+Pulse.Mqtt.Resilience.IMessageStore.DroppedCount.get -> long
+Pulse.Mqtt.Resilience.IMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.IMessageStore.PeekAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Packets.MqttPublishPacket?>
+Pulse.Mqtt.Resilience.IMessageStore.RemoveHeadAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.InMemoryMessageStore
+Pulse.Mqtt.Resilience.InMemoryMessageStore.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.InMemoryMessageStore.Count.get -> int
+Pulse.Mqtt.Resilience.InMemoryMessageStore.DroppedCount.get -> long
+Pulse.Mqtt.Resilience.InMemoryMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.InMemoryMessageStore.InMemoryMessageStore(Pulse.Mqtt.Resilience.OfflineQueueOptions! options) -> void
+Pulse.Mqtt.Resilience.InMemoryMessageStore.PeekAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Packets.MqttPublishPacket?>
+Pulse.Mqtt.Resilience.InMemoryMessageStore.RemoveHeadAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.InMemorySessionStore
+Pulse.Mqtt.Resilience.InMemorySessionStore.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.InMemorySessionStore.InMemorySessionStore() -> void
+Pulse.Mqtt.Resilience.InMemorySessionStore.LoadInFlightAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttInFlightState?>
+Pulse.Mqtt.Resilience.InMemorySessionStore.LoadSubscriptionsAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>!>
+Pulse.Mqtt.Resilience.InMemorySessionStore.RemoveSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<string!>! topics, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.InMemorySessionStore.SaveInFlightAsync(Pulse.Mqtt.Resilience.MqttInFlightState! state, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.InMemorySessionStore.SaveSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.InMemorySessionStore.UpsertSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.IReconnectContext
+Pulse.Mqtt.Resilience.IReconnectContext.Attempt.get -> int
+Pulse.Mqtt.Resilience.IReconnectContext.OnAttemptFailed(int attempt, System.Exception! error) -> void
+Pulse.Mqtt.Resilience.IReconnectContext.OnAttemptStarting(int attempt) -> void
+Pulse.Mqtt.Resilience.IReconnectContext.Time.get -> System.TimeProvider!
+Pulse.Mqtt.Resilience.IReconnectDecision
+Pulse.Mqtt.Resilience.IReconnectDecision.ShouldRetry(int attempt, System.Exception! error) -> bool
+Pulse.Mqtt.Resilience.IReconnectStrategy
+Pulse.Mqtt.Resilience.IReconnectStrategy.RunAsync(Pulse.Mqtt.Resilience.ConnectOnceAsync! connectOnce, Pulse.Mqtt.Resilience.IReconnectContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Pulse.Mqtt.Resilience.ISessionStore
+Pulse.Mqtt.Resilience.ISessionStore.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.ISessionStore.LoadInFlightAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttInFlightState?>
+Pulse.Mqtt.Resilience.ISessionStore.LoadSubscriptionsAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>!>
+Pulse.Mqtt.Resilience.ISessionStore.RemoveSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<string!>! topics, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.ISessionStore.SaveInFlightAsync(Pulse.Mqtt.Resilience.MqttInFlightState! state, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.ISessionStore.SaveSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.ISessionStore.UpsertSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.ISubscriptionRegistrar
+Pulse.Mqtt.Resilience.ISubscriptionRegistrar.SubscribeAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!>
+Pulse.Mqtt.Resilience.MqttConnectRejectedException
+Pulse.Mqtt.Resilience.MqttConnectRejectedException.MqttConnectRejectedException(Pulse.Mqtt.Protocol.MqttReasonCode reasonCode) -> void
+Pulse.Mqtt.Resilience.MqttConnectRejectedException.ReasonCode.get -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Resilience.MqttInFlightPublish
+Pulse.Mqtt.Resilience.MqttInFlightPublish.MqttInFlightPublish(Pulse.Mqtt.Packets.MqttPublishPacket! Packet, Pulse.Mqtt.Resilience.MqttInFlightStage Stage) -> void
+Pulse.Mqtt.Resilience.MqttInFlightPublish.Packet.get -> Pulse.Mqtt.Packets.MqttPublishPacket!
+Pulse.Mqtt.Resilience.MqttInFlightPublish.Packet.init -> void
+Pulse.Mqtt.Resilience.MqttInFlightPublish.Stage.get -> Pulse.Mqtt.Resilience.MqttInFlightStage
+Pulse.Mqtt.Resilience.MqttInFlightPublish.Stage.init -> void
+Pulse.Mqtt.Resilience.MqttInFlightSession
+Pulse.Mqtt.Resilience.MqttInFlightSession.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.MqttInFlightSession.InboundReceivedAsync(ushort packetIdentifier, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.MqttInFlightSession.InboundReleasedAsync(ushort packetIdentifier, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.MqttInFlightSession.MqttInFlightSession(System.Func<Pulse.Mqtt.Resilience.MqttInFlightState!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>! persist) -> void
+Pulse.Mqtt.Resilience.MqttInFlightSession.OutboundAdvancedAsync(ushort packetIdentifier, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.MqttInFlightSession.OutboundCompletedAsync(ushort packetIdentifier, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.MqttInFlightSession.OutboundSentAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, Pulse.Mqtt.Resilience.MqttInFlightStage stage, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.MqttInFlightSession.Restore(Pulse.Mqtt.Resilience.MqttInFlightState? state) -> void
+Pulse.Mqtt.Resilience.MqttInFlightSession.Snapshot() -> Pulse.Mqtt.Resilience.MqttInFlightState!
+Pulse.Mqtt.Resilience.MqttInFlightStage
+Pulse.Mqtt.Resilience.MqttInFlightStage.AwaitingPubAck = 0 -> Pulse.Mqtt.Resilience.MqttInFlightStage
+Pulse.Mqtt.Resilience.MqttInFlightStage.AwaitingPubComp = 2 -> Pulse.Mqtt.Resilience.MqttInFlightStage
+Pulse.Mqtt.Resilience.MqttInFlightStage.AwaitingPubRec = 1 -> Pulse.Mqtt.Resilience.MqttInFlightStage
+Pulse.Mqtt.Resilience.MqttInFlightState
+Pulse.Mqtt.Resilience.MqttInFlightState.InboundExactlyOnce.get -> System.Collections.Generic.IReadOnlyList<ushort>!
+Pulse.Mqtt.Resilience.MqttInFlightState.InboundExactlyOnce.init -> void
+Pulse.Mqtt.Resilience.MqttInFlightState.MqttInFlightState(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Resilience.MqttInFlightPublish!>! Outbound, System.Collections.Generic.IReadOnlyList<ushort>! InboundExactlyOnce) -> void
+Pulse.Mqtt.Resilience.MqttInFlightState.Outbound.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Resilience.MqttInFlightPublish!>!
+Pulse.Mqtt.Resilience.MqttInFlightState.Outbound.init -> void
+Pulse.Mqtt.Resilience.NoReconnectStrategy
+Pulse.Mqtt.Resilience.NoReconnectStrategy.NoReconnectStrategy() -> void
+Pulse.Mqtt.Resilience.NoReconnectStrategy.RunAsync(Pulse.Mqtt.Resilience.ConnectOnceAsync! connectOnce, Pulse.Mqtt.Resilience.IReconnectContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Pulse.Mqtt.Resilience.OfflineQueueFullException
+Pulse.Mqtt.Resilience.OfflineQueueFullException.OfflineQueueFullException(int capacity) -> void
+Pulse.Mqtt.Resilience.OfflineQueueOptions
+Pulse.Mqtt.Resilience.OfflineQueueOptions.Capacity.get -> int
+Pulse.Mqtt.Resilience.OfflineQueueOptions.Capacity.init -> void
+Pulse.Mqtt.Resilience.OfflineQueueOptions.IncludeQos0.get -> bool
+Pulse.Mqtt.Resilience.OfflineQueueOptions.IncludeQos0.init -> void
+Pulse.Mqtt.Resilience.OfflineQueueOptions.Overflow.get -> Pulse.Mqtt.Resilience.OverflowPolicy
+Pulse.Mqtt.Resilience.OfflineQueueOptions.Overflow.init -> void
+Pulse.Mqtt.Resilience.OfflineQueueOptions.PublishWaitTimeout.get -> System.TimeSpan?
+Pulse.Mqtt.Resilience.OfflineQueueOptions.PublishWaitTimeout.init -> void
+Pulse.Mqtt.Resilience.OverflowPolicy
+Pulse.Mqtt.Resilience.OverflowPolicy.Block = 0 -> Pulse.Mqtt.Resilience.OverflowPolicy
+Pulse.Mqtt.Resilience.OverflowPolicy.DropNewest = 2 -> Pulse.Mqtt.Resilience.OverflowPolicy
+Pulse.Mqtt.Resilience.OverflowPolicy.DropOldest = 1 -> Pulse.Mqtt.Resilience.OverflowPolicy
+Pulse.Mqtt.Resilience.OverflowPolicy.Reject = 3 -> Pulse.Mqtt.Resilience.OverflowPolicy
+Pulse.Mqtt.Resilience.TerminalMqttConnectException
+Pulse.Mqtt.Resilience.TerminalMqttConnectException.TerminalMqttConnectException(string! message) -> void
+Pulse.Mqtt.Resilience.TerminalMqttConnectException.TerminalMqttConnectException(string! message, System.Exception! innerException) -> void
+Pulse.Mqtt.Resilience.TransientMqttConnectException
+Pulse.Mqtt.Resilience.TransientMqttConnectException.TransientMqttConnectException(string! message) -> void
+Pulse.Mqtt.Resilience.TransientMqttConnectException.TransientMqttConnectException(string! message, System.Exception! innerException) -> void
+Pulse.Mqtt.Result<T>
+Pulse.Mqtt.Result<T>.Error.get -> Pulse.Mqtt.AppError?
+Pulse.Mqtt.Result<T>.IsSuccess.get -> bool
+Pulse.Mqtt.Result<T>.Result() -> void
+Pulse.Mqtt.Result<T>.Value.get -> T?
+Pulse.Mqtt.Routing.MqttRouteTemplate
+Pulse.Mqtt.Routing.MqttRouteTemplate.ParameterNames.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Pulse.Mqtt.Routing.MqttRouteTemplate.Template.get -> string!
+Pulse.Mqtt.Routing.MqttRouteTemplate.TopicFilter.get -> string!
+Pulse.Mqtt.Routing.MqttRouteTemplate.TryMatch(string! topic, out Pulse.Mqtt.Routing.MqttRouteValues values) -> bool
+Pulse.Mqtt.Routing.MqttRouteValues
+Pulse.Mqtt.Routing.MqttRouteValues.Count.get -> int
+Pulse.Mqtt.Routing.MqttRouteValues.MqttRouteValues() -> void
+Pulse.Mqtt.Routing.MqttRouteValues.this[string! name].get -> string!
+Pulse.Mqtt.Routing.MqttRouteValues.TryGetValue(string! name, out string! value) -> bool
+Pulse.Mqtt.Routing.MqttSharedSubscription
+Pulse.Mqtt.Routing.MqttTopicFilterMatcher
+Pulse.Mqtt.Serialization.IMqttSerializer
+Pulse.Mqtt.Serialization.IMqttSerializer.ContentType.get -> string!
+Pulse.Mqtt.Serialization.IMqttSerializer.Deserialize<T>(System.ReadOnlyMemory<byte> payload) -> T
+Pulse.Mqtt.Serialization.IMqttSerializer.PayloadFormat.get -> Pulse.Mqtt.MqttPayloadFormatIndicator
+Pulse.Mqtt.Serialization.IMqttSerializer.Serialize<T>(T value) -> System.ReadOnlyMemory<byte>
+Pulse.Mqtt.Transport.DuplexPipeTransport
+Pulse.Mqtt.Transport.DuplexPipeTransport.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Transport.DuplexPipeTransport.DuplexPipeTransport(System.IO.Pipelines.PipeReader! input, System.IO.Pipelines.PipeWriter! output) -> void
+Pulse.Mqtt.Transport.DuplexPipeTransport.Input.get -> System.IO.Pipelines.PipeReader!
+Pulse.Mqtt.Transport.DuplexPipeTransport.Output.get -> System.IO.Pipelines.PipeWriter!
+Pulse.Mqtt.Transport.IMqttTransport
+Pulse.Mqtt.Transport.IMqttTransport.Input.get -> System.IO.Pipelines.PipeReader!
+Pulse.Mqtt.Transport.IMqttTransport.Output.get -> System.IO.Pipelines.PipeWriter!
+Pulse.Mqtt.Transport.IMqttTransportFactory
+Pulse.Mqtt.Transport.IMqttTransportFactory.ConnectAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Transport.IMqttTransport!>
+Pulse.Mqtt.Transport.LoopbackTransport
+Pulse.Mqtt.Transport.TcpTransport
+Pulse.Mqtt.Transport.TcpTransport.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Transport.TcpTransport.Input.get -> System.IO.Pipelines.PipeReader!
+Pulse.Mqtt.Transport.TcpTransport.Output.get -> System.IO.Pipelines.PipeWriter!
+Pulse.Mqtt.Transport.TcpTransportFactory
+Pulse.Mqtt.Transport.TcpTransportFactory.ConnectAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Transport.IMqttTransport!>
+Pulse.Mqtt.Transport.TcpTransportFactory.TcpTransportFactory(Pulse.Mqtt.Transport.TcpTransportOptions! options) -> void
+Pulse.Mqtt.Transport.TcpTransportOptions
+Pulse.Mqtt.Transport.TcpTransportOptions.ClientCertificates.get -> System.Security.Cryptography.X509Certificates.X509CertificateCollection?
+Pulse.Mqtt.Transport.TcpTransportOptions.ClientCertificates.init -> void
+Pulse.Mqtt.Transport.TcpTransportOptions.Host.get -> string!
+Pulse.Mqtt.Transport.TcpTransportOptions.Host.init -> void
+Pulse.Mqtt.Transport.TcpTransportOptions.Port.get -> int
+Pulse.Mqtt.Transport.TcpTransportOptions.Port.init -> void
+Pulse.Mqtt.Transport.TcpTransportOptions.ServerCertificateValidation.get -> System.Net.Security.RemoteCertificateValidationCallback?
+Pulse.Mqtt.Transport.TcpTransportOptions.ServerCertificateValidation.init -> void
+Pulse.Mqtt.Transport.TcpTransportOptions.TlsTargetHost.get -> string?
+Pulse.Mqtt.Transport.TcpTransportOptions.TlsTargetHost.init -> void
+Pulse.Mqtt.Transport.TcpTransportOptions.UseTls.get -> bool
+Pulse.Mqtt.Transport.TcpTransportOptions.UseTls.init -> void
+static Pulse.Mqtt.Codec.MqttFrameReader.TryReadFrame(System.ReadOnlySpan<byte> buffer, out Pulse.Mqtt.Codec.MqttFixedHeader header, out System.ReadOnlySpan<byte> body, out int consumed) -> Pulse.Mqtt.Codec.MqttFrameStatus
+static Pulse.Mqtt.Codec.MqttFrameReader.TryReadHeader(System.ReadOnlySpan<byte> buffer, out Pulse.Mqtt.Codec.MqttFixedHeader header, out int headerLength) -> Pulse.Mqtt.Codec.MqttFrameStatus
+static Pulse.Mqtt.Codec.MqttFrameWriter.WriteHeader(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Codec.MqttFixedHeader header) -> void
+static Pulse.Mqtt.Codec.MqttPropertySection.Write(System.Buffers.IBufferWriter<byte>! output, System.ReadOnlySpan<byte> body) -> void
+static Pulse.Mqtt.Codec.MqttPropertySection.WriteEmpty(System.Buffers.IBufferWriter<byte>! output) -> void
+static Pulse.Mqtt.Codec.MqttPropertyTypes.AllowsMultiple(Pulse.Mqtt.Codec.MqttPropertyId id) -> bool
+static Pulse.Mqtt.Codec.MqttPropertyTypes.GetValueType(Pulse.Mqtt.Codec.MqttPropertyId id) -> Pulse.Mqtt.Codec.MqttPropertyType
+static Pulse.Mqtt.Codec.MqttVarInt.GetEncodedLength(uint value) -> int
+static Pulse.Mqtt.Codec.MqttVarInt.TryRead(System.ReadOnlySpan<byte> source, out uint value, out int bytesRead) -> Pulse.Mqtt.Codec.MqttVarIntStatus
+static Pulse.Mqtt.Codec.MqttVarInt.Write(System.Span<byte> destination, uint value) -> int
+static Pulse.Mqtt.MqttTopicFilter.FromSubscriptionOptions(string! topic, byte options) -> Pulse.Mqtt.MqttTopicFilter!
+static Pulse.Mqtt.Packets.MqttAuthCodec.Decode(System.ReadOnlySpan<byte> body) -> Pulse.Mqtt.Packets.MqttAuthPacket!
+static Pulse.Mqtt.Packets.MqttAuthCodec.Encode(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttAuthPacket! packet) -> void
+static Pulse.Mqtt.Packets.MqttConnAckCodec.Decode(System.ReadOnlySpan<byte> body, Pulse.Mqtt.Protocol.MqttProtocolVersion version) -> Pulse.Mqtt.Packets.MqttConnAckPacket!
+static Pulse.Mqtt.Packets.MqttConnAckCodec.Encode(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttConnAckPacket! packet) -> void
+static Pulse.Mqtt.Packets.MqttConnectCodec.Decode(System.ReadOnlySpan<byte> body) -> Pulse.Mqtt.Packets.MqttConnectPacket!
+static Pulse.Mqtt.Packets.MqttConnectCodec.Encode(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttConnectPacket! packet) -> void
+static Pulse.Mqtt.Packets.MqttDisconnectCodec.Decode(System.ReadOnlySpan<byte> body, Pulse.Mqtt.Protocol.MqttProtocolVersion version) -> Pulse.Mqtt.Packets.MqttDisconnectPacket!
+static Pulse.Mqtt.Packets.MqttDisconnectCodec.Encode(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttDisconnectPacket! packet) -> void
+static Pulse.Mqtt.Packets.MqttPacketDecoder.Decode(Pulse.Mqtt.Codec.MqttFixedHeader header, System.ReadOnlySpan<byte> body, Pulse.Mqtt.Protocol.MqttProtocolVersion version) -> Pulse.Mqtt.Packets.MqttPacket!
+static Pulse.Mqtt.Packets.MqttPacketWriter.Write(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttPacket! packet) -> void
+static Pulse.Mqtt.Packets.MqttPingCodec.EnsureEmptyBody(System.ReadOnlySpan<byte> body) -> void
+static Pulse.Mqtt.Packets.MqttPingCodec.WriteRequest(System.Buffers.IBufferWriter<byte>! output) -> void
+static Pulse.Mqtt.Packets.MqttPingCodec.WriteResponse(System.Buffers.IBufferWriter<byte>! output) -> void
+static Pulse.Mqtt.Packets.MqttPublishAckCodec.Decode(Pulse.Mqtt.Codec.MqttFixedHeader header, System.ReadOnlySpan<byte> body, Pulse.Mqtt.Protocol.MqttProtocolVersion version) -> Pulse.Mqtt.Packets.MqttPublishAckPacket!
+static Pulse.Mqtt.Packets.MqttPublishAckCodec.Encode(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttPublishAckPacket! packet) -> void
+static Pulse.Mqtt.Packets.MqttPublishCodec.Decode(Pulse.Mqtt.Codec.MqttFixedHeader header, System.ReadOnlySpan<byte> body, Pulse.Mqtt.Protocol.MqttProtocolVersion version) -> Pulse.Mqtt.Packets.MqttPublishPacket!
+static Pulse.Mqtt.Packets.MqttPublishCodec.Encode(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttPublishPacket! packet) -> void
+static Pulse.Mqtt.Packets.MqttSubAckCodec.Decode(System.ReadOnlySpan<byte> body, Pulse.Mqtt.Protocol.MqttProtocolVersion version) -> Pulse.Mqtt.Packets.MqttSubAckPacket!
+static Pulse.Mqtt.Packets.MqttSubAckCodec.Encode(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttSubAckPacket! packet) -> void
+static Pulse.Mqtt.Packets.MqttSubscribeCodec.Decode(System.ReadOnlySpan<byte> body, Pulse.Mqtt.Protocol.MqttProtocolVersion version) -> Pulse.Mqtt.Packets.MqttSubscribePacket!
+static Pulse.Mqtt.Packets.MqttSubscribeCodec.Encode(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttSubscribePacket! packet) -> void
+static Pulse.Mqtt.Packets.MqttUnsubAckCodec.Decode(System.ReadOnlySpan<byte> body, Pulse.Mqtt.Protocol.MqttProtocolVersion version) -> Pulse.Mqtt.Packets.MqttUnsubAckPacket!
+static Pulse.Mqtt.Packets.MqttUnsubAckCodec.Encode(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttUnsubAckPacket! packet) -> void
+static Pulse.Mqtt.Packets.MqttUnsubscribeCodec.Decode(System.ReadOnlySpan<byte> body, Pulse.Mqtt.Protocol.MqttProtocolVersion version) -> Pulse.Mqtt.Packets.MqttUnsubscribePacket!
+static Pulse.Mqtt.Packets.MqttUnsubscribeCodec.Encode(System.Buffers.IBufferWriter<byte>! output, Pulse.Mqtt.Packets.MqttUnsubscribePacket! packet) -> void
+static Pulse.Mqtt.Resilience.Backoff.Compute(int attempt, Pulse.Mqtt.Resilience.BackoffOptions! options, System.Random! random) -> System.TimeSpan
+static Pulse.Mqtt.Result<T>.Fail(Pulse.Mqtt.AppError! error) -> Pulse.Mqtt.Result<T>
+static Pulse.Mqtt.Result<T>.Fail(string! code, string! message) -> Pulse.Mqtt.Result<T>
+static Pulse.Mqtt.Result<T>.Ok(T value) -> Pulse.Mqtt.Result<T>
+static Pulse.Mqtt.Routing.MqttRouteTemplate.Parse(string! template) -> Pulse.Mqtt.Routing.MqttRouteTemplate!
+static Pulse.Mqtt.Routing.MqttRouteValues.Empty.get -> Pulse.Mqtt.Routing.MqttRouteValues
+static Pulse.Mqtt.Routing.MqttSharedSubscription.Format(string! group, string! topicFilter) -> string!
+static Pulse.Mqtt.Routing.MqttTopicFilterMatcher.Matches(System.ReadOnlySpan<char> filter, System.ReadOnlySpan<char> topic) -> bool
+static Pulse.Mqtt.Transport.LoopbackTransport.CreatePair() -> (Pulse.Mqtt.Transport.IMqttTransport! Client, Pulse.Mqtt.Transport.IMqttTransport! Server)

@@ -2,9 +2,10 @@ namespace Pulse.Mqtt.Connection;
 
 /// <summary>
 /// Allocates MQTT packet identifiers (1..65535). Identifiers stay reserved until returned, so an
-/// id is never reused while its operation is still in flight.
+/// id is never reused while its operation is still in flight. Internal: <see cref="RawMqttClient"/>
+/// owns the id lifecycle; consumers never allocate packet ids themselves.
 /// </summary>
-public sealed class MqttPacketIdAllocator
+internal sealed class MqttPacketIdAllocator
 {
     private readonly HashSet<ushort> _inUse = [];
     private readonly object _gate = new();

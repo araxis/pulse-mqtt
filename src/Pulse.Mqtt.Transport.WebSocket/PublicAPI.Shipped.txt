@@ -1,0 +1,19 @@
+#nullable enable
+Pulse.Mqtt.Transport.WebSocketTransport
+Pulse.Mqtt.Transport.WebSocketTransport.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Transport.WebSocketTransport.Input.get -> System.IO.Pipelines.PipeReader!
+Pulse.Mqtt.Transport.WebSocketTransport.Output.get -> System.IO.Pipelines.PipeWriter!
+Pulse.Mqtt.Transport.WebSocketTransportFactory
+Pulse.Mqtt.Transport.WebSocketTransportFactory.ConnectAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Transport.IMqttTransport!>
+Pulse.Mqtt.Transport.WebSocketTransportFactory.WebSocketTransportFactory(Pulse.Mqtt.Transport.WebSocketTransportOptions! options) -> void
+Pulse.Mqtt.Transport.WebSocketTransportOptions
+Pulse.Mqtt.Transport.WebSocketTransportOptions.ConfigureClient.get -> System.Action<System.Net.WebSockets.ClientWebSocketOptions!>?
+Pulse.Mqtt.Transport.WebSocketTransportOptions.ConfigureClient.init -> void
+Pulse.Mqtt.Transport.WebSocketTransportOptions.Headers.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Pulse.Mqtt.Transport.WebSocketTransportOptions.Headers.init -> void
+Pulse.Mqtt.Transport.WebSocketTransportOptions.Proxy.get -> System.Net.IWebProxy?
+Pulse.Mqtt.Transport.WebSocketTransportOptions.Proxy.init -> void
+Pulse.Mqtt.Transport.WebSocketTransportOptions.SubProtocol.get -> string!
+Pulse.Mqtt.Transport.WebSocketTransportOptions.SubProtocol.init -> void
+Pulse.Mqtt.Transport.WebSocketTransportOptions.Uri.get -> System.Uri!
+Pulse.Mqtt.Transport.WebSocketTransportOptions.Uri.init -> void

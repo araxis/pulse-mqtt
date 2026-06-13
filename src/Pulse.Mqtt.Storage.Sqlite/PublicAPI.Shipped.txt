@@ -1,0 +1,25 @@
+#nullable enable
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.Count.get -> int
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.Dispose() -> void
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.DroppedCount.get -> long
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.PeekAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Packets.MqttPublishPacket?>
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.RemoveHeadAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.SqliteMessageStore(string! connectionString, Pulse.Mqtt.Resilience.OfflineQueueOptions! options) -> void
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.Dispose() -> void
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.LoadInFlightAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttInFlightState?>
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.LoadSubscriptionsAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>!>
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.RemoveSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<string!>! topics, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.SaveInFlightAsync(Pulse.Mqtt.Resilience.MqttInFlightState! state, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.SaveSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.SqliteSessionStore(string! connectionString) -> void
+Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.UpsertSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteStorageException
+Pulse.Mqtt.Storage.Sqlite.SqliteStorageException.SqliteStorageException(string! message) -> void
+Pulse.Mqtt.Storage.Sqlite.SqliteStorageException.SqliteStorageException(string! message, System.Exception! innerException) -> void

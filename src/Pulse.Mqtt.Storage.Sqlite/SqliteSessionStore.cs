@@ -10,30 +10,31 @@ namespace Pulse.Mqtt.Storage.Sqlite;
 /// persisted so a persistent-session client resumes — re-subscribing and redelivering unfinished
 /// exchanges — after a process restart, not just a reconnect.
 /// </summary>
-public sealed class SqliteSessionStore : SqliteStore, ISessionStore
+public sealed class SqliteSessionStore : ISessionStore, IAsyncDisposable, IDisposable
 {
+    private const string Schema =
+        """
+        CREATE TABLE IF NOT EXISTS Subscriptions (Topic TEXT PRIMARY KEY, Options INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS InFlightOutbound (Seq INTEGER PRIMARY KEY AUTOINCREMENT, Stage INTEGER NOT NULL, Version INTEGER NOT NULL, Packet BLOB NOT NULL);
+        CREATE TABLE IF NOT EXISTS InFlightInbound (PacketId INTEGER PRIMARY KEY);
+        """;
+
+    private readonly SqliteStore _store;
+
     /// <summary>Opens (creating if needed) the session database at <paramref name="connectionString"/>.</summary>
     /// <param name="connectionString">
     /// A Microsoft.Data.Sqlite connection string, or a plain file path (e.g. <c>mqtt-session.db</c>).
     /// </param>
     public SqliteSessionStore(string connectionString)
-        : base(Normalize(connectionString))
     {
+        _store = new SqliteStore(SqliteStore.Normalize(connectionString), Schema);
     }
-
-    /// <inheritdoc />
-    protected override void EnsureSchema() => Execute(
-        """
-        CREATE TABLE IF NOT EXISTS Subscriptions (Topic TEXT PRIMARY KEY, Options INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS InFlightOutbound (Seq INTEGER PRIMARY KEY AUTOINCREMENT, Stage INTEGER NOT NULL, Version INTEGER NOT NULL, Packet BLOB NOT NULL);
-        CREATE TABLE IF NOT EXISTS InFlightInbound (PacketId INTEGER PRIMARY KEY);
-        """);
 
     /// <inheritdoc />
     public ValueTask SaveSubscriptionsAsync(IReadOnlyList<MqttTopicFilter> topicFilters, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(topicFilters);
-        return RunAsync(connection =>
+        return _store.RunAsync(connection =>
         {
             using var transaction = connection.BeginTransaction();
             Execute(connection, transaction, "DELETE FROM Subscriptions;");
@@ -44,7 +45,7 @@ public sealed class SqliteSessionStore : SqliteStore, ISessionStore
 
     /// <inheritdoc />
     public ValueTask<IReadOnlyList<MqttTopicFilter>> LoadSubscriptionsAsync(CancellationToken cancellationToken) =>
-        RunAsync(connection =>
+        _store.RunAsync(connection =>
         {
             var filters = new List<MqttTopicFilter>();
             using var command = connection.CreateCommand();
@@ -62,7 +63,7 @@ public sealed class SqliteSessionStore : SqliteStore, ISessionStore
     public ValueTask UpsertSubscriptionsAsync(IReadOnlyList<MqttTopicFilter> topicFilters, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(topicFilters);
-        return RunAsync(connection =>
+        return _store.RunAsync(connection =>
         {
             using var transaction = connection.BeginTransaction();
             UpsertSubscriptions(connection, transaction, topicFilters);
@@ -74,7 +75,7 @@ public sealed class SqliteSessionStore : SqliteStore, ISessionStore
     public ValueTask RemoveSubscriptionsAsync(IReadOnlyList<string> topics, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(topics);
-        return RunAsync(connection =>
+        return _store.RunAsync(connection =>
         {
             using var transaction = connection.BeginTransaction();
             using var command = connection.CreateCommand();
@@ -95,7 +96,7 @@ public sealed class SqliteSessionStore : SqliteStore, ISessionStore
     public ValueTask SaveInFlightAsync(MqttInFlightState state, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(state);
-        return RunAsync(connection =>
+        return _store.RunAsync(connection =>
         {
             using var transaction = connection.BeginTransaction();
             Execute(connection, transaction, "DELETE FROM InFlightOutbound; DELETE FROM InFlightInbound;");
@@ -134,7 +135,7 @@ public sealed class SqliteSessionStore : SqliteStore, ISessionStore
 
     /// <inheritdoc />
     public ValueTask<MqttInFlightState?> LoadInFlightAsync(CancellationToken cancellationToken) =>
-        RunAsync(connection =>
+        _store.RunAsync(connection =>
         {
             var outbound = new List<MqttInFlightPublish>();
             using (var command = connection.CreateCommand())
@@ -167,12 +168,18 @@ public sealed class SqliteSessionStore : SqliteStore, ISessionStore
 
     /// <inheritdoc />
     public ValueTask ClearAsync(CancellationToken cancellationToken) =>
-        RunAsync(connection =>
+        _store.RunAsync(connection =>
         {
             using var transaction = connection.BeginTransaction();
             Execute(connection, transaction, "DELETE FROM Subscriptions; DELETE FROM InFlightOutbound; DELETE FROM InFlightInbound;");
             transaction.Commit();
         }, cancellationToken);
+
+    /// <inheritdoc />
+    public void Dispose() => _store.Dispose();
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => _store.DisposeAsync();
 
     private static void UpsertSubscriptions(SqliteConnection connection, SqliteTransaction transaction, IReadOnlyList<MqttTopicFilter> topicFilters)
     {

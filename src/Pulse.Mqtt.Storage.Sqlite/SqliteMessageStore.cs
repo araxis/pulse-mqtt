@@ -17,9 +17,13 @@ namespace Pulse.Mqtt.Storage.Sqlite;
 /// live count, so it never races. The admission semaphore exists only for
 /// <see cref="OverflowPolicy.Block"/>, where a publisher must wait for space.
 /// </remarks>
-public sealed class SqliteMessageStore : SqliteStore, IMessageStore
+public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDisposable
 {
+    private const string Schema =
+        "CREATE TABLE IF NOT EXISTS Queue (Seq INTEGER PRIMARY KEY AUTOINCREMENT, Version INTEGER NOT NULL, Packet BLOB NOT NULL);";
+
     private readonly OfflineQueueOptions _options;
+    private readonly SqliteStore _store;
     private readonly SemaphoreSlim? _space;
     private int _count;
     private long _dropped;
@@ -30,14 +34,14 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
     /// </param>
     /// <param name="options">Bounds and overflow policy for the queue.</param>
     public SqliteMessageStore(string connectionString, OfflineQueueOptions options)
-        : base(Normalize(connectionString))
     {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.Capacity, 1);
+        _options = options;
+        _store = new SqliteStore(SqliteStore.Normalize(connectionString), Schema);
+
         try
         {
-            ArgumentNullException.ThrowIfNull(options);
-            ArgumentOutOfRangeException.ThrowIfLessThan(options.Capacity, 1);
-            _options = options;
-
             // A capacity lowered between runs can leave more rows than fit; shed the oldest so the
             // count never exceeds capacity and the admission bookkeeping stays sound.
             var trimmed = TrimToCapacity(options.Capacity);
@@ -46,7 +50,7 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
                 _dropped = trimmed;
             }
 
-            _count = (int)ExecuteScalarLong("SELECT COUNT(*) FROM Queue;");
+            _count = (int)_store.ExecuteScalarLong("SELECT COUNT(*) FROM Queue;");
             if (options.Overflow == OverflowPolicy.Block)
             {
                 _space = new SemaphoreSlim(options.Capacity - _count, options.Capacity);
@@ -54,15 +58,10 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
         }
         catch
         {
-            // The base constructor already opened the connection; don't leak it on a bad argument.
-            Dispose();
+            _store.Dispose();
             throw;
         }
     }
-
-    /// <inheritdoc />
-    protected override void EnsureSchema() => Execute(
-        "CREATE TABLE IF NOT EXISTS Queue (Seq INTEGER PRIMARY KEY AUTOINCREMENT, Version INTEGER NOT NULL, Packet BLOB NOT NULL);");
 
     /// <inheritdoc />
     public int Count => Volatile.Read(ref _count);
@@ -82,7 +81,7 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
                 return;
 
             case OverflowPolicy.DropNewest:
-                await RunAsync(connection =>
+                await _store.RunAsync(connection =>
                 {
                     if (_count >= _options.Capacity)
                     {
@@ -96,7 +95,7 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
                 return;
 
             case OverflowPolicy.DropOldest:
-                await RunAsync(connection =>
+                await _store.RunAsync(connection =>
                 {
                     if (_count >= _options.Capacity)
                     {
@@ -116,7 +115,7 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
                 return;
 
             case OverflowPolicy.Reject:
-                var rejected = await RunAsync(connection =>
+                var rejected = await _store.RunAsync(connection =>
                 {
                     if (_count >= _options.Capacity)
                     {
@@ -143,7 +142,7 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
 
     /// <inheritdoc />
     public ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken) =>
-        RunAsync(connection =>
+        _store.RunAsync(connection =>
         {
             using var command = connection.CreateCommand();
             command.CommandText = "SELECT Version, Packet FROM Queue ORDER BY Seq LIMIT 1;";
@@ -159,7 +158,7 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
 
     /// <inheritdoc />
     public ValueTask RemoveHeadAsync(CancellationToken cancellationToken) =>
-        RunAsync(connection =>
+        _store.RunAsync(connection =>
         {
             using var command = connection.CreateCommand();
             command.CommandText = "DELETE FROM Queue WHERE Seq = (SELECT Seq FROM Queue ORDER BY Seq LIMIT 1);";
@@ -172,7 +171,7 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
 
     /// <inheritdoc />
     public ValueTask ClearAsync(CancellationToken cancellationToken) =>
-        RunAsync(connection =>
+        _store.RunAsync(connection =>
         {
             using var command = connection.CreateCommand();
             command.CommandText = "DELETE FROM Queue;";
@@ -183,6 +182,12 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
                 _space?.Release(removed);
             }
         }, cancellationToken);
+
+    /// <inheritdoc />
+    public void Dispose() => _store.Dispose();
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => _store.DisposeAsync();
 
     private async ValueTask EnqueueBlockingAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
     {
@@ -201,7 +206,7 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
 
         try
         {
-            await RunAsync(connection =>
+            await _store.RunAsync(connection =>
             {
                 Insert(connection, transaction: null, packet);
                 _count++;
@@ -217,13 +222,13 @@ public sealed class SqliteMessageStore : SqliteStore, IMessageStore
 
     private int TrimToCapacity(int capacity)
     {
-        var excess = (int)Math.Max(0, ExecuteScalarLong("SELECT COUNT(*) FROM Queue;") - capacity);
+        var excess = (int)Math.Max(0, _store.ExecuteScalarLong("SELECT COUNT(*) FROM Queue;") - capacity);
         if (excess == 0)
         {
             return 0;
         }
 
-        using var command = CreateCommand();
+        using var command = _store.CreateCommand();
         // The excess is a computed int, not user input — safe to inline; SQLite allows LIMIT only
         // inside the subquery here, not on DELETE directly.
         command.CommandText = $"DELETE FROM Queue WHERE Seq IN (SELECT Seq FROM Queue ORDER BY Seq LIMIT {excess});";

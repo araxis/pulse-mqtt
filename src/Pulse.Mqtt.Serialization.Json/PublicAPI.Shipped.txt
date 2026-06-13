@@ -1,0 +1,7 @@
+#nullable enable
+Pulse.Mqtt.Serialization.Json.JsonMqttSerializer
+Pulse.Mqtt.Serialization.Json.JsonMqttSerializer.ContentType.get -> string!
+Pulse.Mqtt.Serialization.Json.JsonMqttSerializer.Deserialize<T>(System.ReadOnlyMemory<byte> payload) -> T
+Pulse.Mqtt.Serialization.Json.JsonMqttSerializer.JsonMqttSerializer(System.Text.Json.Serialization.JsonSerializerContext! context) -> void
+Pulse.Mqtt.Serialization.Json.JsonMqttSerializer.PayloadFormat.get -> Pulse.Mqtt.MqttPayloadFormatIndicator
+Pulse.Mqtt.Serialization.Json.JsonMqttSerializer.Serialize<T>(T value) -> System.ReadOnlyMemory<byte>
