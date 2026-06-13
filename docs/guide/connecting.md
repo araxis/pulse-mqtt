@@ -59,9 +59,30 @@ From the `Pulse.Mqtt.Transport.WebSocket` package:
 .UseTransportFactory(_ => new WebSocketTransportFactory(new WebSocketTransportOptions
 {
     Uri = new Uri("wss://broker.example.com/mqtt"),
-    // SubProtocol defaults to "mqtt"; ConfigureClient customizes headers, proxy, certificates.
+    // SubProtocol defaults to "mqtt".
 }))
 ```
+
+### Through a reverse proxy
+
+`Headers` and `Proxy` are first-class — handy for a broker behind a reverse proxy or gateway that
+expects an `Authorization` token or a routing header, reached through a corporate proxy:
+
+```csharp
+new WebSocketTransportOptions
+{
+    Uri = new Uri("wss://gateway.example.com/mqtt"),
+    Headers = new Dictionary<string, string>
+    {
+        ["Authorization"] = $"Bearer {token}",   // gateway authenticates the upgrade
+        ["X-Tenant"] = "acme",                    // routing header the proxy keys on
+    },
+    Proxy = new WebProxy("http://corp-proxy:8080"),
+}
+```
+
+`ConfigureClient` is still there for anything these do not cover (client certificates, cookies,
+custom keep-alive); it runs last, so it can override `Headers` and `Proxy`.
 
 ## Credentials and identity
 

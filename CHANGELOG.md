@@ -2,6 +2,10 @@
 
 ## 0.7.0 (unreleased)
 
+- WebSocket proxy and headers: `WebSocketTransportOptions` gains first-class `Proxy` and `Headers`
+  for reaching a broker behind a reverse proxy or gateway — an `Authorization` token, a routing
+  header, a corporate proxy — without dropping to `ConfigureClient` (which still runs last and can
+  override them).
 - Durable storage: a new **`Pulse.Mqtt.Storage.Sqlite`** package provides `SqliteSessionStore` and
   `SqliteMessageStore` — SQLite-backed implementations of `ISessionStore` and `IMessageStore` so
   subscriptions, the offline queue, and in-flight QoS state survive a process restart, not just a
