@@ -2,6 +2,10 @@
 
 ## 1.1.0 (unreleased)
 
+- Publish hot path: the per-publish `messages.published` / `publish.duration` metric tag no longer
+  allocates a string for the disposition on every call (it used the enum's `ToString()`), so a
+  publisher with no telemetry listener attached allocates nothing extra for the metric. Confirmed
+  against the MQTTnet comparison benchmark.
 - Receive-maximum flow control now holds the send-quota slot for a QoS 2 message until **PUBCOMP**
   (the final acknowledgement, per MQTT 5 §4.9) rather than freeing it at PUBREC. The previous
   behavior could let a burst of QoS 2 publishes exceed the broker's advertised receive maximum,
