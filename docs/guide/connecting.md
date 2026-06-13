@@ -88,6 +88,46 @@ var connect = new MqttConnectPacket
 
 The same packet template is used for every reconnection.
 
+## Enhanced authentication (MQTT 5)
+
+For challenge/response schemes — SCRAM, OAuth-style token exchanges, Kerberos — implement one
+small interface and hand it to the client:
+
+```csharp
+public sealed class ScramAuthenticator : IMqttAuthenticator
+{
+    public string Method => "SCRAM-SHA-256";
+
+    public ValueTask<ReadOnlyMemory<byte>?> NextDataAsync(
+        ReadOnlyMemory<byte>? challenge, CancellationToken ct)
+    {
+        // null challenge → produce the initial data for CONNECT (or a re-auth start);
+        // otherwise → answer the broker's challenge.
+        return ValueTask.FromResult<ReadOnlyMemory<byte>?>(ComputeNextStep(challenge));
+    }
+}
+```
+
+```csharp
+new ResilientMqttClientOptions
+{
+    Connect = connect,
+    Raw = new RawMqttClientOptions { Authenticator = new ScramAuthenticator() },
+}
+```
+
+The client carries the method and initial data on CONNECT, answers every broker AUTH challenge
+through the authenticator until the broker concludes with a CONNACK, and supports
+client-initiated **re-authentication** on a live connection:
+
+```csharp
+await client.ReAuthenticateAsync(token);   // e.g. when a token rotates
+```
+
+A throwing authenticator fails the attempt like any connect failure; with no authenticator
+configured, no AUTH is ever sent and a broker that starts an exchange anyway is a protocol
+error.
+
 ## Protocol version
 
 MQTT 5.0 is the default. For brokers that only speak 3.1.1:

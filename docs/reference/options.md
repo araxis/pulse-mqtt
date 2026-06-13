@@ -51,6 +51,7 @@ For direct construction; with DI these come from `PulseMqttClientOptions` plus b
 | `AcknowledgementTimeout` | 30 s | Publish/subscribe/unsubscribe acknowledgement wait |
 | `InboundMessageCapacity` | `256` | Bound of the received-message queue |
 | `UseOutboundTopicAliases` | `false` | Compress repeated publish topics into MQTT 5 aliases, within the broker's maximum |
+| `Authenticator` | `null` | MQTT 5 enhanced-authentication handler ([connecting](../guide/connecting#enhanced-authentication-mqtt-5)) |
 
 ## MqttConnectionOptions
 

@@ -29,6 +29,7 @@ public sealed class RawMqttClient : IAsyncDisposable
     private string?[]? _inboundAliasTopics;   // index = alias - 1; touched only by the pump
     private Dictionary<string, ushort>? _outboundAliases;   // touched only inside the send lock
     private ushort _outboundAliasMaximum;
+    private TaskCompletionSource? _reauthSignal;   // swapped with Interlocked; completed by the pump
     private MqttProtocolVersion _protocolVersion = MqttProtocolVersion.V500;
     private Task? _pump;
     private Task? _keepAliveLoop;
@@ -100,21 +101,57 @@ public sealed class RawMqttClient : IAsyncDisposable
 
         try
         {
+            if (_options.Authenticator is { } initialAuthenticator)
+            {
+                connect = connect with
+                {
+                    AuthenticationMethod = initialAuthenticator.Method,
+                    AuthenticationData = await initialAuthenticator.NextDataAsync(null, cancellationToken).ConfigureAwait(false),
+                };
+            }
+
             await SendThroughAsync(connection, connect, cancellationToken).ConfigureAwait(false);
 
             MqttPacket first;
-            try
+            while (true)
             {
-                first = await connection.Inbound.ReadAsync(cancellationToken).AsTask()
-                    .WaitAsync(_options.ConnAckTimeout, _time, cancellationToken).ConfigureAwait(false);
-            }
-            catch (TimeoutException)
-            {
-                throw new MqttException("The broker did not answer the CONNECT in time.");
-            }
-            catch (ChannelClosedException ex)
-            {
-                throw new MqttException("The connection closed during the handshake.", ex.InnerException ?? ex);
+                try
+                {
+                    first = await connection.Inbound.ReadAsync(cancellationToken).AsTask()
+                        .WaitAsync(_options.ConnAckTimeout, _time, cancellationToken).ConfigureAwait(false);
+                }
+                catch (TimeoutException)
+                {
+                    throw new MqttException("The broker did not answer the CONNECT in time.");
+                }
+                catch (ChannelClosedException ex)
+                {
+                    throw new MqttException("The connection closed during the handshake.", ex.InnerException ?? ex);
+                }
+
+                // Enhanced authentication: answer each challenge until the broker concludes
+                // with a CONNACK (success or rejection).
+                if (first is MqttAuthPacket { ReasonCode: MqttReasonCode.ContinueAuthentication } challenge)
+                {
+                    if (_options.Authenticator is not { } authenticator)
+                    {
+                        throw new MqttProtocolException("The broker started an authentication exchange, but no authenticator is configured.");
+                    }
+
+                    var data = await authenticator.NextDataAsync(challenge.AuthenticationData, cancellationToken).ConfigureAwait(false);
+                    await SendThroughAsync(
+                        connection,
+                        new MqttAuthPacket
+                        {
+                            ReasonCode = MqttReasonCode.ContinueAuthentication,
+                            AuthenticationMethod = authenticator.Method,
+                            AuthenticationData = data,
+                        },
+                        cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                break;
             }
 
             if (first is not MqttConnAckPacket connAck)
@@ -270,6 +307,80 @@ public sealed class RawMqttClient : IAsyncDisposable
         finally
         {
             _packetIds.Return(id);
+        }
+    }
+
+    /// <summary>
+    /// Starts a client-initiated re-authentication on the live connection and completes when
+    /// the broker concludes the exchange with an AUTH success.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No authenticator is configured, or an exchange is already running.</exception>
+    /// <exception cref="MqttException">The broker did not conclude in time or the connection closed.</exception>
+    public async Task ReAuthenticateAsync(CancellationToken cancellationToken)
+    {
+        var connection = ConnectedOrThrow();
+        var authenticator = _options.Authenticator
+            ?? throw new InvalidOperationException("Configure an authenticator to use re-authentication.");
+
+        var signal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (Interlocked.CompareExchange(ref _reauthSignal, signal, null) is not null)
+        {
+            throw new InvalidOperationException("A re-authentication exchange is already in progress.");
+        }
+
+        try
+        {
+            var data = await authenticator.NextDataAsync(null, cancellationToken).ConfigureAwait(false);
+            await SendThroughAsync(
+                connection,
+                new MqttAuthPacket
+                {
+                    ReasonCode = MqttReasonCode.ReAuthenticate,
+                    AuthenticationMethod = authenticator.Method,
+                    AuthenticationData = data,
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                await signal.Task.WaitAsync(_options.AcknowledgementTimeout, _time, cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                throw new MqttException("The broker did not conclude the re-authentication in time.");
+            }
+        }
+        finally
+        {
+            _reauthSignal = null;
+        }
+    }
+
+    // Runs on the pump: answers broker challenges mid-session and completes a pending
+    // re-authentication when the broker concludes with success.
+    private async ValueTask HandleAuthAsync(MqttConnection connection, MqttAuthPacket auth, CancellationToken cancellationToken)
+    {
+        switch (auth.ReasonCode)
+        {
+            case MqttReasonCode.ContinueAuthentication when _options.Authenticator is { } authenticator:
+                var data = await authenticator.NextDataAsync(auth.AuthenticationData, cancellationToken).ConfigureAwait(false);
+                await SendThroughAsync(
+                    connection,
+                    new MqttAuthPacket
+                    {
+                        ReasonCode = MqttReasonCode.ContinueAuthentication,
+                        AuthenticationMethod = authenticator.Method,
+                        AuthenticationData = data,
+                    },
+                    cancellationToken).ConfigureAwait(false);
+                break;
+
+            case MqttReasonCode.ContinueAuthentication:
+                throw new MqttProtocolException("The broker started an authentication exchange, but no authenticator is configured.");
+
+            case MqttReasonCode.Success:
+                _reauthSignal?.TrySetResult();
+                break;
         }
     }
 
@@ -473,6 +584,9 @@ public sealed class RawMqttClient : IAsyncDisposable
                                 },
                                 cancellationToken).ConfigureAwait(false);
                             break;
+                        case MqttAuthPacket auth:
+                            await HandleAuthAsync(connection, auth, cancellationToken).ConfigureAwait(false);
+                            break;
                         case MqttDisconnectPacket disconnect:
                             // The broker ended the session on purpose: an orderly close, not a
                             // protocol error. Record the reason and stop — waiters fail with it.
@@ -642,6 +756,7 @@ public sealed class RawMqttClient : IAsyncDisposable
 
     private void FailPending(Exception error)
     {
+        _reauthSignal?.TrySetException(error);
         foreach (var entry in _pending)
         {
             entry.Value.TrySetException(error);

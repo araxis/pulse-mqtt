@@ -24,4 +24,12 @@ public sealed record RawMqttClientOptions
     /// on every connection. Off by default.
     /// </summary>
     public bool UseOutboundTopicAliases { get; init; }
+
+    /// <summary>
+    /// The MQTT 5 enhanced-authentication handler. When set, its method and initial data ride
+    /// the CONNECT, broker AUTH challenges are answered through it during the handshake, and
+    /// <see cref="RawMqttClient.ReAuthenticateAsync"/> becomes available. <see langword="null"/>
+    /// (the default) sends no AUTH and costs nothing.
+    /// </summary>
+    public IMqttAuthenticator? Authenticator { get; init; }
 }
