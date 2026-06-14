@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using Pulse.Mqtt.Client;
@@ -47,12 +46,15 @@ public sealed class SoakTests
             [new MqttTopicFilter(topic) { MaximumQualityOfService = MqttQualityOfService.AtLeastOnce }],
             lifetime.Token);
 
-        var received = new ConcurrentDictionary<long, byte>();
+        // Verify zero loss with bounded memory: track the contiguous run of received sequence
+        // numbers and a small set of out-of-order arrivals, rather than remembering every message
+        // (which would itself grow O(messages) and mask the library's heap — the thing under test).
+        var tracker = new ContiguousTracker();
         var collector = Task.Run(async () =>
         {
             await foreach (var message in subscriber.Messages.ReadAllAsync(lifetime.Token))
             {
-                received[long.Parse(Encoding.UTF8.GetString(message.Payload.Span), CultureInfo.InvariantCulture)] = 0;
+                tracker.Observe(long.Parse(Encoding.UTF8.GetString(message.Payload.Span), CultureInfo.InvariantCulture));
             }
         }, lifetime.Token);
 
@@ -116,19 +118,21 @@ public sealed class SoakTests
 
         // Let the session resume and the queue fully drain.
         using var settle = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-        while (received.Count < published && !settle.IsCancellationRequested)
+        while (tracker.Contiguous < published && !tracker.Overflowed && !settle.IsCancellationRequested)
         {
             await Task.Delay(200, lifetime.Token);
         }
 
         var finalHeap = HeapBytes();
 
-        // Zero loss: every published sequence reached the subscriber.
-        received.Count.ShouldBe((int)published, $"published={published}, received={received.Count}, state={publisher.State}");
+        // Zero loss: every published sequence (0..published-1) arrived, forming one contiguous run.
+        tracker.Overflowed.ShouldBeFalse("the contiguous run stalled too far behind — a message was lost");
+        tracker.Contiguous.ShouldBe(published, $"received contiguous up to {tracker.Contiguous} of {published} ({tracker.OutOfOrder} still out of order), state={publisher.State}");
         publisher.State.ShouldBe(ConnectionState.Connected);
 
         // Bounded growth: the heap after a full drain is within a generous tolerance of the
-        // post-warmup baseline (no unbounded accumulation of tasks/buffers/sessions).
+        // post-warmup baseline (no unbounded accumulation of tasks/buffers/sessions). The tracker
+        // above is O(reorder window), so this measures the library, not the test's bookkeeping.
         var growth = finalHeap - baseline;
         growth.ShouldBeLessThan(32 * 1024 * 1024, $"heap grew {growth / (1024 * 1024)} MB over {published} messages (peak {maxHeap / (1024 * 1024)} MB)");
 
@@ -175,5 +179,65 @@ public sealed class SoakTests
         }
 
         public ValueTask KillAsync() => _current?.DisposeAsync() ?? ValueTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// Tracks how far an in-order sequence of integers has been received contiguously, holding only
+    /// the out-of-order arrivals that have not yet joined the run — so memory is bounded by the
+    /// reorder window, not the total message count. Duplicates (re-delivered messages) are ignored.
+    /// </summary>
+    private sealed class ContiguousTracker
+    {
+        // A real loss stalls the run forever, after which every later message piles up here; cap it
+        // so a leak in the harness can never masquerade as a leak in the library under test.
+        private const int OutOfOrderCap = 100_000;
+
+        private readonly object _gate = new();
+        private readonly HashSet<long> _ahead = [];
+        private long _next;
+        private bool _overflowed;
+
+        public long Contiguous
+        {
+            get { lock (_gate) { return _next; } }
+        }
+
+        public int OutOfOrder
+        {
+            get { lock (_gate) { return _ahead.Count; } }
+        }
+
+        public bool Overflowed
+        {
+            get { lock (_gate) { return _overflowed; } }
+        }
+
+        public void Observe(long sequence)
+        {
+            lock (_gate)
+            {
+                if (sequence == _next)
+                {
+                    _next++;
+                    while (_ahead.Remove(_next))
+                    {
+                        _next++;
+                    }
+                }
+                else if (sequence > _next)
+                {
+                    if (_ahead.Count < OutOfOrderCap)
+                    {
+                        _ahead.Add(sequence);
+                    }
+                    else
+                    {
+                        _overflowed = true;
+                    }
+                }
+
+                // sequence < _next: a duplicate from re-delivery — ignore.
+            }
+        }
     }
 }
