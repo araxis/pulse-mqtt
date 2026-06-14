@@ -20,6 +20,15 @@ namespace Pulse.Mqtt.IntegrationTests;
 /// normal CI run; invoke it with <c>dotnet test --filter "Category=Soak"</c> against a broker, and
 /// restart the broker container periodically to cover process restarts as well as network cuts.
 /// </summary>
+/// <remarks>
+/// Expect the broker log to fill with <c>disconnected: session taken over</c> for the publisher
+/// client id — this is normal, not an error. Each chaos cut drops the socket ungracefully, so the
+/// client reconnects with the same id before the broker has noticed the old TCP close; the broker
+/// then evicts the stale connection (reason 0x8E, Session Taken Over) and hands the preserved
+/// session to the new one. The eviction targets the already-dead old socket, so the client never
+/// faults on it, and the resumed session (<c>SessionPresent = true</c>) keeps QoS 1 redelivery
+/// intact. It is simply the broker-side signature of fast ungraceful reconnect.
+/// </remarks>
 [Trait("Category", "Soak")]
 [Collection("mosquitto")]
 public sealed class SoakTests
