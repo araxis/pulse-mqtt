@@ -64,7 +64,7 @@ internal sealed class SqliteStore : IAsyncDisposable, IDisposable
         ArgumentNullException.ThrowIfNull(work);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await AcquireGateAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             return work(_connection);
@@ -81,7 +81,7 @@ internal sealed class SqliteStore : IAsyncDisposable, IDisposable
         ArgumentNullException.ThrowIfNull(work);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await AcquireGateAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             work(_connection);
@@ -90,6 +90,21 @@ internal sealed class SqliteStore : IAsyncDisposable, IDisposable
         {
             _gate.Release();
         }
+    }
+
+    // SemaphoreSlim.WaitAsync(token) builds an internal linked CancellationTokenSource on the supplied
+    // token for every contended wait; a long-lived caller token over a high-volume store accumulates
+    // those registrations until cancelling the token throws an ObjectDisposedException avalanche. Take
+    // the gate synchronously when free and confine any real wait to a per-call source disposed at once.
+    private async ValueTask AcquireGateAsync(CancellationToken cancellationToken)
+    {
+        if (_gate.Wait(0, cancellationToken))
+        {
+            return;
+        }
+
+        using var scoped = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        await _gate.WaitAsync(scoped.Token).ConfigureAwait(false);
     }
 
     /// <summary>Executes a non-query statement on the connection. For construction-time use only.</summary>

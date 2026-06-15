@@ -295,7 +295,7 @@ public sealed class RawMqttClient : IAsyncDisposable
         {
             if (quota is not null)
             {
-                await quota.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await quota.WaitScopedAsync(cancellationToken).ConfigureAwait(false);
                 quotaHeld = true;
             }
 

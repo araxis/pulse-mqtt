@@ -2,6 +2,15 @@
 
 ## 1.1.0 (unreleased)
 
+- Long-run stability: `SemaphoreSlim.WaitAsync(token)` builds an internal linked
+  `CancellationTokenSource` on the supplied token for every contended wait, so a long-lived
+  cancellation token passed through the send lock, the receive-maximum quota, or the offline queue
+  accumulated one registration per contended wait — invisible until the token was finally cancelled,
+  when executing the pile threw an `AggregateException` of `ObjectDisposedException`. The contended
+  waits now confine that linked source to a per-call scope disposed immediately, taking a free slot
+  synchronously first, so a token held for the life of the process stays clean. Surfaced by an
+  extended chaos soak (millions of publishes through endless reconnects) and reproduced
+  deterministically in a unit test. The same fix covers the SQLite session/message stores.
 - Publish hot path: the per-publish `messages.published` / `publish.duration` metric tag no longer
   allocates a string for the disposition on every call (it used the enum's `ToString()`), so a
   publisher with no telemetry listener attached allocates nothing extra for the metric. Confirmed
