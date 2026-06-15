@@ -89,7 +89,7 @@ public sealed class MqttConnection : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(packet);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await _sendLock.WaitScopedAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             if (OutboundTransform is { } transform)

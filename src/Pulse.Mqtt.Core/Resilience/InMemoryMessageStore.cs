@@ -44,9 +44,12 @@ public sealed class InMemoryMessageStore : IMessageStore
         switch (_options.Overflow)
         {
             case OverflowPolicy.Block:
+                // WaitScopedAsync keeps the internal linked CancellationTokenSource that SemaphoreSlim
+                // builds per contended wait off the (possibly long-lived) caller token, so a high-volume
+                // offline queue cannot accumulate registrations on it.
                 if (_options.PublishWaitTimeout is { } timeout)
                 {
-                    if (!await _space.WaitAsync(timeout, cancellationToken).ConfigureAwait(false))
+                    if (!await _space.WaitScopedAsync(timeout, cancellationToken).ConfigureAwait(false))
                     {
                         Interlocked.Increment(ref _dropped);
                         throw new OfflineQueueFullException(_options.Capacity);
@@ -54,7 +57,7 @@ public sealed class InMemoryMessageStore : IMessageStore
                 }
                 else
                 {
-                    await _space.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    await _space.WaitScopedAsync(cancellationToken).ConfigureAwait(false);
                 }
 
                 lock (_gate)

@@ -191,17 +191,25 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
 
     private async ValueTask EnqueueBlockingAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
     {
-        if (_options.PublishWaitTimeout is { } timeout)
+        // SemaphoreSlim.WaitAsync(token) builds an internal linked CancellationTokenSource on the
+        // supplied token for every contended wait; a long-lived caller token driving a high-volume
+        // offline queue accumulates those registrations until cancelling it throws. Take a free slot
+        // synchronously and confine any real wait to a per-call source disposed immediately.
+        if (!_space!.Wait(0, cancellationToken))
         {
-            if (!await _space!.WaitAsync(timeout, cancellationToken).ConfigureAwait(false))
+            using var scoped = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            if (_options.PublishWaitTimeout is { } timeout)
             {
-                Interlocked.Increment(ref _dropped);
-                throw new OfflineQueueFullException(_options.Capacity);
+                if (!await _space!.WaitAsync(timeout, scoped.Token).ConfigureAwait(false))
+                {
+                    Interlocked.Increment(ref _dropped);
+                    throw new OfflineQueueFullException(_options.Capacity);
+                }
             }
-        }
-        else
-        {
-            await _space!.WaitAsync(cancellationToken).ConfigureAwait(false);
+            else
+            {
+                await _space!.WaitAsync(scoped.Token).ConfigureAwait(false);
+            }
         }
 
         try
