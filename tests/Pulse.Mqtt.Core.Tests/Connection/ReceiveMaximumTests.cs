@@ -3,6 +3,7 @@ using Pulse.Mqtt.Codec;
 using Pulse.Mqtt.Connection;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
+using Pulse.Mqtt.Resilience;
 using Pulse.Mqtt.Transport;
 using Shouldly;
 using Xunit;
@@ -152,20 +153,42 @@ public sealed class ReceiveMaximumTests
         }
     }
 
+    [Fact]
+    public async Task A_cancelled_publish_on_a_session_parks_its_quota_slot()
+    {
+        var session = new MqttInFlightSession((_, _) => ValueTask.CompletedTask);
+        var (client, broker, timeout) = await ConnectedAsync(receiveMaximum: 1, session);
+
+        using var cancelFirst = new CancellationTokenSource();
+        var first = Publish(client, "a", cancelFirst.Token);
+        (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfType<MqttPublishPacket>(); // on the wire, the only slot taken
+        await cancelFirst.CancelAsync();
+        await Should.ThrowAsync<OperationCanceledException>(async () => await first);
+
+        // The cancelled publish is parked in the session — the broker still counts it — so its slot stays
+        // held. A second publish must wait rather than exceed the broker's Receive Maximum of 1.
+        _ = Publish(client, "b", timeout.Token);
+        var gated = broker.ReadPacketAsync(timeout.Token);
+        await Task.Delay(100, timeout.Token);
+        gated.IsCompleted.ShouldBeFalse("a cancelled-but-in-flight publish must keep its receive-maximum slot until the connection re-arms");
+    }
+
     private static Task<MqttReasonCode> Publish(RawMqttClient client, string topic, CancellationToken cancellationToken) =>
         client.PublishAsync(
             new MqttPublishPacket { Topic = topic, Payload = new byte[] { 1 }, QualityOfService = MqttQualityOfService.AtLeastOnce },
             cancellationToken);
 
     private static async Task<(RawMqttClient Client, ScriptedBroker Broker, CancellationTokenSource Timeout)> ConnectedAsync(
-        ushort? receiveMaximum)
+        ushort? receiveMaximum,
+        MqttInFlightSession? session = null)
     {
         var (clientTransport, serverTransport) = LoopbackTransport.CreatePair();
         var broker = new ScriptedBroker(serverTransport);
         var client = new RawMqttClient(new FixedTransportFactory(clientTransport), timeProvider: new FakeTimeProvider());
 
         var timeout = new CancellationTokenSource(SafetyTimeout);
-        var connectTask = client.ConnectAsync(new MqttConnectPacket { ClientId = "c" }, timeout.Token);
+        var connectTask = client.ConnectAsync(
+            new MqttConnectPacket { ClientId = "c", CleanStart = session is null }, session, timeout.Token);
         await broker.ReadPacketAsync(timeout.Token);
         await broker.SendAsync(new MqttConnAckPacket { ReceiveMaximum = receiveMaximum }, timeout.Token);
         await connectTask;

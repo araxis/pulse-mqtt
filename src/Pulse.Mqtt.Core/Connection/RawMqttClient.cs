@@ -361,7 +361,12 @@ public sealed class RawMqttClient : IAsyncDisposable
         }
         finally
         {
-            if (quotaHeld)
+            // Release the receive-maximum slot only when the id is also released — when the exchange
+            // truly settled, or there is no session to resume it. A cancelled-but-on-the-wire publish on
+            // a persistent session parks both: the broker still counts the message against its Receive
+            // Maximum, so freeing the slot early would let a later burst exceed it. The connection drop
+            // on the next reconnect re-arms the quota.
+            if (quotaHeld && (settled || _session is null))
             {
                 quota!.Release();
             }
@@ -560,7 +565,12 @@ public sealed class RawMqttClient : IAsyncDisposable
             }
             catch (TimeoutException)
             {
-                throw new MqttException("The broker did not conclude the re-authentication in time.");
+                // The broker never concluded the exchange: faulting the connection both surfaces the
+                // failure and prevents a late AUTH success from completing a subsequent re-authentication
+                // (the next attempt runs on a fresh connection, not this stale signal slot).
+                var error = new MqttException("The broker did not conclude the re-authentication in time.");
+                await FaultConnectionAsync(connection, error).ConfigureAwait(false);
+                throw error;
             }
         }
         finally
@@ -734,7 +744,26 @@ public sealed class RawMqttClient : IAsyncDisposable
             }
             catch (TimeoutException)
             {
-                throw new MqttException($"The broker did not acknowledge packet {id} in time.");
+                // The packet is on the wire but the broker never acknowledged it within the window, so
+                // it still owns the id and counts the message. Fault the connection to recover cleanly.
+                var error = new MqttException($"The broker did not acknowledge packet {id} in time.");
+                await FaultConnectionAsync(connection, error).ConfigureAwait(false);
+                throw error;
+            }
+            catch (OperationCanceledException)
+            {
+                // A persistent session parks the id and keeps the message in flight for redelivery while
+                // the connection (which is healthy — the caller cancelled, the broker did not fail) keeps
+                // running. A clean-start client has no session to track the still-owned id, so the
+                // connection is faulted to reset it; the broker drops the exchange on disconnect.
+                if (_session is null)
+                {
+                    await FaultConnectionAsync(
+                        connection,
+                        new MqttException($"The wait for packet {id} was cancelled after it was sent.")).ConfigureAwait(false);
+                }
+
+                throw;
             }
         }
         finally
@@ -988,6 +1017,19 @@ public sealed class RawMqttClient : IAsyncDisposable
         }
     }
 
+    // Tears the connection down the way the keep-alive loop does on a ping-response timeout. An
+    // exchange that reached the wire but went unacknowledged — the broker too slow, or the caller
+    // abandoning the wait — leaves the broker still owning the packet id and counting a QoS > 0 PUBLISH
+    // against its Receive Maximum, so the connection is no longer in a known-good state. Faulting it
+    // makes the supervisor reconnect, which re-arms the send quota and the packet-id allocator and
+    // redelivers a persistent session's in-flight work.
+    private async ValueTask FaultConnectionAsync(MqttConnection connection, Exception error)
+    {
+        _messages.Writer.TryComplete(error);
+        FailPending(error);
+        await connection.DisposeAsync().ConfigureAwait(false);
+    }
+
     private async Task KeepAliveLoopAsync(MqttConnection connection, TimeSpan interval, CancellationToken cancellationToken)
     {
         try
@@ -1011,10 +1053,9 @@ public sealed class RawMqttClient : IAsyncDisposable
                 }
                 catch (TimeoutException)
                 {
-                    var error = new MqttException("The broker did not answer a PINGREQ within the keep-alive window.");
-                    _messages.Writer.TryComplete(error);
-                    FailPending(error);
-                    await connection.DisposeAsync().ConfigureAwait(false);
+                    await FaultConnectionAsync(
+                        connection,
+                        new MqttException("The broker did not answer a PINGREQ within the keep-alive window.")).ConfigureAwait(false);
                     return;
                 }
             }
