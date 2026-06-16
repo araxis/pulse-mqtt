@@ -25,6 +25,50 @@ public sealed class MqttInFlightSessionTests
     }
 
     [Fact]
+    public async Task A_slow_persist_of_an_older_snapshot_never_overwrites_a_newer_one()
+    {
+        var gate = new object();
+        var committed = new List<ushort[]>();
+        var session = new MqttInFlightSession(async (state, cancellationToken) =>
+        {
+            var ids = state.Outbound.Select(e => e.Packet.PacketIdentifier!.Value).OrderBy(x => x).ToArray();
+
+            // The newest snapshot after the race is [2]; the racing older snapshot is [1,2] or [].
+            // Slow the older one so that, without serialization, it would land after the newer and win.
+            if (ids.Length != 1)
+            {
+                await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+            }
+
+            lock (gate)
+            {
+                committed.Add(ids);
+            }
+        });
+
+        // First exchange settles on its own.
+        await session.OutboundSentAsync(Publish(1), MqttInFlightStage.AwaitingPubAck, CancellationToken.None);
+
+        // Two more mutations race: add a second publish, and complete the first. Their persists overlap.
+        var racingAdd = session.OutboundSentAsync(Publish(2), MqttInFlightStage.AwaitingPubAck, CancellationToken.None);
+        var racingComplete = session.OutboundCompletedAsync(1, CancellationToken.None);
+        await racingAdd;
+        await racingComplete;
+
+        // Whatever the interleaving, the store's last write must be the authoritative newest state — [2] —
+        // not a slow, stale snapshot resurrecting the completed id 1.
+        var authoritative = session.Snapshot().Outbound.Select(e => e.Packet.PacketIdentifier!.Value).OrderBy(x => x).ToArray();
+        authoritative.ShouldBe([(ushort)2]);
+        ushort[] last;
+        lock (gate)
+        {
+            last = committed[^1];
+        }
+
+        last.ShouldBe(authoritative);
+    }
+
+    [Fact]
     public async Task Outbound_entries_keep_insertion_order_and_advance_in_place()
     {
         var session = new MqttInFlightSession((_, _) => ValueTask.CompletedTask);

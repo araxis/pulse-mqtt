@@ -2,6 +2,13 @@
 
 ## 1.1.0 (unreleased)
 
+- Durable in-flight persistence ordering: the persistent-session in-flight tracker built each snapshot
+  under its lock but ran the async persist outside it, so two concurrent mutations could reach a durable
+  store (the SQLite session store) out of order and let an older snapshot overwrite a newer one —
+  resurrecting an already-completed exchange after a process restart and re-sending it with DUP. Each
+  snapshot now carries a monotonic version and the persists are serialized and applied only forward, so
+  the store always lands on the newest snapshot regardless of completion order. Surfaced by an
+  adversarial correctness audit.
 - Unacknowledged-exchange recovery: an exchange that reached the wire but was never acknowledged now
   faults the connection so the supervisor reconnects, instead of leaving a live connection in a state
   the broker and client disagree about. Previously an **acknowledgement timeout** left the connection
