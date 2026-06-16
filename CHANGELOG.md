@@ -2,6 +2,18 @@
 
 ## 1.1.0 (unreleased)
 
+- Unacknowledged-exchange recovery: an exchange that reached the wire but was never acknowledged now
+  faults the connection so the supervisor reconnects, instead of leaving a live connection in a state
+  the broker and client disagree about. Previously an **acknowledgement timeout** left the connection
+  running while the broker still owned the packet id and still counted a QoS > 0 PUBLISH against its
+  Receive Maximum, so a clean-start client could recycle that id and have a delayed PUBACK complete the
+  wrong operation, and the freed receive-maximum slot could let a later burst exceed the broker's limit
+  (MQTT 5 §4.9). A **re-authentication timeout** likewise left the signal slot reusable, so a stale AUTH
+  success could complete a subsequently started re-authentication. Both timeouts now tear the connection
+  down the same way a keep-alive ping-response timeout already did. A receive-maximum slot is also parked
+  alongside the packet id when a persistent-session publish is cancelled after it is on the wire (the
+  broker still counts it), and a clean-start publish cancelled after it is sent faults the connection
+  since there is no session to park the still-owned id. Surfaced by an adversarial correctness audit.
 - Subscription state on session resume: a subscribe or unsubscribe issued while the client was offline
   (or interrupted mid-call) is now reconciled onto the broker when the connection comes back — even
   when the broker resumes the session (CONNACK `SessionPresent = true`), where the lifecycle's full
