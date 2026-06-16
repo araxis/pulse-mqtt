@@ -39,6 +39,13 @@ public sealed class MqttInFlightSession
     private readonly Func<MqttInFlightState, CancellationToken, ValueTask> _persist;
     private readonly object _gate = new();
 
+    // Each snapshot is stamped with a monotonic version under _gate (mutation order); persists are
+    // serialized through _persistGate and applied only forward, so a slower persist of an older
+    // snapshot can never overwrite a newer one in a durable async store.
+    private readonly SemaphoreSlim _persistGate = new(1, 1);
+    private long _version;
+    private long _persistedVersion;
+
     /// <summary>Creates a session that persists every change through <paramref name="persist"/>.</summary>
     public MqttInFlightSession(Func<MqttInFlightState, CancellationToken, ValueTask> persist)
     {
@@ -79,6 +86,7 @@ public sealed class MqttInFlightSession
     public ValueTask OutboundSentAsync(MqttPublishPacket packet, MqttInFlightStage stage, CancellationToken cancellationToken)
     {
         MqttInFlightState snapshot;
+        long version;
         lock (_gate)
         {
             // Update in place when the identifier is already tracked (a redelivery re-records
@@ -95,15 +103,17 @@ public sealed class MqttInFlightSession
             }
 
             snapshot = SnapshotLocked();
+            version = ++_version;
         }
 
-        return _persist(snapshot, cancellationToken);
+        return PersistAsync(snapshot, version, cancellationToken);
     }
 
     /// <summary>Advances a QoS 2 exchange to <see cref="MqttInFlightStage.AwaitingPubComp"/> when its PUBREC arrives.</summary>
     public ValueTask OutboundAdvancedAsync(ushort packetIdentifier, CancellationToken cancellationToken)
     {
         MqttInFlightState snapshot;
+        long version;
         lock (_gate)
         {
             var index = _outbound.FindIndex(entry => entry.Packet.PacketIdentifier == packetIdentifier);
@@ -113,67 +123,99 @@ public sealed class MqttInFlightSession
             }
 
             snapshot = SnapshotLocked();
+            version = ++_version;
         }
 
-        return _persist(snapshot, cancellationToken);
+        return PersistAsync(snapshot, version, cancellationToken);
     }
 
     /// <summary>Removes a completed outbound exchange.</summary>
     public ValueTask OutboundCompletedAsync(ushort packetIdentifier, CancellationToken cancellationToken)
     {
         MqttInFlightState snapshot;
+        long version;
         lock (_gate)
         {
             _outbound.RemoveAll(entry => entry.Packet.PacketIdentifier == packetIdentifier);
             snapshot = SnapshotLocked();
+            version = ++_version;
         }
 
-        return _persist(snapshot, cancellationToken);
+        return PersistAsync(snapshot, version, cancellationToken);
     }
 
     /// <summary>Records an inbound QoS 2 delivery for duplicate suppression across resumes.</summary>
     public ValueTask InboundReceivedAsync(ushort packetIdentifier, CancellationToken cancellationToken)
     {
         MqttInFlightState snapshot;
+        long version;
         lock (_gate)
         {
             _inbound.Add(packetIdentifier);
             snapshot = SnapshotLocked();
+            version = ++_version;
         }
 
-        return _persist(snapshot, cancellationToken);
+        return PersistAsync(snapshot, version, cancellationToken);
     }
 
     /// <summary>Removes an inbound QoS 2 identifier once its PUBREL releases it.</summary>
     public ValueTask InboundReleasedAsync(ushort packetIdentifier, CancellationToken cancellationToken)
     {
         MqttInFlightState snapshot;
+        long version;
         lock (_gate)
         {
             _inbound.Remove(packetIdentifier);
             snapshot = SnapshotLocked();
+            version = ++_version;
         }
 
-        return _persist(snapshot, cancellationToken);
+        return PersistAsync(snapshot, version, cancellationToken);
     }
 
     /// <summary>Discards everything — the broker did not preserve the session.</summary>
     public ValueTask ClearAsync(CancellationToken cancellationToken)
     {
         MqttInFlightState snapshot;
+        long version;
         lock (_gate)
         {
             _outbound.Clear();
             _inbound.Clear();
             snapshot = SnapshotLocked();
+            version = ++_version;
         }
 
-        return _persist(snapshot, cancellationToken);
+        return PersistAsync(snapshot, version, cancellationToken);
     }
 
-    // Builds the snapshot under the caller's lock so the persisted payload is bound to the
-    // mutation that produced it. NOTE for durable async stores: persists are not yet serialized
-    // across concurrent mutations — add a version stamp or single-writer queue before shipping a
-    // store whose SaveInFlightAsync completes asynchronously.
+    // Builds the snapshot under the caller's lock so the persisted payload is bound to the mutation
+    // that produced it. Concurrent mutations produce snapshots in version order under _gate; PersistAsync
+    // then serializes the writes and applies them only forward.
     private MqttInFlightState SnapshotLocked() => new([.. _outbound], [.. _inbound]);
+
+    // Serializes persists and drops a stale one. Concurrent mutations build snapshots in version order,
+    // but their async persists can otherwise reach a durable store out of order and let an older snapshot
+    // overwrite a newer one — resurrecting a completed exchange on the next restore (a spurious
+    // redelivery). Applying only when the version advances keeps the store on the newest snapshot
+    // regardless of completion order.
+    private async ValueTask PersistAsync(MqttInFlightState snapshot, long version, CancellationToken cancellationToken)
+    {
+        await _persistGate.WaitScopedAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (version <= _persistedVersion)
+            {
+                return;
+            }
+
+            await _persist(snapshot, cancellationToken).ConfigureAwait(false);
+            _persistedVersion = version;
+        }
+        finally
+        {
+            _persistGate.Release();
+        }
+    }
 }
