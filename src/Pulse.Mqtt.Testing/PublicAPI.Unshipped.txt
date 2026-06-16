@@ -1,1 +1,3 @@
 #nullable enable
+Pulse.Mqtt.Testing.PulseMqttTestBroker.ResumeSessions.get -> bool
+Pulse.Mqtt.Testing.PulseMqttTestBroker.ResumeSessions.init -> void

@@ -34,6 +34,13 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     private readonly Channel<MqttPublishPacket> _messages;
     private readonly List<Channel<ConnectionStateChanged>> _watchers = [];
     private readonly Dictionary<string, MqttTopicFilter> _subscriptions = [];
+
+    // Subscribe/unsubscribe changes made while offline (or when a live call lost the connection). The
+    // lifecycle replays the full set only on a fresh session; on a resumed one (SessionPresent = true)
+    // it skips, so this delta is what the broker would otherwise never hear about. Guarded by _subscriptionGate.
+    private readonly Dictionary<string, MqttTopicFilter> _pendingSubscribe = [];
+    private readonly HashSet<string> _pendingUnsubscribe = [];
+
     private readonly object _stateGate = new();
     private readonly object _subscriptionGate = new();
 
@@ -279,11 +286,33 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         {
             try
             {
-                return await raw.SubscribeAsync(topicFilters, cancellationToken).ConfigureAwait(false);
+                var granted = await raw.SubscribeAsync(topicFilters, cancellationToken).ConfigureAwait(false);
+                lock (_subscriptionGate)
+                {
+                    foreach (var filter in topicFilters)
+                    {
+                        _pendingSubscribe.Remove(filter.Topic);
+                        _pendingUnsubscribe.Remove(filter.Topic);
+                    }
+                }
+
+                return granted;
             }
             catch (Exception ex) when (ex is MqttException or InvalidOperationException or ObjectDisposedException)
             {
-                // The connection died; the lifecycle re-subscribes on the next connection-up.
+                // The connection died mid-subscribe; fall through to record it as pending so the next
+                // connection-up applies it even when the broker resumes the session.
+            }
+        }
+
+        // Offline (or the live subscribe lost the connection): the broker has not heard this change.
+        // Record it so connection-up replays it even on a resumed session, where the lifecycle skips.
+        lock (_subscriptionGate)
+        {
+            foreach (var filter in topicFilters)
+            {
+                _pendingSubscribe[filter.Topic] = filter;
+                _pendingUnsubscribe.Remove(filter.Topic);
             }
         }
 
@@ -312,10 +341,32 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         {
             try
             {
-                return await raw.UnsubscribeAsync(topicFilters, cancellationToken).ConfigureAwait(false);
+                var result = await raw.UnsubscribeAsync(topicFilters, cancellationToken).ConfigureAwait(false);
+                lock (_subscriptionGate)
+                {
+                    foreach (var topic in topicFilters)
+                    {
+                        _pendingUnsubscribe.Remove(topic);
+                        _pendingSubscribe.Remove(topic);
+                    }
+                }
+
+                return result;
             }
             catch (Exception ex) when (ex is MqttException or InvalidOperationException or ObjectDisposedException)
             {
+                // The connection died mid-unsubscribe; fall through to record it as pending.
+            }
+        }
+
+        // Offline (or the live unsubscribe lost the connection): a resumed session still holds this
+        // filter, so record the removal for connection-up to apply even when SessionPresent is true.
+        lock (_subscriptionGate)
+        {
+            foreach (var topic in topicFilters)
+            {
+                _pendingUnsubscribe.Add(topic);
+                _pendingSubscribe.Remove(topic);
             }
         }
 
@@ -358,6 +409,33 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             MaximumQualityOfService = (options ?? new MqttRouteOptions()).SubscriptionQualityOfService,
         };
         return SubscribeAsync([filter], cancellationToken);
+    }
+
+    // Applies subscribe/unsubscribe changes made while offline. On a fresh session the lifecycle has
+    // already replayed the full stored set (which contains the offline additions, and excludes the
+    // offline removals), so the broker already matches and the pending delta is simply dropped. On a
+    // resumed session the lifecycle did nothing, so the delta is exactly what the broker is missing.
+    private async Task ReconcileOfflineSubscriptionsAsync(RawMqttClient raw, bool sessionPresent, CancellationToken cancellationToken)
+    {
+        List<MqttTopicFilter> toSubscribe;
+        List<string> toUnsubscribe;
+        lock (_subscriptionGate)
+        {
+            toSubscribe = sessionPresent ? [.. _pendingSubscribe.Values] : [];
+            toUnsubscribe = sessionPresent ? [.. _pendingUnsubscribe] : [];
+            _pendingSubscribe.Clear();
+            _pendingUnsubscribe.Clear();
+        }
+
+        if (toSubscribe.Count > 0)
+        {
+            await raw.SubscribeAsync(toSubscribe, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (toUnsubscribe.Count > 0)
+        {
+            await raw.UnsubscribeAsync(toUnsubscribe, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -949,6 +1027,11 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 {
                     var upContext = new ConnectionUpContext(connAck!, _attempt, new RawSubscriptionRegistrar(raw!));
                     await _lifecycle.OnConnectionUpAsync(upContext, cancellationToken).ConfigureAwait(false);
+
+                    // The lifecycle replays the full subscription set only on a fresh session. On a
+                    // resumed one (SessionPresent = true) it does nothing, so any subscribe/unsubscribe
+                    // made while offline must be applied here or the broker would never hear it.
+                    await ReconcileOfflineSubscriptionsAsync(raw!, connAck!.SessionPresent, cancellationToken).ConfigureAwait(false);
 
                     // Order is deliberate and spec-driven:
                     //   1. re-subscription (above) is in place first,

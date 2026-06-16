@@ -2,6 +2,13 @@
 
 ## 1.1.0 (unreleased)
 
+- Subscription state on session resume: a subscribe or unsubscribe issued while the client was offline
+  (or interrupted mid-call) is now reconciled onto the broker when the connection comes back — even
+  when the broker resumes the session (CONNACK `SessionPresent = true`), where the lifecycle's full
+  re-subscribe deliberately does nothing. Previously the change was recorded only in the durable
+  subscription set, so the broker's resumed session never learned it: a topic subscribed offline went
+  silently undelivered, and a topic unsubscribed offline kept being delivered. The offline delta is
+  tracked and applied on connection-up. Surfaced by an adversarial correctness audit.
 - Long-run stability: `SemaphoreSlim.WaitAsync(token)` builds an internal linked
   `CancellationTokenSource` on the supplied token for every contended wait, so a long-lived
   cancellation token passed through the send lock, the receive-maximum quota, or the offline queue
