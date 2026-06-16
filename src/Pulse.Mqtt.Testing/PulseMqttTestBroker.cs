@@ -25,8 +25,18 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
     private int _packetId;
     private volatile bool _disposed;
 
+    private readonly HashSet<string> _seenSessions = [];
+    private readonly object _seenGate = new();
+
     /// <summary>Every message a client published, in arrival order, for assertions.</summary>
     public ChannelReader<MqttPublishPacket> ClientPublishes => _clientPublishes.Reader;
+
+    /// <summary>
+    /// When set, the broker models persistent-session resume: a non-clean reconnect by a client id it
+    /// has already seen answers CONNACK with <c>SessionPresent = true</c>. Off by default — every
+    /// CONNACK reports no session — so existing tests are unaffected.
+    /// </summary>
+    public bool ResumeSessions { get; init; }
 
     /// <summary>Hands a connecting client its end of a new in-memory session.</summary>
     public ValueTask<IMqttTransport> ConnectAsync(CancellationToken cancellationToken)
@@ -125,6 +135,28 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
 
     private void RecordClientPublish(MqttPublishPacket message) => _clientPublishes.Writer.TryWrite(message);
 
+    // Decides the CONNACK SessionPresent flag. A clean start always reports no session (and resets the
+    // record); a non-clean reconnect by a previously seen client id reports a resumed session.
+    private bool ResumeSession(string clientId, bool cleanStart)
+    {
+        if (!ResumeSessions)
+        {
+            return false;
+        }
+
+        lock (_seenGate)
+        {
+            if (cleanStart)
+            {
+                _seenSessions.Add(clientId);
+                return false;
+            }
+
+            // HashSet.Add returns false when the id was already present — i.e. a session to resume.
+            return !_seenSessions.Add(clientId);
+        }
+    }
+
     private sealed class BrokerSession : IAsyncDisposable
     {
         private readonly PulseMqttTestBroker _broker;
@@ -208,6 +240,11 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
             finally
             {
                 _broker.Remove(this);
+
+                // Close the broker's half so the peer's transport observes the disconnect. A real socket
+                // closes both directions; the in-memory pipe must be completed explicitly, otherwise a
+                // client whose transport is dropped never sees the connection go down.
+                await _connection.DisposeAsync().ConfigureAwait(false);
             }
         }
 
@@ -216,8 +253,13 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
             switch (packet)
             {
                 case MqttConnectPacket connect:
-                    await SendAsync(new MqttConnAckPacket { ProtocolVersion = connect.ProtocolVersion }, cancellationToken)
-                        .ConfigureAwait(false);
+                    await SendAsync(
+                        new MqttConnAckPacket
+                        {
+                            ProtocolVersion = connect.ProtocolVersion,
+                            SessionPresent = _broker.ResumeSession(connect.ClientId, connect.CleanStart),
+                        },
+                        cancellationToken).ConfigureAwait(false);
                     break;
 
                 case MqttPingReqPacket:
