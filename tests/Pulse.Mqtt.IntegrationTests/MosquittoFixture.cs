@@ -11,21 +11,45 @@ namespace Pulse.Mqtt.IntegrationTests;
 /// </summary>
 public sealed class MosquittoFixture : IMqttBroker, IAsyncLifetime
 {
-    private readonly IContainer _container = new ContainerBuilder("eclipse-mosquitto:2")
-        .WithCommand("mosquitto", "-c", "/mosquitto-no-auth.conf")
-        .WithPortBinding(1883, assignRandomHostPort: true)
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(1883))
-        .Build();
+    private readonly (string Host, int Port)? _external = ParseExternalBroker();
+    private readonly IContainer? _container;
+
+    public MosquittoFixture()
+    {
+        // Default: a throwaway Docker container. When PULSE_MQTT_BROKER points at an already-running
+        // broker, skip Docker entirely (useful when Docker is unavailable — run a native mosquitto.exe).
+        if (_external is null)
+        {
+            _container = new ContainerBuilder("eclipse-mosquitto:2")
+                .WithCommand("mosquitto", "-c", "/mosquitto-no-auth.conf")
+                .WithPortBinding(1883, assignRandomHostPort: true)
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(1883))
+                .Build();
+        }
+    }
 
     public string Name => "Mosquitto 2";
 
-    public string Host => _container.Hostname;
+    public string Host => _external?.Host ?? _container!.Hostname;
 
-    public int Port => _container.GetMappedPublicPort(1883);
+    public int Port => _external?.Port ?? _container!.GetMappedPublicPort(1883);
 
-    public Task InitializeAsync() => _container.StartAsync();
+    public Task InitializeAsync() => _container?.StartAsync() ?? Task.CompletedTask;
 
-    public Task DisposeAsync() => _container.DisposeAsync().AsTask();
+    public Task DisposeAsync() => _container?.DisposeAsync().AsTask() ?? Task.CompletedTask;
+
+    // "host:port" of an already-running broker to use instead of a Docker container; null when unset.
+    private static (string Host, int Port)? ParseExternalBroker()
+    {
+        var value = Environment.GetEnvironmentVariable("PULSE_MQTT_BROKER");
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var parts = value.Split(':', 2);
+        return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var port) ? port : 1883);
+    }
 }
 
 [CollectionDefinition("mosquitto")]
