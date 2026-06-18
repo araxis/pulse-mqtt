@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Text;
 using Pulse.Mqtt.Client;
 using Pulse.Mqtt.Connection;
@@ -86,8 +87,13 @@ public sealed class SoakTests
         await Task.Delay(TimeSpan.FromSeconds(2), lifetime.Token);
         var baseline = HeapBytes();
 
+        // Optional disk checkpointing: a long run becomes observable live and its verdict survives even
+        // if the process or stdout dies. Off unless PULSE_SOAK_CHECKPOINT names a file, so CI is unchanged.
+        var checkpoint = new SoakCheckpoint();
+
         using var chaos = new CancellationTokenSource();
         var random = new Random(20240613);
+        var killCount = 0;
         var chaosLoop = Task.Run(async () =>
         {
             while (!chaos.IsCancellationRequested)
@@ -95,12 +101,16 @@ public sealed class SoakTests
                 try { await Task.Delay(random.Next(150, 600), chaos.Token); }
                 catch (OperationCanceledException) { return; }
                 await killable.KillAsync();
+                Interlocked.Increment(ref killCount);
             }
         }, lifetime.Token);
 
         long sequence = 0;
         long maxHeap = baseline;
-        var deadline = DateTimeOffset.UtcNow + duration;
+        var started = DateTimeOffset.UtcNow;
+        var deadline = started + duration;
+        var nextCheckpoint = started + TimeSpan.FromSeconds(30);
+        checkpoint.Write($"START duration={duration} baselineMB={baseline / (1024 * 1024)} broker={Environment.GetEnvironmentVariable("PULSE_MQTT_BROKER") ?? "docker"}");
         while (DateTimeOffset.UtcNow < deadline)
         {
             await publisher.PublishAsync(
@@ -118,9 +128,19 @@ public sealed class SoakTests
             {
                 maxHeap = Math.Max(maxHeap, HeapBytes());
             }
+
+            if (DateTimeOffset.UtcNow >= nextCheckpoint)
+            {
+                nextCheckpoint = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(30);
+                checkpoint.Write(
+                    $"elapsed={DateTimeOffset.UtcNow - started:hh\\:mm\\:ss} published={sequence} contiguous={tracker.Contiguous} " +
+                    $"outOfOrder={tracker.OutOfOrder} kills={Volatile.Read(ref killCount)} " +
+                    $"heapMB={GC.GetTotalMemory(forceFullCollection: false) / (1024 * 1024)} maxHeapMB={maxHeap / (1024 * 1024)} state={publisher.State}");
+            }
         }
 
         var published = sequence;
+        checkpoint.Write($"DRAIN published={published} contiguous={tracker.Contiguous} outOfOrder={tracker.OutOfOrder} kills={Volatile.Read(ref killCount)}");
         await chaos.CancelAsync();
         await chaosLoop;
         await WaitConnectedAsync(publisher, lifetime.Token);
@@ -133,17 +153,31 @@ public sealed class SoakTests
         }
 
         var finalHeap = HeapBytes();
-
-        // Zero loss: every published sequence (0..published-1) arrived, forming one contiguous run.
-        tracker.Overflowed.ShouldBeFalse("the contiguous run stalled too far behind — a message was lost");
-        tracker.Contiguous.ShouldBe(published, $"received contiguous up to {tracker.Contiguous} of {published} ({tracker.OutOfOrder} still out of order), state={publisher.State}");
-        publisher.State.ShouldBe(ConnectionState.Connected);
-
-        // Bounded growth: the heap after a full drain is within a generous tolerance of the
-        // post-warmup baseline (no unbounded accumulation of tasks/buffers/sessions). The tracker
-        // above is O(reorder window), so this measures the library, not the test's bookkeeping.
         var growth = finalHeap - baseline;
-        growth.ShouldBeLessThan(32 * 1024 * 1024, $"heap grew {growth / (1024 * 1024)} MB over {published} messages (peak {maxHeap / (1024 * 1024)} MB)");
+
+        try
+        {
+            // Zero loss: every published sequence (0..published-1) arrived, forming one contiguous run.
+            tracker.Overflowed.ShouldBeFalse("the contiguous run stalled too far behind — a message was lost");
+            tracker.Contiguous.ShouldBe(published, $"received contiguous up to {tracker.Contiguous} of {published} ({tracker.OutOfOrder} still out of order), state={publisher.State}");
+            publisher.State.ShouldBe(ConnectionState.Connected);
+
+            // Bounded growth: the heap after a full drain is within a generous tolerance of the
+            // post-warmup baseline (no unbounded accumulation of tasks/buffers/sessions). The tracker
+            // above is O(reorder window), so this measures the library, not the test's bookkeeping.
+            growth.ShouldBeLessThan(32 * 1024 * 1024, $"heap grew {growth / (1024 * 1024)} MB over {published} messages (peak {maxHeap / (1024 * 1024)} MB)");
+        }
+        catch (Exception failure)
+        {
+            checkpoint.Write(
+                $"RESULT=FAIL elapsed={DateTimeOffset.UtcNow - started:hh\\:mm\\:ss} published={published} contiguous={tracker.Contiguous} " +
+                $"outOfOrder={tracker.OutOfOrder} kills={Volatile.Read(ref killCount)} growthMB={growth / (1024 * 1024)} maxHeapMB={maxHeap / (1024 * 1024)} state={publisher.State} :: {failure.Message}");
+            throw;
+        }
+
+        checkpoint.Write(
+            $"RESULT=PASS elapsed={DateTimeOffset.UtcNow - started:hh\\:mm\\:ss} published={published} contiguous={tracker.Contiguous} " +
+            $"kills={Volatile.Read(ref killCount)} growthMB={growth / (1024 * 1024)} maxHeapMB={maxHeap / (1024 * 1024)}");
 
         await publisher.StopAsync(lifetime.Token);
         await subscriber.DisconnectAsync(lifetime.Token);
@@ -173,6 +207,29 @@ public sealed class SoakTests
         while (client.State != ConnectionState.Connected)
         {
             await Task.Delay(10, cancellationToken);
+        }
+    }
+
+    // Appends flushed health/result lines to the file named by PULSE_SOAK_CHECKPOINT, or does nothing
+    // when that variable is unset (so CI is unaffected). Each call opens, writes, and closes the file,
+    // so every line lands on disk immediately — a long run is observable live and its verdict survives
+    // a lost process or a broken stdout pipe.
+    private sealed class SoakCheckpoint
+    {
+        private readonly string? _path = Environment.GetEnvironmentVariable("PULSE_SOAK_CHECKPOINT");
+        private readonly object _gate = new();
+
+        public void Write(string line)
+        {
+            if (_path is null)
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                File.AppendAllText(_path, $"{DateTimeOffset.UtcNow:O} {line}{Environment.NewLine}");
+            }
         }
     }
 
