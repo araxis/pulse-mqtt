@@ -1,5 +1,7 @@
 # Changelog
 
+## 1.2.0 (unreleased)
+
 ## 1.1.0
 
 A correctness and long-run stability release, with no breaking API changes. An adversarial code audit

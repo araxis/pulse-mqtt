@@ -5,3 +5,5 @@ Pulse.Mqtt.Testing.PulseMqttTestBroker.ConnectAsync(System.Threading.Cancellatio
 Pulse.Mqtt.Testing.PulseMqttTestBroker.DisposeAsync() -> System.Threading.Tasks.ValueTask
 Pulse.Mqtt.Testing.PulseMqttTestBroker.PublishAsync(Pulse.Mqtt.Packets.MqttPublishPacket! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 Pulse.Mqtt.Testing.PulseMqttTestBroker.PulseMqttTestBroker() -> void
+Pulse.Mqtt.Testing.PulseMqttTestBroker.ResumeSessions.get -> bool
+Pulse.Mqtt.Testing.PulseMqttTestBroker.ResumeSessions.init -> void
