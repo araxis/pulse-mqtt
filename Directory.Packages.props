@@ -33,6 +33,12 @@
 
     <!-- Durable storage add-on -->
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+    <!-- Pin the native SQLite forward off the 2.1.11 that Microsoft.Data.Sqlite pulls transitively:
+         that build bundles SQLite < 3.50.2, vulnerable to CVE-2025-6965 (GHSA-2m69-gcr7-jv3q). 3.50.3
+         bundles a patched SQLite; the 2.1.11 managed provider P/Invokes the stable SQLite C API, so the
+         newer native binary is a drop-in. Transitive pinning (enabled above) applies it without a direct
+         reference. Drop this once Microsoft.Data.Sqlite ships a build on the patched native. -->
+    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
 
     <!-- Serialization add-on -->
     <PackageVersion Include="MessagePack" Version="3.1.7" />
