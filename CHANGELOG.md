@@ -8,6 +8,10 @@ resume, MQTT 5 §4.9 receive-maximum lifetime, packet-id reuse, re-authenticatio
 persistence ordering), a long-run cancellation-token registration leak closed, plus TLS interop and an
 expanded cross-broker matrix. Every fix ships with a regression test verified to fail without it.
 
+- Security: the durable SQLite storage add-on now ships a patched native SQLite. `Microsoft.Data.Sqlite`
+  pulls `SQLitePCLRaw.lib.e_sqlite3` 2.1.11 transitively, which bundles SQLite < 3.50.2 — vulnerable to
+  CVE-2025-6965 (GHSA-2m69-gcr7-jv3q, high severity). The native lib is pinned forward to 3.50.3 (SQLite
+  3.50.3); the managed provider is unchanged.
 - Durable in-flight persistence ordering: the persistent-session in-flight tracker built each snapshot
   under its lock but ran the async persist outside it, so two concurrent mutations could reach a durable
   store (the SQLite session store) out of order and let an older snapshot overwrite a newer one —
