@@ -1,6 +1,12 @@
 # Changelog
 
-## 1.1.0 (unreleased)
+## 1.1.0
+
+A correctness and long-run stability release, with no breaking API changes. An adversarial code audit
+and an extended chaos soak hardened the resilience layer: five protocol/concurrency bugs fixed (session
+resume, MQTT 5 §4.9 receive-maximum lifetime, packet-id reuse, re-authentication, and durable in-flight
+persistence ordering), a long-run cancellation-token registration leak closed, plus TLS interop and an
+expanded cross-broker matrix. Every fix ships with a regression test verified to fail without it.
 
 - Durable in-flight persistence ordering: the persistent-session in-flight tracker built each snapshot
   under its lock but ran the async persist outside it, so two concurrent mutations could reach a durable
