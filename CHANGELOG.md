@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.2.0 (unreleased)
+
 ## 2.1.0
 
 - Added endpoint-style `OnAsync(...)` fluent routing helpers. They subscribe the route's broker
