@@ -93,6 +93,7 @@ jobs:
               Pulse.Mqtt.Serialization.Json \
               Pulse.Mqtt.Serialization.MessagePack \
               Pulse.Mqtt.Resilience.Polly \
+              Pulse.Mqtt.Storage.LiteDB \
               Pulse.Mqtt.Storage.Sqlite \
               Pulse.Mqtt.Transport.WebSocket \
               Pulse.Mqtt.Testing; do
