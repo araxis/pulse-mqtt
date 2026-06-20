@@ -659,6 +659,7 @@ Pulse.Mqtt.Routing.MqttRouteTemplate
 Pulse.Mqtt.Routing.MqttRouteTemplate.ParameterNames.get -> System.Collections.Generic.IReadOnlyList<string!>!
 Pulse.Mqtt.Routing.MqttRouteTemplate.Template.get -> string!
 Pulse.Mqtt.Routing.MqttRouteTemplate.TopicFilter.get -> string!
+Pulse.Mqtt.Routing.MqttRouteTemplate.ToTopicFilter(Pulse.Mqtt.MqttQualityOfService maximumQualityOfService = Pulse.Mqtt.MqttQualityOfService.AtMostOnce, bool noLocal = false, bool retainAsPublished = false, Pulse.Mqtt.MqttRetainHandling retainHandling = Pulse.Mqtt.MqttRetainHandling.SendAtSubscribe) -> Pulse.Mqtt.MqttTopicFilter!
 Pulse.Mqtt.Routing.MqttRouteTemplate.TryMatch(string! topic, out Pulse.Mqtt.Routing.MqttRouteValues values) -> bool
 Pulse.Mqtt.Routing.MqttRouteValues
 Pulse.Mqtt.Routing.MqttRouteValues.Count.get -> int
