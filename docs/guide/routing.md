@@ -39,7 +39,7 @@ queue/concurrency settings:
 
 ```csharp
 var template = MqttRouteTemplate.Parse("sensors/{deviceId}/temp");
-await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+await client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, token);
 
 using IDisposable route = client.RegisterRoute(
     template,
@@ -54,8 +54,9 @@ using IDisposable route = client.RegisterRoute(
 registration removes the local handler only; use `UnsubscribeAsync` when the broker should stop
 delivering that filter.
 
-`MqttRouteTemplate.ToTopicFilter(...)` keeps the subscription side readable while still making
-MQTT 5 subscription options explicit:
+`SubscribeAsync(template, qos, token)` is the concise form for a route-template broker
+subscription. Use `MqttRouteTemplate.ToTopicFilter(...)` when MQTT 5 subscription options need
+to be explicit:
 
 ```csharp
 await client.SubscribeAsync([
@@ -70,7 +71,7 @@ Typed handlers deserialize through the configured [serializer](./typed-messaging
 
 ```csharp
 var template = MqttRouteTemplate.Parse("sensors/{deviceId}/telemetry");
-await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+await client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, token);
 
 using var route = client.RegisterRoute<TelemetryReading>(
     template,
@@ -83,7 +84,7 @@ Prefer pull over callbacks where it reads better:
 
 ```csharp
 var template = MqttRouteTemplate.Parse("sensors/{deviceId}/temp");
-await client.SubscribeAsync([template.ToTopicFilter()], token);
+await client.SubscribeAsync(template, token);
 
 await using MqttRouteStream stream = client.OpenRouteStream(template);
 await foreach (MqttRoutedMessage routed in stream.ReadAllAsync(token))

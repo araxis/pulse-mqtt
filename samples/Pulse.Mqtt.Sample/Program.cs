@@ -66,7 +66,7 @@ await using var telemetryRoute = await client.OnAsync<TelemetryReading>(
 // 2. Request/response: this client also acts as the responder for device status requests.
 var started = DateTimeOffset.UtcNow;
 var statusTemplate = MqttRouteTemplate.Parse("devices/{deviceId}/status");
-await client.SubscribeAsync([statusTemplate.ToTopicFilter(MqttQualityOfService.AtLeastOnce)]);
+await client.SubscribeAsync(statusTemplate, MqttQualityOfService.AtLeastOnce);
 using var statusResponder = client.RegisterRequestHandler<StatusRequest, StatusReply>(
     statusTemplate,
     (request, message, _) =>
