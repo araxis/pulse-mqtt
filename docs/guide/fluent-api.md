@@ -60,19 +60,19 @@ the payload format stamped), or raw bytes. `WithContentType`, `WithResponseTopic
 ## Routing
 
 ```csharp
-using var route = await client.Route("sensors/{deviceId}/temp")
+var route = client.Route("sensors/{deviceId}/temp");
+await client.SubscribeAsync([route.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
+
+using var registration = route
     .WithQueue(capacity: 128, RouteOverflow.DropOldest)
     .WithConcurrency(4)
-    .WithSubscriptionQualityOfService(MqttQualityOfService.AtLeastOnce)
-    .WithNoLocal()
-    .WithRetainHandling(MqttRetainHandling.DoNotSendAtSubscribe)
-    .HandleAsync<TelemetryReading>((reading, message, ct) =>
+    .Handle<TelemetryReading>((reading, message, ct) =>
         Handle(reading, message.Values["deviceId"]));
 ```
 
-Terminals: `HandleAsync` (raw handler), `HandleAsync<T>` (typed), and `StreamAsync` for the
-`await foreach` form. Each registers the route and subscribes its filter, exactly like
-`OnAsync`/`OpenStreamAsync`; everything from [Routing](./routing) — bounded queues, overflow,
+Terminals: `Handle` (raw handler), `Handle<T>` (typed), and `Stream` for the `await foreach`
+form. The builder registers only local routing. Use `ToTopicFilter(...)` with `SubscribeAsync`
+when broker delivery is needed; everything from [Routing](./routing) — bounded queues, overflow,
 fault isolation — applies unchanged.
 
 ## Request and response
@@ -102,5 +102,5 @@ Correlation, the private reply subscription, and timeouts behave exactly as in
 - Each terminal delegates to the corresponding client method, so behavior, diagnostics, and
   outcomes are identical between the fluent and direct forms.
 - The route and request builders reuse the options records (`MqttRouteOptions`,
-  `MqttRequestOptions`); the client builder produces a regular `ResilientMqttClientOptions`.
+  `MqttRequestOptions`); subscription options stay on `MqttTopicFilter`.
   There is no second configuration model to learn — the DSL is shorthand, not a dialect.

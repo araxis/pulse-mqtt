@@ -3,6 +3,7 @@ using Pulse.Mqtt;
 using Pulse.Mqtt.Client;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Resilience;
+using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Serialization.Json;
 using Pulse.Mqtt.Testing;
 
@@ -23,11 +24,13 @@ while (client.State != ConnectionState.Connected)
 }
 
 var received = new TaskCompletionSource<SmokeReading>(TaskCreationOptions.RunContinuationsAsynchronously);
-await client.OnAsync<SmokeReading>("smoke/{id}", (value, _, _) =>
+var template = MqttRouteTemplate.Parse("smoke/{id}");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], timeout.Token);
+using var route = client.RegisterRoute<SmokeReading>(template, (value, _, _) =>
 {
     received.TrySetResult(value);
     return ValueTask.CompletedTask;
-}, cancellationToken: timeout.Token);
+});
 
 var outcome = await client.PublishAsync("smoke/1", new SmokeReading("aot", 1.0), MqttQualityOfService.AtLeastOnce, cancellationToken: timeout.Token);
 var reading = await received.Task.WaitAsync(TimeSpan.FromSeconds(10));

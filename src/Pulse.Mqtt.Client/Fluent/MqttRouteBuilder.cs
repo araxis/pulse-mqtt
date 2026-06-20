@@ -1,32 +1,42 @@
-using Pulse.Mqtt.Protocol;
+using Pulse.Mqtt.Routing;
 
 namespace Pulse.Mqtt.Client;
 
 /// <summary>
 /// Fluent registration of one route. Created by
 /// <see cref="ResilientMqttClientFluentExtensions.Route"/>; finished with a handler or stream
-/// terminal, which registers the route and subscribes its filter.
+/// terminal, which registers a local route. Subscribe the matching broker filter separately.
 /// </summary>
 /// <example>
 /// <code>
-/// using var route = await client.Route("sensors/{deviceId}/temp")
+/// var template = client.Route("sensors/{deviceId}/temp");
+/// await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+/// using var route = template
 ///     .WithConcurrency(4)
 ///     .WithQueue(capacity: 128, overflow: RouteOverflow.DropOldest)
-///     .HandleAsync&lt;TelemetryReading&gt;((reading, message, ct) =>
+///     .Handle&lt;TelemetryReading&gt;((reading, message, ct) =>
 ///         Handle(reading, message.Values["deviceId"]));
 /// </code>
 /// </example>
 public sealed class MqttRouteBuilder
 {
     private readonly ResilientMqttClient _client;
-    private readonly string _template;
+    private readonly MqttRouteTemplate _template;
     private MqttRouteOptions _options = new();
 
     internal MqttRouteBuilder(ResilientMqttClient client, string template)
     {
         _client = client;
-        _template = template;
+        _template = MqttRouteTemplate.Parse(template);
     }
+
+    /// <summary>Creates the broker subscription filter that delivers messages matching this route.</summary>
+    public MqttTopicFilter ToTopicFilter(
+        MqttQualityOfService maximumQualityOfService = MqttQualityOfService.AtMostOnce,
+        bool noLocal = false,
+        bool retainAsPublished = false,
+        MqttRetainHandling retainHandling = MqttRetainHandling.SendAtSubscribe) =>
+        _template.ToTopicFilter(maximumQualityOfService, noLocal, retainAsPublished, retainHandling);
 
     /// <summary>Bounds the route's queue and picks its overflow behavior.</summary>
     public MqttRouteBuilder WithQueue(int capacity, RouteOverflow overflow = RouteOverflow.Wait)
@@ -42,44 +52,16 @@ public sealed class MqttRouteBuilder
         return this;
     }
 
-    /// <summary>The QoS requested when the route's filter is subscribed.</summary>
-    public MqttRouteBuilder WithSubscriptionQualityOfService(MqttQualityOfService qualityOfService)
-    {
-        _options = _options with { SubscriptionQualityOfService = qualityOfService };
-        return this;
-    }
+    /// <summary>Registers a raw local handler. Dispose the result to remove the route.</summary>
+    public IDisposable Handle(MqttRouteHandler handler) =>
+        _client.RegisterRoute(_template, handler, _options);
 
-    /// <summary>Prevents the broker from echoing this client's own publications back to the route.</summary>
-    public MqttRouteBuilder WithNoLocal(bool noLocal = true)
-    {
-        _options = _options with { NoLocal = noLocal };
-        return this;
-    }
-
-    /// <summary>Preserves the original RETAIN flag on messages forwarded to the route.</summary>
-    public MqttRouteBuilder WithRetainAsPublished(bool retainAsPublished = true)
-    {
-        _options = _options with { RetainAsPublished = retainAsPublished };
-        return this;
-    }
-
-    /// <summary>Controls when retained messages are sent for the route's subscription.</summary>
-    public MqttRouteBuilder WithRetainHandling(MqttRetainHandling retainHandling)
-    {
-        _options = _options with { RetainHandling = retainHandling };
-        return this;
-    }
-
-    /// <summary>Registers a raw handler and subscribes the filter. Dispose the result to remove the route.</summary>
-    public Task<IDisposable> HandleAsync(MqttRouteHandler handler, CancellationToken cancellationToken = default) =>
-        _client.OnAsync(_template, handler, _options, cancellationToken);
-
-    /// <summary>Registers a typed handler and subscribes the filter. Dispose the result to remove the route.</summary>
+    /// <summary>Registers a typed local handler. Dispose the result to remove the route.</summary>
     /// <exception cref="InvalidOperationException">No serializer is configured.</exception>
-    public Task<IDisposable> HandleAsync<T>(MqttTypedRouteHandler<T> handler, CancellationToken cancellationToken = default) =>
-        _client.OnAsync(_template, handler, _options, cancellationToken);
+    public IDisposable Handle<T>(MqttTypedRouteHandler<T> handler) =>
+        _client.RegisterRoute(_template, handler, _options);
 
-    /// <summary>Opens an <c>await foreach</c>-able stream for the route and subscribes the filter.</summary>
-    public Task<MqttRouteStream> StreamAsync(CancellationToken cancellationToken = default) =>
-        _client.OpenStreamAsync(_template, _options, cancellationToken);
+    /// <summary>Opens an <c>await foreach</c>-able stream for the local route.</summary>
+    public MqttRouteStream Stream() =>
+        _client.OpenRouteStream(_template, _options);
 }

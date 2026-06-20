@@ -1,6 +1,7 @@
 using System.Text;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Resilience;
+using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Testing;
 using Shouldly;
 using Xunit;
@@ -38,12 +39,15 @@ public sealed class TestBrokerHarnessTests
         await client.StartAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
 
+        var template = MqttRouteTemplate.Parse("sensors/{id}");
+        await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], timeout.Token);
+
         var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await client.OnAsync("sensors/{id}", (message, values, _) =>
+        using var registration = client.RegisterRoute(template, (message, values, _) =>
         {
             received.TrySetResult($"{values["id"]}:{Encoding.UTF8.GetString(message.Payload.Span)}");
             return ValueTask.CompletedTask;
-        }, cancellationToken: timeout.Token);
+        });
 
         var outcome = await client.PublishAsync(
             new MqttPublishPacket
@@ -71,7 +75,9 @@ public sealed class TestBrokerHarnessTests
         await WaitForStateAsync(subscriber, ConnectionState.Connected, timeout.Token);
         await WaitForStateAsync(publisher, ConnectionState.Connected, timeout.Token);
 
-        await using var stream = await subscriber.OpenStreamAsync("jobs/{kind}", cancellationToken: timeout.Token);
+        var template = MqttRouteTemplate.Parse("jobs/{kind}");
+        await subscriber.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], timeout.Token);
+        await using var stream = subscriber.OpenRouteStream(template);
 
         await publisher.PublishAsync(
             new MqttPublishPacket
@@ -97,7 +103,9 @@ public sealed class TestBrokerHarnessTests
         await client.StartAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
 
-        await using var stream = await client.OpenStreamAsync("alerts/#", cancellationToken: timeout.Token);
+        var template = MqttRouteTemplate.Parse("alerts/#");
+        await client.SubscribeAsync([template.ToTopicFilter()], timeout.Token);
+        await using var stream = client.OpenRouteStream(template);
         await broker.PublishAsync(new MqttPublishPacket { Topic = "alerts/temp", Payload = "hot"u8.ToArray() }, timeout.Token);
 
         var routed = await stream.Reader.ReadAsync(timeout.Token);

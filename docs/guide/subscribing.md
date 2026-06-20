@@ -1,8 +1,8 @@
 # Subscribing
 
-Two levels are available. **[Routing](./routing)** — templates, handlers, streams — is what
-most applications want and is covered in its own guide. This page covers the subscription
-machinery underneath.
+Subscribing is the broker-delivery contract: it tells the MQTT broker which filters to send to
+this client. **[Routing](./routing)** is the local-dispatch contract layered on top: templates,
+handlers, and streams for messages the broker already delivers.
 
 ## Subscribe and unsubscribe
 

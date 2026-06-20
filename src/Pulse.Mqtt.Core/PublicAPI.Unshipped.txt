@@ -1,1 +1,2 @@
 #nullable enable
+Pulse.Mqtt.Routing.MqttRouteTemplate.ToTopicFilter(Pulse.Mqtt.MqttQualityOfService maximumQualityOfService = Pulse.Mqtt.MqttQualityOfService.AtMostOnce, bool noLocal = false, bool retainAsPublished = false, Pulse.Mqtt.MqttRetainHandling retainHandling = Pulse.Mqtt.MqttRetainHandling.SendAtSubscribe) -> Pulse.Mqtt.MqttTopicFilter!

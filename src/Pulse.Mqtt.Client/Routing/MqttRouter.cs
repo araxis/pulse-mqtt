@@ -52,8 +52,12 @@ public sealed class MqttRouter : IAsyncDisposable
         _dispatch = Task.Run(() => DispatchAsync(_lifetime.Token), CancellationToken.None);
     }
 
-    /// <summary>Registers a handler for a route template. Dispose the registration to remove it.</summary>
-    public IDisposable On(MqttRouteTemplate template, MqttRouteHandler handler, MqttRouteOptions? options = null)
+    /// <summary>Registers a local handler for a route template. Dispose the registration to remove it.</summary>
+    public IDisposable RegisterRoute(MqttRouteTemplate template, MqttRouteHandler handler) =>
+        RegisterRoute(template, handler, options: null);
+
+    /// <summary>Registers a local handler for a route template. Dispose the registration to remove it.</summary>
+    public IDisposable RegisterRoute(MqttRouteTemplate template, MqttRouteHandler handler, MqttRouteOptions? options)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(handler);
@@ -62,12 +66,20 @@ public sealed class MqttRouter : IAsyncDisposable
         return AddRoute(new Route(this, template, handler, options ?? new MqttRouteOptions(), _lifetime.Token));
     }
 
-    /// <summary>Registers a handler for a route template given as text.</summary>
-    public IDisposable On(string template, MqttRouteHandler handler, MqttRouteOptions? options = null) =>
-        On(MqttRouteTemplate.Parse(template), handler, options);
+    /// <summary>Registers a local handler for a route template given as text.</summary>
+    public IDisposable RegisterRoute(string template, MqttRouteHandler handler) =>
+        RegisterRoute(MqttRouteTemplate.Parse(template), handler, options: null);
+
+    /// <summary>Registers a local handler for a route template given as text.</summary>
+    public IDisposable RegisterRoute(string template, MqttRouteHandler handler, MqttRouteOptions? options) =>
+        RegisterRoute(MqttRouteTemplate.Parse(template), handler, options);
 
     /// <summary>Opens a consumable stream for a route template instead of registering a handler.</summary>
-    public MqttRouteStream OpenStream(MqttRouteTemplate template, MqttRouteOptions? options = null)
+    public MqttRouteStream OpenRouteStream(MqttRouteTemplate template) =>
+        OpenRouteStream(template, options: null);
+
+    /// <summary>Opens a consumable stream for a route template instead of registering a handler.</summary>
+    public MqttRouteStream OpenRouteStream(MqttRouteTemplate template, MqttRouteOptions? options)
     {
         ArgumentNullException.ThrowIfNull(template);
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -78,8 +90,12 @@ public sealed class MqttRouter : IAsyncDisposable
     }
 
     /// <summary>Opens a consumable stream for a route template given as text.</summary>
-    public MqttRouteStream OpenStream(string template, MqttRouteOptions? options = null) =>
-        OpenStream(MqttRouteTemplate.Parse(template), options);
+    public MqttRouteStream OpenRouteStream(string template) =>
+        OpenRouteStream(MqttRouteTemplate.Parse(template), options: null);
+
+    /// <summary>Opens a consumable stream for a route template given as text.</summary>
+    public MqttRouteStream OpenRouteStream(string template, MqttRouteOptions? options) =>
+        OpenRouteStream(MqttRouteTemplate.Parse(template), options);
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()

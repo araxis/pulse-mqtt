@@ -26,7 +26,7 @@ public sealed class ObservabilityCompletionTests
 
         Activity? handlerActivity = null;
         var handled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        router.On("metrics/{id}", (_, _, _) =>
+        router.RegisterRoute("metrics/{id}", (_, _, _) =>
         {
             handlerActivity = Activity.Current;
             handled.TrySetResult();
@@ -54,7 +54,7 @@ public sealed class ObservabilityCompletionTests
 
         Activity? handlerActivity = null;
         var handled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        router.On("trace/{id}", (_, _, _) =>
+        router.RegisterRoute("trace/{id}", (_, _, _) =>
         {
             handlerActivity = Activity.Current;
             handled.TrySetResult();
@@ -92,7 +92,7 @@ public sealed class ObservabilityCompletionTests
         // child of this unrelated registration-time span.
         using var ambient = PulseMqttDiagnostics.ActivitySource.StartActivity("ambient");
         ambient.ShouldNotBeNull();
-        router.On("noparent/{id}", (_, _, _) =>
+        router.RegisterRoute("noparent/{id}", (_, _, _) =>
         {
             handlerActivity = Activity.Current;
             handled.TrySetResult();

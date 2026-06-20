@@ -374,46 +374,70 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// Registers a handler for a route template (for example <c>sensors/{deviceId}/temp</c>) and
-    /// subscribes to the template's topic filter. Dispose the registration to remove the route;
-    /// the subscription stays until <see cref="UnsubscribeAsync"/>.
+    /// Registers a local handler for a route template (for example <c>sensors/{deviceId}/temp</c>).
+    /// Subscribe the matching broker filter separately with <see cref="SubscribeAsync"/>.
     /// </summary>
-    public async Task<IDisposable> OnAsync(
+    public IDisposable RegisterRoute(
+        MqttRouteTemplate template,
+        MqttRouteHandler handler) =>
+        RegisterRoute(template, handler, options: null);
+
+    /// <summary>
+    /// Registers a local handler for a route template (for example <c>sensors/{deviceId}/temp</c>).
+    /// Subscribe the matching broker filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public IDisposable RegisterRoute(
+        MqttRouteTemplate template,
+        MqttRouteHandler handler,
+        MqttRouteOptions? options) =>
+        Router.RegisterRoute(template, handler, options);
+
+    /// <summary>
+    /// Registers a local handler for a route template given as text. Subscribe the matching broker
+    /// filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public IDisposable RegisterRoute(
+        string template,
+        MqttRouteHandler handler) =>
+        RegisterRoute(MqttRouteTemplate.Parse(template), handler, options: null);
+
+    /// <summary>
+    /// Registers a local handler for a route template given as text. Subscribe the matching broker
+    /// filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public IDisposable RegisterRoute(
         string template,
         MqttRouteHandler handler,
-        MqttRouteOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        var parsed = MqttRouteTemplate.Parse(template);
-        var registration = Router.On(parsed, handler, options);
-        await SubscribeToTemplateAsync(parsed, options, cancellationToken).ConfigureAwait(false);
-        return registration;
-    }
+        MqttRouteOptions? options) =>
+        RegisterRoute(MqttRouteTemplate.Parse(template), handler, options);
 
-    /// <summary>Opens an <c>await foreach</c>-able stream for a route template and subscribes to its filter.</summary>
-    public async Task<MqttRouteStream> OpenStreamAsync(
-        string template,
-        MqttRouteOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        var parsed = MqttRouteTemplate.Parse(template);
-        var stream = Router.OpenStream(parsed, options);
-        await SubscribeToTemplateAsync(parsed, options, cancellationToken).ConfigureAwait(false);
-        return stream;
-    }
+    /// <summary>
+    /// Opens an <c>await foreach</c>-able stream for a local route template. Subscribe the matching
+    /// broker filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public MqttRouteStream OpenRouteStream(MqttRouteTemplate template) =>
+        OpenRouteStream(template, options: null);
 
-    private Task SubscribeToTemplateAsync(MqttRouteTemplate template, MqttRouteOptions? options, CancellationToken cancellationToken)
-    {
-        var routeOptions = options ?? new MqttRouteOptions();
-        var filter = new MqttTopicFilter(template.TopicFilter)
-        {
-            MaximumQualityOfService = routeOptions.SubscriptionQualityOfService,
-            NoLocal = routeOptions.NoLocal,
-            RetainAsPublished = routeOptions.RetainAsPublished,
-            RetainHandling = routeOptions.RetainHandling,
-        };
-        return SubscribeAsync([filter], cancellationToken);
-    }
+    /// <summary>
+    /// Opens an <c>await foreach</c>-able stream for a local route template. Subscribe the matching
+    /// broker filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public MqttRouteStream OpenRouteStream(MqttRouteTemplate template, MqttRouteOptions? options) =>
+        Router.OpenRouteStream(template, options);
+
+    /// <summary>
+    /// Opens an <c>await foreach</c>-able stream for a local route template given as text. Subscribe
+    /// the matching broker filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public MqttRouteStream OpenRouteStream(string template) =>
+        OpenRouteStream(MqttRouteTemplate.Parse(template), options: null);
+
+    /// <summary>
+    /// Opens an <c>await foreach</c>-able stream for a local route template given as text. Subscribe
+    /// the matching broker filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public MqttRouteStream OpenRouteStream(string template, MqttRouteOptions? options) =>
+        OpenRouteStream(MqttRouteTemplate.Parse(template), options);
 
     // Applies subscribe/unsubscribe changes made while offline. On a fresh session the lifecycle has
     // already replayed the full stored set (which contains the offline additions, and excludes the
@@ -475,22 +499,53 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// <see cref="MqttRouter.HandlerFaulted"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException">No serializer is configured.</exception>
-    public Task<IDisposable> OnAsync<T>(
-        string template,
+    public IDisposable RegisterRoute<T>(
+        MqttRouteTemplate template,
+        MqttTypedRouteHandler<T> handler) =>
+        RegisterRoute(template, handler, options: null);
+
+    /// <summary>
+    /// Registers a typed handler for a route template: payloads are deserialized with the
+    /// configured serializer before the handler runs. Deserialization failures surface through
+    /// <see cref="MqttRouter.HandlerFaulted"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No serializer is configured.</exception>
+    public IDisposable RegisterRoute<T>(
+        MqttRouteTemplate template,
         MqttTypedRouteHandler<T> handler,
-        MqttRouteOptions? options = null,
-        CancellationToken cancellationToken = default)
+        MqttRouteOptions? options)
     {
+        ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(handler);
         var serializer = SerializerOrThrow();
 
-        return OnAsync(
+        return RegisterRoute(
             template,
             (message, values, token) =>
                 handler(serializer.Deserialize<T>(message.Payload), new MqttRoutedMessage(message, values), token),
-            options,
-            cancellationToken);
+            options);
     }
+
+    /// <summary>
+    /// Registers a typed local handler for a route template given as text. Payloads are deserialized
+    /// with the configured serializer before the handler runs.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No serializer is configured.</exception>
+    public IDisposable RegisterRoute<T>(
+        string template,
+        MqttTypedRouteHandler<T> handler) =>
+        RegisterRoute(MqttRouteTemplate.Parse(template), handler, options: null);
+
+    /// <summary>
+    /// Registers a typed local handler for a route template given as text. Payloads are deserialized
+    /// with the configured serializer before the handler runs.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No serializer is configured.</exception>
+    public IDisposable RegisterRoute<T>(
+        string template,
+        MqttTypedRouteHandler<T> handler,
+        MqttRouteOptions? options) =>
+        RegisterRoute(MqttRouteTemplate.Parse(template), handler, options);
 
     /// <summary>
     /// Sends a request and awaits the matching response. The client assigns the response topic
@@ -574,7 +629,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// publishes the end-of-stream marker, the idle timeout elapses between responses, or the
     /// enumeration is cancelled. The client assigns the response topic and correlation data; the
     /// responder publishes each answer to the request's response topic (see
-    /// <see cref="OnRequestStreamAsync{TRequest, TResponse}"/>). Backpressure is bounded: a slow
+    /// <c>RegisterRequestStreamHandler</c>). Backpressure is bounded: a slow
     /// consumer throttles delivery rather than buffering without limit.
     /// </summary>
     /// <exception cref="MqttException">The client is offline, or no response arrived within the idle timeout.</exception>
@@ -694,16 +749,26 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// responses, every one published to the request's response topic with its correlation echoed,
     /// followed by the end-of-stream marker. Requests without a response topic are ignored.
     /// </summary>
-    public Task<IDisposable> OnRequestStreamAsync<TRequest, TResponse>(
-        string template,
+    public IDisposable RegisterRequestStreamHandler<TRequest, TResponse>(
+        MqttRouteTemplate template,
+        Func<TRequest, MqttRoutedMessage, CancellationToken, IAsyncEnumerable<TResponse>> handler) =>
+        RegisterRequestStreamHandler<TRequest, TResponse>(template, handler, options: null);
+
+    /// <summary>
+    /// Registers a typed streaming responder: each request's handler yields a sequence of
+    /// responses, every one published to the request's response topic with its correlation echoed,
+    /// followed by the end-of-stream marker. Requests without a response topic are ignored.
+    /// </summary>
+    public IDisposable RegisterRequestStreamHandler<TRequest, TResponse>(
+        MqttRouteTemplate template,
         Func<TRequest, MqttRoutedMessage, CancellationToken, IAsyncEnumerable<TResponse>> handler,
-        MqttRouteOptions? options = null,
-        CancellationToken cancellationToken = default)
+        MqttRouteOptions? options)
     {
+        ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(handler);
         var serializer = SerializerOrThrow();
 
-        return OnAsync(
+        return RegisterRoute(
             template,
             async (message, values, token) =>
             {
@@ -732,8 +797,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                     EndOfStreamMarker(responseTopic, message.CorrelationData, message.QualityOfService),
                     token).ConfigureAwait(false);
             },
-            options,
-            cancellationToken);
+            options);
     }
 
     /// <summary>
@@ -741,16 +805,46 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// and the response published to the request's response topic with its correlation data
     /// echoed. Requests without a response topic are ignored.
     /// </summary>
-    public Task<IDisposable> OnRequestAsync<TRequest, TResponse>(
+    public IDisposable RegisterRequestStreamHandler<TRequest, TResponse>(
         string template,
+        Func<TRequest, MqttRoutedMessage, CancellationToken, IAsyncEnumerable<TResponse>> handler) =>
+        RegisterRequestStreamHandler<TRequest, TResponse>(MqttRouteTemplate.Parse(template), handler, options: null);
+
+    /// <summary>
+    /// Registers a typed local streaming responder route given as text. Subscribe the request
+    /// filter separately.
+    /// </summary>
+    public IDisposable RegisterRequestStreamHandler<TRequest, TResponse>(
+        string template,
+        Func<TRequest, MqttRoutedMessage, CancellationToken, IAsyncEnumerable<TResponse>> handler,
+        MqttRouteOptions? options) =>
+        RegisterRequestStreamHandler(MqttRouteTemplate.Parse(template), handler, options);
+
+    /// <summary>
+    /// Registers a typed local responder route: each request is deserialized, handled, and the
+    /// response published to the request's response topic with its correlation data echoed.
+    /// Requests without a response topic are ignored. Subscribe the request filter separately.
+    /// </summary>
+    public IDisposable RegisterRequestHandler<TRequest, TResponse>(
+        MqttRouteTemplate template,
+        Func<TRequest, MqttRoutedMessage, CancellationToken, ValueTask<TResponse>> handler) =>
+        RegisterRequestHandler<TRequest, TResponse>(template, handler, options: null);
+
+    /// <summary>
+    /// Registers a typed local responder route: each request is deserialized, handled, and the
+    /// response published to the request's response topic with its correlation data echoed.
+    /// Requests without a response topic are ignored. Subscribe the request filter separately.
+    /// </summary>
+    public IDisposable RegisterRequestHandler<TRequest, TResponse>(
+        MqttRouteTemplate template,
         Func<TRequest, MqttRoutedMessage, CancellationToken, ValueTask<TResponse>> handler,
-        MqttRouteOptions? options = null,
-        CancellationToken cancellationToken = default)
+        MqttRouteOptions? options)
     {
+        ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(handler);
         var serializer = SerializerOrThrow();
 
-        return OnAsync(
+        return RegisterRoute(
             template,
             async (message, values, token) =>
             {
@@ -773,38 +867,60 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 };
                 await PublishAsync(reply, token).ConfigureAwait(false);
             },
-            options,
-            cancellationToken);
+            options);
     }
+
+    /// <summary>
+    /// Registers a typed local responder route given as text. Subscribe the request filter separately.
+    /// </summary>
+    public IDisposable RegisterRequestHandler<TRequest, TResponse>(
+        string template,
+        Func<TRequest, MqttRoutedMessage, CancellationToken, ValueTask<TResponse>> handler) =>
+        RegisterRequestHandler<TRequest, TResponse>(MqttRouteTemplate.Parse(template), handler, options: null);
+
+    /// <summary>
+    /// Registers a typed local responder route given as text. Subscribe the request filter separately.
+    /// </summary>
+    public IDisposable RegisterRequestHandler<TRequest, TResponse>(
+        string template,
+        Func<TRequest, MqttRoutedMessage, CancellationToken, ValueTask<TResponse>> handler,
+        MqttRouteOptions? options) =>
+        RegisterRequestHandler(MqttRouteTemplate.Parse(template), handler, options);
 
     private Task EnsureResponseRouteAsync(CancellationToken cancellationToken)
     {
         lock (_rpcGate)
         {
-            _rpcRoute ??= OnAsync(
-                $"pulse-rpc/{_clientId}/{{correlation}}",
-                (message, values, _) =>
-                {
-                    var correlation = values["correlation"];
-                    if (_pendingRequests.TryGetValue(correlation, out var pending))
-                    {
-                        pending.TrySetResult(message);
-                    }
-                    else if (_pendingStreams.TryGetValue(correlation, out var sink) && !sink.Writer.TryWrite(message))
-                    {
-                        // Non-blocking: never stall the shared dispatch loop on a slow stream
-                        // consumer. A full buffer means the consumer fell behind its capacity, so
-                        // fail that one stream explicitly rather than block the client or drop
-                        // silently.
-                        sink.Overflowed = true;
-                        sink.Writer.TryComplete();
-                    }
-
-                    return ValueTask.CompletedTask;
-                },
-                cancellationToken: cancellationToken);
+            _rpcRoute ??= EnsureResponseRouteCoreAsync(cancellationToken);
             return _rpcRoute;
         }
+    }
+
+    private async Task EnsureResponseRouteCoreAsync(CancellationToken cancellationToken)
+    {
+        var template = MqttRouteTemplate.Parse($"pulse-rpc/{_clientId}/{{correlation}}");
+        await SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], cancellationToken).ConfigureAwait(false);
+        RegisterRoute(
+            template,
+            (message, values, _) =>
+            {
+                var correlation = values["correlation"];
+                if (_pendingRequests.TryGetValue(correlation, out var pending))
+                {
+                    pending.TrySetResult(message);
+                }
+                else if (_pendingStreams.TryGetValue(correlation, out var sink) && !sink.Writer.TryWrite(message))
+                {
+                    // Non-blocking: never stall the shared dispatch loop on a slow stream
+                    // consumer. A full buffer means the consumer fell behind its capacity, so
+                    // fail that one stream explicitly rather than block the client or drop
+                    // silently.
+                    sink.Overflowed = true;
+                    sink.Writer.TryComplete();
+                }
+
+                return ValueTask.CompletedTask;
+            });
     }
 
     internal IMqttSerializer SerializerOrThrow() =>

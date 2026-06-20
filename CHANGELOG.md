@@ -1,6 +1,31 @@
 # Changelog
 
-## 1.3.0 (unreleased)
+## 2.0.0
+
+- **Breaking:** split broker subscriptions from local routing. `SubscribeAsync` /
+  `UnsubscribeAsync` are now the only public APIs that change broker delivery. Local route
+  registration is synchronous and explicit through `RegisterRoute(...)`,
+  `OpenRouteStream(...)`, `RegisterRequestHandler(...)`, and
+  `RegisterRequestStreamHandler(...)`.
+- **Breaking:** removed the route APIs that mixed local dispatch with broker subscribe:
+  `OnAsync(...)`, `OpenStreamAsync(...)`, `OnRequestAsync(...)`, and
+  `OnRequestStreamAsync(...)`. Subscribe the route's broker filter first, then register the
+  route:
+
+  ```csharp
+  var template = MqttRouteTemplate.Parse("sensors/{deviceId}/telemetry");
+  await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+  using var route = client.RegisterRoute<TelemetryReading>(template, HandleReading);
+  ```
+
+- **Breaking:** `MqttRouteOptions` now describes local route delivery only (`Capacity`,
+  `Overflow`, `MaxConcurrency`). MQTT 5 subscription settings (`MaximumQualityOfService`,
+  `NoLocal`, `RetainAsPublished`, `RetainHandling`) stay on `MqttTopicFilter`.
+- **Breaking:** fluent route terminals are now synchronous local-route operations:
+  `Handle(...)`, `Handle<T>(...)`, and `Stream()`. The route builder exposes
+  `ToTopicFilter(...)` for the explicit `SubscribeAsync` step.
+- Added `MqttRouteTemplate.ToTopicFilter(...)` to make route-template subscriptions concise
+  without hiding broker subscription ownership.
 
 ## 1.2.0
 

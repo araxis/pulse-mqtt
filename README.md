@@ -65,12 +65,15 @@ await client.WaitUntilConnectedAsync(TimeSpan.FromSeconds(10), ct); // when read
 ### Route topics to handlers
 
 ```csharp
-await client.OnAsync("sensors/{deviceId}/temp", (message, values, ct) =>
+var template = MqttRouteTemplate.Parse("sensors/{deviceId}/temp");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
+
+using var route = client.RegisterRoute(template, (message, values, ct) =>
 {
     Console.WriteLine($"{values["deviceId"]}: {Encoding.UTF8.GetString(message.Payload.Span)}");
     return ValueTask.CompletedTask;
 });
-// Subscribes sensors/+/temp, captures {deviceId}, dispatches through a bounded per-route queue.
+// SubscribeAsync owns broker delivery; RegisterRoute owns local dispatch and captured values.
 ```
 
 ### Typed messaging
@@ -78,7 +81,9 @@ await client.OnAsync("sensors/{deviceId}/temp", (message, values, ct) =>
 ```csharp
 // options.Serializer = new JsonMqttSerializer(AppJsonContext.Default);
 await client.PublishAsync("telemetry/1", new Reading("dev-1", 21.5));            // stamps content type
-await client.OnAsync<Reading>("telemetry/{id}", (reading, msg, ct) => Handle(reading));
+var template = MqttRouteTemplate.Parse("telemetry/{id}");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
+using var route = client.RegisterRoute<Reading>(template, (reading, msg, ct) => Handle(reading));
 ```
 
 ### Request / response
@@ -87,7 +92,9 @@ await client.OnAsync<Reading>("telemetry/{id}", (reading, msg, ct) => Handle(rea
 var status = await client.RequestAsync<StatusQuery, StatusReply>("devices/7/status", new StatusQuery());
 // Response topic + correlation data managed for you; concurrent calls never cross.
 
-await client.OnRequestAsync<StatusQuery, StatusReply>("devices/{id}/status",
+var template = MqttRouteTemplate.Parse("devices/{id}/status");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
+using var responder = client.RegisterRequestHandler<StatusQuery, StatusReply>(template,
     (query, msg, ct) => ValueTask.FromResult(BuildStatus(msg.Values["id"])));
 ```
 
@@ -103,8 +110,10 @@ await using var client = await new PulseMqttClientBuilder()
 await client.Publish("telemetry/1").AtLeastOnce().WithRetain()
     .WithPayload(new Reading("dev-1", 21.5)).SendAsync(ct);
 
-using var route = await client.Route("sensors/{deviceId}/temp")
-    .WithConcurrency(4).HandleAsync<Reading>((reading, msg, ct) => Handle(reading));
+var route = client.Route("sensors/{deviceId}/temp");
+await client.SubscribeAsync([route.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
+using var registration = route
+    .WithConcurrency(4).Handle<Reading>((reading, msg, ct) => Handle(reading));
 ```
 
 ### Test without a broker

@@ -2,6 +2,7 @@ using System.Text;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Resilience;
+using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Testing;
 using Pulse.Mqtt.Transport;
 using Shouldly;
@@ -40,7 +41,9 @@ public sealed class OfflineSubscriptionReconcileTests
         await WaitForStateAsync(subscriber, s => s != ConnectionState.Connected, timeout.Token);
 
         // Subscribe while offline. It is stored but never sent; the resumed session must still learn it.
-        await using var stream = await subscriber.OpenStreamAsync(topic, cancellationToken: timeout.Token);
+        var template = MqttRouteTemplate.Parse(topic);
+        await subscriber.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], timeout.Token);
+        await using var stream = subscriber.OpenRouteStream(template);
 
         // Let it reconnect; the broker resumes the persistent session (SessionPresent = true).
         gated.AllowReconnect();

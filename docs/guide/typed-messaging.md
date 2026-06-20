@@ -38,8 +38,11 @@ The serializer stamps wire metadata so consumers (including non-.NET ones) know 
 ## Consume
 
 ```csharp
-using var route = await client.OnAsync<TelemetryReading>(
-    "sensors/{deviceId}/telemetry",
+var template = MqttRouteTemplate.Parse("sensors/{deviceId}/telemetry");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+
+using var route = client.RegisterRoute<TelemetryReading>(
+    template,
     (reading, message, token) =>
     {
         // reading       — the deserialized payload

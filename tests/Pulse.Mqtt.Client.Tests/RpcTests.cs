@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.Extensions.Time.Testing;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
+using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Serialization.Json;
 using Shouldly;
 using Xunit;
@@ -78,19 +79,21 @@ public sealed class RpcTests
         await using var _1 = client;
         var serializer = new JsonMqttSerializer(TestJsonContext.Default);
 
-        var onTask = client.OnRequestAsync<TelemetryReading, TelemetryReading>(
-            "svc/{op}",
-            (request, message, _) =>
-            {
-                message.Values["op"].ShouldBe("double");
-                return ValueTask.FromResult(request with { Value = request.Value * 2 });
-            },
-            cancellationToken: ct);
+        var template = MqttRouteTemplate.Parse("svc/{op}");
+        var subscribeTask = client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
         var subscribe = (await broker.ReadPacketAsync(ct)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
         subscribe.TopicFilters.ShouldHaveSingleItem().Topic.ShouldBe("svc/+");
         await broker.SendAsync(
             new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] }, ct);
-        await onTask;
+        await subscribeTask;
+
+        using var responder = client.RegisterRequestHandler<TelemetryReading, TelemetryReading>(
+            template,
+            (request, message, _) =>
+            {
+                message.Values["op"].ShouldBe("double");
+                return ValueTask.FromResult(request with { Value = request.Value * 2 });
+            });
 
         await broker.SendAsync(new MqttPublishPacket
         {
