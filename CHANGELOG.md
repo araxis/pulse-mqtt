@@ -1,6 +1,12 @@
 # Changelog
 
-## 2.4.0 (unreleased)
+## 2.4.0
+
+- Added acknowledged route streams. `OpenAcknowledgedRouteStream(...)` lets a route consumer
+  explicitly `AcknowledgeAsync` or `RejectAsync` an inbound QoS 1/2 publish after application
+  work, while the default raw and routed streams keep automatic acknowledgement. `CanReject`
+  reports whether the active MQTT delivery can carry a protocol-level negative acknowledgement;
+  acknowledged streams require lossless `RouteOverflow.Wait` queues.
 
 ## 2.3.0
 

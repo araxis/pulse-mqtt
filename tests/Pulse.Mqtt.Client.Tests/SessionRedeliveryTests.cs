@@ -208,6 +208,64 @@ public sealed class SessionRedeliveryTests
     }
 
     [Fact]
+    public async Task Acknowledged_inbound_qos2_redelivers_after_reconnect_before_consumer_ack()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = NewClient(factory);
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.StartAsync(timeout.Token);
+        var broker1 = await factory.NextBrokerAsync(timeout.Token);
+        await broker1.AcceptConnectionAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        await using var stream = client.OpenAcknowledgedRouteStream("in");
+        await broker1.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "in",
+                Payload = new byte[] { 1 },
+                QualityOfService = MqttQualityOfService.ExactlyOnce,
+                PacketIdentifier = 51,
+            },
+            timeout.Token);
+
+        var first = await stream.Reader.ReadAsync(timeout.Token);
+        first.Message.Topic.ShouldBe("in");
+        first.IsAcknowledged.ShouldBeFalse();
+
+        // The application has the message, but has not acknowledged it. A reconnect before PUBREC
+        // must not turn the packet id into durable duplicate-suppression state.
+        await broker1.DisposeAsync();
+
+        var broker2 = await factory.NextBrokerAsync(timeout.Token);
+        await broker2.AcceptConnectionAsync(timeout.Token, sessionPresent: true);
+        await broker2.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "in",
+                Payload = new byte[] { 1 },
+                QualityOfService = MqttQualityOfService.ExactlyOnce,
+                PacketIdentifier = 51,
+                Dup = true,
+            },
+            timeout.Token);
+
+        var second = await stream.Reader.ReadAsync(timeout.Token);
+        second.Message.Topic.ShouldBe("in");
+
+        await second.AcknowledgeAsync(timeout.Token);
+        (await broker2.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttPublishAckPacket>()
+            .PacketType.ShouldBe(MqttPacketType.PubRec);
+
+        await broker2.SendAsync(
+            new MqttPublishAckPacket { PacketType = MqttPacketType.PubRel, PacketIdentifier = 51 },
+            timeout.Token);
+        (await broker2.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttPublishAckPacket>()
+            .PacketType.ShouldBe(MqttPacketType.PubComp);
+    }
+
+    [Fact]
     public async Task A_swapped_session_store_persists_the_in_flight_state()
     {
         var store = new InMemorySessionStore();

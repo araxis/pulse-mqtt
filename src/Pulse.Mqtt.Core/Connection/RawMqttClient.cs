@@ -23,7 +23,9 @@ public sealed class RawMqttClient : IAsyncDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private readonly ConcurrentDictionary<ushort, TaskCompletionSource<MqttPacket>> _pending = new();
     private readonly MqttPacketIdAllocator _packetIds = new();
-    private readonly HashSet<ushort> _inboundQos2 = []; // touched only by the single-threaded pump
+    private readonly object _inboundQos2Gate = new();
+    private readonly HashSet<ushort> _inboundQos2 = [];
+    private readonly HashSet<ushort> _pendingAcknowledgedInboundQos2 = [];
 
     private MqttConnection? _connection;
     private SemaphoreSlim? _sendQuota;
@@ -72,6 +74,13 @@ public sealed class RawMqttClient : IAsyncDisposable
     /// anything; observe <see cref="Completion"/> instead.
     /// </summary>
     public Func<MqttPublishPacket, CancellationToken, ValueTask>? MessageSink { get; set; }
+
+    /// <summary>
+    /// An optional delivery sink that receives inbound application messages with an explicit
+    /// acknowledgement context. When set before connecting, QoS 1/2 inbound publishes are not
+    /// protocol-acknowledged until the context is completed by the sink or a downstream consumer.
+    /// </summary>
+    public Func<MqttInboundPublishContext, CancellationToken, ValueTask>? AcknowledgedMessageSink { get; set; }
 
     /// <summary>Completes when the inbound pump stops — the connection is over, however it ended.</summary>
     public Task Completion => _pump ?? Task.CompletedTask;
@@ -193,7 +202,7 @@ public sealed class RawMqttClient : IAsyncDisposable
                     var state = session.Snapshot();
                     foreach (var id in state.InboundExactlyOnce)
                     {
-                        _inboundQos2.Add(id);
+                        RestoreAcceptedInboundQos2(id);
                     }
 
                     foreach (var entry in state.Outbound)
@@ -815,7 +824,7 @@ public sealed class RawMqttClient : IAsyncDisposable
                             await HandleInboundPublishAsync(connection, publish, cancellationToken).ConfigureAwait(false);
                             break;
                         case MqttPublishAckPacket { PacketType: MqttPacketType.PubRel } pubRel:
-                            _inboundQos2.Remove(pubRel.PacketIdentifier);
+                            ReleaseAcceptedInboundQos2(pubRel.PacketIdentifier);
                             if (_session is { } pubRelSession)
                             {
                                 await pubRelSession.InboundReleasedAsync(pubRel.PacketIdentifier, cancellationToken).ConfigureAwait(false);
@@ -879,6 +888,12 @@ public sealed class RawMqttClient : IAsyncDisposable
     {
         publish = ResolveInboundTopicAlias(publish);
 
+        if (AcknowledgedMessageSink is { } acknowledgedSink)
+        {
+            await DeliverAcknowledgedAsync(connection, publish, acknowledgedSink, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         switch (publish.QualityOfService)
         {
             case MqttQualityOfService.AtMostOnce:
@@ -904,7 +919,8 @@ public sealed class RawMqttClient : IAsyncDisposable
             case MqttQualityOfService.ExactlyOnce:
             {
                 var id = RequiredId(publish);
-                if (_inboundQos2.Add(id))
+                var state = BeginInboundQos2(id, pendingAcknowledgement: false);
+                if (state == InboundQos2ReceiveState.New)
                 {
                     // Record before delivering: a crash after delivery but before the PUBREL
                     // must still suppress the broker's redelivery on resume.
@@ -914,6 +930,11 @@ public sealed class RawMqttClient : IAsyncDisposable
                     }
 
                     await DeliverAsync(publish, cancellationToken).ConfigureAwait(false);
+                }
+
+                if (state == InboundQos2ReceiveState.PendingAcknowledgement)
+                {
+                    break;
                 }
 
                 await SendThroughAsync(
@@ -932,6 +953,185 @@ public sealed class RawMqttClient : IAsyncDisposable
         static ushort RequiredId(MqttPublishPacket publish) =>
             publish.PacketIdentifier
             ?? throw new MqttProtocolException("A QoS > 0 PUBLISH must carry a packet identifier.");
+    }
+
+    private async ValueTask DeliverAcknowledgedAsync(
+        MqttConnection connection,
+        MqttPublishPacket publish,
+        Func<MqttInboundPublishContext, CancellationToken, ValueTask> sink,
+        CancellationToken cancellationToken)
+    {
+        switch (publish.QualityOfService)
+        {
+            case MqttQualityOfService.AtMostOnce:
+                await sink(new MqttInboundPublishContext(publish, canReject: false, CompleteQos0Async), cancellationToken)
+                    .ConfigureAwait(false);
+                break;
+
+            case MqttQualityOfService.AtLeastOnce:
+            {
+                var id = RequiredId(publish);
+                var canReject = _protocolVersion == MqttProtocolVersion.V500;
+                await sink(
+                        new MqttInboundPublishContext(
+                            publish,
+                            canReject,
+                            (reason, reasonString, token) => SendPublishAckAsync(
+                                connection,
+                                MqttPacketType.PubAck,
+                                id,
+                                reason,
+                                reasonString,
+                                token)),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                break;
+            }
+
+            case MqttQualityOfService.ExactlyOnce:
+            {
+                var id = RequiredId(publish);
+                var state = BeginInboundQos2(id, pendingAcknowledgement: true);
+                if (state == InboundQos2ReceiveState.Accepted)
+                {
+                    await SendPublishAckAsync(
+                            connection,
+                            MqttPacketType.PubRec,
+                            id,
+                            MqttReasonCode.Success,
+                            reasonString: null,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                if (state == InboundQos2ReceiveState.PendingAcknowledgement)
+                {
+                    return;
+                }
+
+                await sink(
+                        new MqttInboundPublishContext(
+                            publish,
+                            canReject: _protocolVersion == MqttProtocolVersion.V500,
+                            async (reason, reasonString, token) =>
+                            {
+                                if ((byte)reason < 0x80 && _session is { } acceptedSession)
+                                {
+                                    await acceptedSession.InboundReceivedAsync(id, token).ConfigureAwait(false);
+                                }
+
+                                CompletePendingInboundQos2(id, accepted: (byte)reason < 0x80);
+
+                                await SendPublishAckAsync(
+                                        connection,
+                                        MqttPacketType.PubRec,
+                                        id,
+                                        reason,
+                                        reasonString,
+                                        token)
+                                    .ConfigureAwait(false);
+                            }),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                break;
+            }
+        }
+
+        static ushort RequiredId(MqttPublishPacket publish) =>
+            publish.PacketIdentifier
+            ?? throw new MqttProtocolException("A QoS > 0 PUBLISH must carry a packet identifier.");
+
+        static ValueTask CompleteQos0Async(
+            MqttReasonCode reason,
+            string? reasonString,
+            CancellationToken token) =>
+            ValueTask.CompletedTask;
+    }
+
+    private ValueTask SendPublishAckAsync(
+        MqttConnection connection,
+        MqttPacketType packetType,
+        ushort packetIdentifier,
+        MqttReasonCode reasonCode,
+        string? reasonString,
+        CancellationToken cancellationToken) =>
+        SendThroughAsync(
+            connection,
+            new MqttPublishAckPacket
+            {
+                PacketType = packetType,
+                PacketIdentifier = packetIdentifier,
+                ReasonCode = reasonCode,
+                ReasonString = reasonString,
+                ProtocolVersion = _protocolVersion,
+            },
+            cancellationToken);
+
+    private enum InboundQos2ReceiveState
+    {
+        New,
+        PendingAcknowledgement,
+        Accepted,
+    }
+
+    private InboundQos2ReceiveState BeginInboundQos2(ushort packetIdentifier, bool pendingAcknowledgement)
+    {
+        lock (_inboundQos2Gate)
+        {
+            if (_inboundQos2.Contains(packetIdentifier))
+            {
+                return InboundQos2ReceiveState.Accepted;
+            }
+
+            if (_pendingAcknowledgedInboundQos2.Contains(packetIdentifier))
+            {
+                return InboundQos2ReceiveState.PendingAcknowledgement;
+            }
+
+            if (pendingAcknowledgement)
+            {
+                _pendingAcknowledgedInboundQos2.Add(packetIdentifier);
+            }
+            else
+            {
+                _inboundQos2.Add(packetIdentifier);
+            }
+
+            return InboundQos2ReceiveState.New;
+        }
+    }
+
+    private void RestoreAcceptedInboundQos2(ushort packetIdentifier)
+    {
+        lock (_inboundQos2Gate)
+        {
+            _inboundQos2.Add(packetIdentifier);
+        }
+    }
+
+    private void CompletePendingInboundQos2(ushort packetIdentifier, bool accepted)
+    {
+        lock (_inboundQos2Gate)
+        {
+            _pendingAcknowledgedInboundQos2.Remove(packetIdentifier);
+            if (accepted)
+            {
+                _inboundQos2.Add(packetIdentifier);
+            }
+            else
+            {
+                _inboundQos2.Remove(packetIdentifier);
+            }
+        }
+    }
+
+    private void ReleaseAcceptedInboundQos2(ushort packetIdentifier)
+    {
+        lock (_inboundQos2Gate)
+        {
+            _inboundQos2.Remove(packetIdentifier);
+        }
     }
 
     private ValueTask DeliverAsync(MqttPublishPacket publish, CancellationToken cancellationToken) =>

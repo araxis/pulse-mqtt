@@ -1,7 +1,26 @@
 #nullable enable
+Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage
+Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage.AcknowledgeAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage.CanReject.get -> bool
+Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage.IsAcknowledged.get -> bool
+Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage.Message.get -> Pulse.Mqtt.Packets.MqttPublishPacket!
+Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage.RejectAsync(Pulse.Mqtt.Protocol.MqttReasonCode reasonCode = Pulse.Mqtt.Protocol.MqttReasonCode.UnspecifiedError, string? reasonString = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage.Values.get -> Pulse.Mqtt.Routing.MqttRouteValues
+Pulse.Mqtt.Client.MqttAcknowledgedRouteStream
+Pulse.Mqtt.Client.MqttAcknowledgedRouteStream.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Client.MqttAcknowledgedRouteStream.Reader.get -> System.Threading.Channels.ChannelReader<Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage!>!
+Pulse.Mqtt.Client.MqttAcknowledgedRouteStream.ReadAllAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage!>!
 Pulse.Mqtt.Client.MqttSubscribedRoute
 Pulse.Mqtt.Client.MqttSubscribedRoute.DisposeAsync() -> System.Threading.Tasks.ValueTask
 Pulse.Mqtt.Client.MqttSubscribedRoute.TopicFilter.get -> Pulse.Mqtt.MqttTopicFilter!
+Pulse.Mqtt.Client.MqttRouter.OpenAcknowledgedRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
+Pulse.Mqtt.Client.MqttRouter.OpenAcknowledgedRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
+Pulse.Mqtt.Client.MqttRouter.OpenAcknowledgedRouteStream(string! template) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
+Pulse.Mqtt.Client.MqttRouter.OpenAcknowledgedRouteStream(string! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
+Pulse.Mqtt.Client.ResilientMqttClient.OpenAcknowledgedRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
+Pulse.Mqtt.Client.ResilientMqttClient.OpenAcknowledgedRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
+Pulse.Mqtt.Client.ResilientMqttClient.OpenAcknowledgedRouteStream(string! template) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
+Pulse.Mqtt.Client.ResilientMqttClient.OpenAcknowledgedRouteStream(string! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
 static Pulse.Mqtt.Client.ResilientMqttClientFluentExtensions.SubscribeAsync(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Routing.MqttRouteTemplate! template) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!>!
 static Pulse.Mqtt.Client.ResilientMqttClientFluentExtensions.SubscribeAsync(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.MqttQualityOfService maximumQualityOfService) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!>!
 static Pulse.Mqtt.Client.ResilientMqttClientFluentExtensions.SubscribeAsync(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.MqttQualityOfService maximumQualityOfService, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!>!

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Threading.Channels;
+using Pulse.Mqtt.Connection;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Routing;
 
@@ -20,6 +21,7 @@ public sealed class MqttRouter : IAsyncDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _gate = new();
     private volatile Route[] _routes = [];
+    private volatile AcknowledgedRoute[] _acknowledgedRoutes = [];
     private Task? _dispatch;
     private volatile bool _disposed;
 
@@ -97,6 +99,37 @@ public sealed class MqttRouter : IAsyncDisposable
     public MqttRouteStream OpenRouteStream(string template, MqttRouteOptions? options) =>
         OpenRouteStream(MqttRouteTemplate.Parse(template), options);
 
+    /// <summary>Opens a consumable stream with explicit protocol acknowledgement for a route template.</summary>
+    public MqttAcknowledgedRouteStream OpenAcknowledgedRouteStream(MqttRouteTemplate template) =>
+        OpenAcknowledgedRouteStream(template, options: null);
+
+    /// <summary>Opens a consumable stream with explicit protocol acknowledgement for a route template.</summary>
+    public MqttAcknowledgedRouteStream OpenAcknowledgedRouteStream(MqttRouteTemplate template, MqttRouteOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var routeOptions = options ?? new MqttRouteOptions();
+        if (routeOptions.Overflow != RouteOverflow.Wait)
+        {
+            throw new ArgumentException(
+                "Acknowledged route streams must use RouteOverflow.Wait because dropping a message would also drop its pending protocol acknowledgement.",
+                nameof(options));
+        }
+
+        var route = new AcknowledgedRoute(template, routeOptions);
+        var registration = AddAcknowledgedRoute(route);
+        return new MqttAcknowledgedRouteStream(route.Reader, registration);
+    }
+
+    /// <summary>Opens a consumable stream with explicit protocol acknowledgement for a route template given as text.</summary>
+    public MqttAcknowledgedRouteStream OpenAcknowledgedRouteStream(string template) =>
+        OpenAcknowledgedRouteStream(MqttRouteTemplate.Parse(template), options: null);
+
+    /// <summary>Opens a consumable stream with explicit protocol acknowledgement for a route template given as text.</summary>
+    public MqttAcknowledgedRouteStream OpenAcknowledgedRouteStream(string template, MqttRouteOptions? options) =>
+        OpenAcknowledgedRouteStream(MqttRouteTemplate.Parse(template), options);
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
@@ -118,8 +151,34 @@ public sealed class MqttRouter : IAsyncDisposable
             await route.CompleteAsync().ConfigureAwait(false);
         }
 
+        foreach (var route in _acknowledgedRoutes)
+        {
+            route.CompleteChannel();
+        }
+
         _unmatched.Writer.TryComplete();
         _lifetime.Dispose();
+    }
+
+    internal async ValueTask<bool> DeliverAcknowledgedAsync(
+        MqttInboundPublishContext context,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        foreach (var route in _acknowledgedRoutes)
+        {
+            if (route.Template.TryMatch(context.Message.Topic, out var values))
+            {
+                await route.DeliverAsync(
+                        new MqttAcknowledgedRoutedMessage(context, values),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private IDisposable AddRoute(Route route)
@@ -140,6 +199,26 @@ public sealed class MqttRouter : IAsyncDisposable
         }
 
         _ = route.CompleteAsync();
+    }
+
+    private IDisposable AddAcknowledgedRoute(AcknowledgedRoute route)
+    {
+        lock (_gate)
+        {
+            _acknowledgedRoutes = [.. _acknowledgedRoutes, route];
+        }
+
+        return new AcknowledgedRegistration(this, route);
+    }
+
+    private void RemoveAcknowledgedRoute(AcknowledgedRoute route)
+    {
+        lock (_gate)
+        {
+            _acknowledgedRoutes = _acknowledgedRoutes.Where(existing => !ReferenceEquals(existing, route)).ToArray();
+        }
+
+        route.CompleteChannel();
     }
 
     private void RaiseHandlerFaulted(string template, Exception error) => HandlerFaulted?.Invoke(template, error);
@@ -237,6 +316,19 @@ public sealed class MqttRouter : IAsyncDisposable
         }
     }
 
+    private sealed class AcknowledgedRegistration(MqttRouter router, AcknowledgedRoute route) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                router.RemoveAcknowledgedRoute(route);
+            }
+        }
+    }
+
     private sealed class Route
     {
         private readonly MqttRouter _router;
@@ -322,5 +414,44 @@ public sealed class MqttRouter : IAsyncDisposable
                 // Shutdown.
             }
         }
+    }
+
+    private sealed class AcknowledgedRoute
+    {
+        private readonly Channel<MqttAcknowledgedRoutedMessage> _channel;
+        private readonly RouteOverflow _overflow;
+
+        public AcknowledgedRoute(MqttRouteTemplate template, MqttRouteOptions options)
+        {
+            Template = template;
+            _overflow = options.Overflow;
+            _channel = Channel.CreateBounded<MqttAcknowledgedRoutedMessage>(new BoundedChannelOptions(options.Capacity)
+            {
+                SingleWriter = true,
+                FullMode = options.Overflow switch
+                {
+                    RouteOverflow.DropOldest => BoundedChannelFullMode.DropOldest,
+                    RouteOverflow.DropNewest => BoundedChannelFullMode.DropWrite,
+                    _ => BoundedChannelFullMode.Wait,
+                },
+            });
+        }
+
+        public MqttRouteTemplate Template { get; }
+
+        public ChannelReader<MqttAcknowledgedRoutedMessage> Reader => _channel.Reader;
+
+        public ValueTask DeliverAsync(MqttAcknowledgedRoutedMessage message, CancellationToken cancellationToken)
+        {
+            if (_overflow == RouteOverflow.Wait)
+            {
+                return _channel.Writer.WriteAsync(message, cancellationToken);
+            }
+
+            _channel.Writer.TryWrite(message);
+            return ValueTask.CompletedTask;
+        }
+
+        public void CompleteChannel() => _channel.Writer.TryComplete();
     }
 }

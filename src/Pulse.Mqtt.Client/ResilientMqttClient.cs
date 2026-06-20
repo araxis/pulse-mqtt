@@ -439,6 +439,38 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     public MqttRouteStream OpenRouteStream(string template, MqttRouteOptions? options) =>
         OpenRouteStream(MqttRouteTemplate.Parse(template), options);
 
+    /// <summary>
+    /// Opens an <c>await foreach</c>-able stream for a local route template where the consumer
+    /// explicitly acknowledges or rejects each matching inbound message. Subscribe the matching
+    /// broker filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public MqttAcknowledgedRouteStream OpenAcknowledgedRouteStream(MqttRouteTemplate template) =>
+        OpenAcknowledgedRouteStream(template, options: null);
+
+    /// <summary>
+    /// Opens an <c>await foreach</c>-able stream for a local route template where the consumer
+    /// explicitly acknowledges or rejects each matching inbound message. Subscribe the matching
+    /// broker filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public MqttAcknowledgedRouteStream OpenAcknowledgedRouteStream(MqttRouteTemplate template, MqttRouteOptions? options) =>
+        Router.OpenAcknowledgedRouteStream(template, options);
+
+    /// <summary>
+    /// Opens an <c>await foreach</c>-able stream for a local route template given as text where the
+    /// consumer explicitly acknowledges or rejects each matching inbound message. Subscribe the
+    /// matching broker filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public MqttAcknowledgedRouteStream OpenAcknowledgedRouteStream(string template) =>
+        OpenAcknowledgedRouteStream(MqttRouteTemplate.Parse(template), options: null);
+
+    /// <summary>
+    /// Opens an <c>await foreach</c>-able stream for a local route template given as text where the
+    /// consumer explicitly acknowledges or rejects each matching inbound message. Subscribe the
+    /// matching broker filter separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public MqttAcknowledgedRouteStream OpenAcknowledgedRouteStream(string template, MqttRouteOptions? options) =>
+        OpenAcknowledgedRouteStream(MqttRouteTemplate.Parse(template), options);
+
     // Applies subscribe/unsubscribe changes made while offline. On a fresh session the lifecycle has
     // already replayed the full stored set (which contains the offline additions, and excludes the
     // offline removals), so the broker already matches and the pending delta is simply dropped. On a
@@ -1142,11 +1174,22 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                         async token =>
                         {
                             var candidate = new RawMqttClient(_transportFactory, _options.Raw, _time);
-                            candidate.MessageSink = (message, sinkToken) =>
+                            candidate.AcknowledgedMessageSink = DispatchInboundAsync;
+
+                            async ValueTask DispatchInboundAsync(
+                                MqttInboundPublishContext context,
+                                CancellationToken sinkToken)
                             {
                                 PulseMqttDiagnostics.MessagesReceived.Add(1, new KeyValuePair<string, object?>("client.id", _clientId));
-                                return _messages.Writer.WriteAsync(message, sinkToken);
-                            };
+                                if (_router.IsValueCreated &&
+                                    await _router.Value.DeliverAcknowledgedAsync(context, sinkToken).ConfigureAwait(false))
+                                {
+                                    return;
+                                }
+
+                                await _messages.Writer.WriteAsync(context.Message, sinkToken).ConfigureAwait(false);
+                                await context.AcknowledgeAsync(sinkToken).ConfigureAwait(false);
+                            }
 
                             var clientIdTag = new KeyValuePair<string, object?>("client.id", _clientId);
                             var connectStart = _time.GetTimestamp();

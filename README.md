@@ -77,6 +77,11 @@ using var route = client.RegisterRoute(template, (message, values, ct) =>
 // SubscribeAsync owns broker delivery; RegisterRoute owns local dispatch and captured values.
 ```
 
+Need broker acknowledgement to wait for application work? Use
+`OpenAcknowledgedRouteStream(...)` and call `AcknowledgeAsync` or `RejectAsync` after handling
+the routed message. `RejectAsync` is available when `CanReject` is true, which means the
+delivery can carry an MQTT 5 negative acknowledgement reason code.
+
 ### Typed messaging
 
 ```csharp

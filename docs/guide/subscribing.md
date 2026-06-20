@@ -90,3 +90,9 @@ Acknowledgements for received messages are automatic: QoS 1 messages are acknowl
 they are accepted into the inbound queue; QoS 2 messages run the full
 PUBREC/PUBREL/PUBCOMP exchange with duplicate suppression. Your code only ever sees each
 message once.
+
+When broker acknowledgement must wait for application work, consume through an
+[`OpenAcknowledgedRouteStream`](./routing#acknowledged-streams). That is an explicit routing
+mode; ordinary `Messages`, `OpenRouteStream`, and route handlers stay automatic.
+Negative acknowledgement is protocol-version dependent: MQTT 5 QoS 1/2 deliveries expose
+`CanReject = true`; MQTT 3.1.1 and QoS 0 cannot carry a per-message rejection.

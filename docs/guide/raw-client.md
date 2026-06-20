@@ -51,6 +51,10 @@ await foreach (var message in client.Messages.ReadAllAsync(ct))
 await client.DisconnectAsync(ct);
 ```
 
+The default inbound `Messages` reader acknowledges QoS 1/2 publishes automatically after the
+message is accepted into the bounded channel. Protocol tools that need to delay acknowledgement
+can set `AcknowledgedMessageSink` and complete each `MqttInboundPublishContext` explicitly.
+
 What it owns:
 
 - The CONNECT/CONNACK handshake, with timeout.

@@ -114,6 +114,134 @@ public sealed class RawMqttClientQosTests
     }
 
     [Fact]
+    public async Task Acknowledged_inbound_qos1_publish_waits_for_consumer_ack()
+    {
+        var (client, broker, _, ct) = await ConnectedAsync();
+        var received = new TaskCompletionSource<MqttInboundPublishContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.AcknowledgedMessageSink = (context, _) =>
+        {
+            received.TrySetResult(context);
+            return ValueTask.CompletedTask;
+        };
+
+        await broker.SendAsync(
+            new MqttPublishPacket { Topic = "n", QualityOfService = MqttQualityOfService.AtLeastOnce, PacketIdentifier = 9 }, ct);
+
+        var context = await received.Task.WaitAsync(SafetyTimeout);
+        context.Message.Topic.ShouldBe("n");
+
+        var ackRead = Task.Run(() => broker.ReadPacketAsync(ct), CancellationToken.None);
+        (await Task.WhenAny(ackRead, Task.Delay(100, ct))).ShouldNotBe(ackRead);
+
+        await context.AcknowledgeAsync(ct);
+
+        var ack = (await ackRead.WaitAsync(SafetyTimeout)).ShouldBeOfType<MqttPublishAckPacket>();
+        ack.PacketType.ShouldBe(MqttPacketType.PubAck);
+        ack.PacketIdentifier.ShouldBe((ushort)9);
+    }
+
+    [Fact]
+    public async Task Acknowledged_inbound_qos1_publish_can_be_rejected()
+    {
+        var (client, broker, _, ct) = await ConnectedAsync();
+        var received = new TaskCompletionSource<MqttInboundPublishContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.AcknowledgedMessageSink = (context, _) =>
+        {
+            received.TrySetResult(context);
+            return ValueTask.CompletedTask;
+        };
+
+        await broker.SendAsync(
+            new MqttPublishPacket { Topic = "n", QualityOfService = MqttQualityOfService.AtLeastOnce, PacketIdentifier = 10 }, ct);
+
+        var context = await received.Task.WaitAsync(SafetyTimeout);
+        context.CanReject.ShouldBeTrue();
+        await context.RejectAsync(MqttReasonCode.UnspecifiedError, "failed", ct);
+
+        var ack = (await broker.ReadPacketAsync(ct)).ShouldBeOfType<MqttPublishAckPacket>();
+        ack.PacketType.ShouldBe(MqttPacketType.PubAck);
+        ack.PacketIdentifier.ShouldBe((ushort)10);
+        ack.ReasonCode.ShouldBe(MqttReasonCode.UnspecifiedError);
+        ack.ReasonString.ShouldBe("failed");
+    }
+
+    [Fact]
+    public async Task Acknowledged_inbound_qos1_publish_cannot_be_rejected_on_mqtt_3_1_1()
+    {
+        var (client, broker, _, ct) = await ConnectedAsync(MqttProtocolVersion.V311);
+        var received = new TaskCompletionSource<MqttInboundPublishContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.AcknowledgedMessageSink = (context, _) =>
+        {
+            received.TrySetResult(context);
+            return ValueTask.CompletedTask;
+        };
+
+        await broker.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "n",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                PacketIdentifier = 11,
+                ProtocolVersion = MqttProtocolVersion.V311,
+            },
+            ct);
+
+        var context = await received.Task.WaitAsync(SafetyTimeout);
+        context.CanReject.ShouldBeFalse();
+
+        await Should.ThrowAsync<NotSupportedException>(
+            async () => await context.RejectAsync(MqttReasonCode.UnspecifiedError, "failed", ct));
+        context.IsAcknowledged.ShouldBeFalse();
+
+        await context.AcknowledgeAsync(ct);
+
+        var ack = (await broker.ReadPacketAsync(ct)).ShouldBeOfType<MqttPublishAckPacket>();
+        ack.PacketType.ShouldBe(MqttPacketType.PubAck);
+        ack.PacketIdentifier.ShouldBe((ushort)11);
+        ack.ReasonCode.ShouldBe(MqttReasonCode.Success);
+        ack.ReasonString.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Acknowledged_inbound_qos2_publish_waits_for_consumer_ack_and_suppresses_pending_duplicates()
+    {
+        var (client, broker, _, ct) = await ConnectedAsync();
+        var received = new TaskCompletionSource<MqttInboundPublishContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deliveries = 0;
+        client.AcknowledgedMessageSink = (context, _) =>
+        {
+            Interlocked.Increment(ref deliveries);
+            received.TrySetResult(context);
+            return ValueTask.CompletedTask;
+        };
+
+        var publish = new MqttPublishPacket
+        {
+            Topic = "n",
+            QualityOfService = MqttQualityOfService.ExactlyOnce,
+            PacketIdentifier = 12,
+        };
+        await broker.SendAsync(publish, ct);
+
+        var context = await received.Task.WaitAsync(SafetyTimeout);
+        context.Message.Topic.ShouldBe("n");
+
+        var pubRecRead = Task.Run(() => broker.ReadPacketAsync(ct), CancellationToken.None);
+        (await Task.WhenAny(pubRecRead, Task.Delay(100, ct))).ShouldNotBe(pubRecRead);
+
+        await broker.SendAsync(publish with { Dup = true }, ct);
+        await Task.Delay(100, ct);
+        Volatile.Read(ref deliveries).ShouldBe(1);
+        pubRecRead.IsCompleted.ShouldBeFalse();
+
+        await context.AcknowledgeAsync(ct);
+
+        var pubRec = (await pubRecRead.WaitAsync(SafetyTimeout)).ShouldBeOfType<MqttPublishAckPacket>();
+        pubRec.PacketType.ShouldBe(MqttPacketType.PubRec);
+        pubRec.PacketIdentifier.ShouldBe((ushort)12);
+    }
+
+    [Fact]
     public async Task Inbound_qos2_duplicate_is_delivered_once()
     {
         var (client, broker, _, ct) = await ConnectedAsync();
@@ -182,7 +310,8 @@ public sealed class RawMqttClientQosTests
         await Should.ThrowAsync<MqttException>(async () => await publishTask);
     }
 
-    private static async Task<(RawMqttClient Client, ScriptedBroker Broker, FakeTimeProvider Time, CancellationToken Ct)> ConnectedAsync()
+    private static async Task<(RawMqttClient Client, ScriptedBroker Broker, FakeTimeProvider Time, CancellationToken Ct)> ConnectedAsync(
+        MqttProtocolVersion protocolVersion = MqttProtocolVersion.V500)
     {
         var (clientTransport, serverTransport) = LoopbackTransport.CreatePair();
         var broker = new ScriptedBroker(serverTransport);
@@ -190,9 +319,11 @@ public sealed class RawMqttClientQosTests
         var client = new RawMqttClient(new FixedTransportFactory(clientTransport), timeProvider: time);
 
         var timeout = new CancellationTokenSource(SafetyTimeout);
-        var connectTask = client.ConnectAsync(new MqttConnectPacket { ClientId = "c", KeepAliveSeconds = 0 }, timeout.Token);
+        var connectTask = client.ConnectAsync(
+            new MqttConnectPacket { ClientId = "c", KeepAliveSeconds = 0, ProtocolVersion = protocolVersion },
+            timeout.Token);
         await broker.ReadPacketAsync(timeout.Token);
-        await broker.SendAsync(new MqttConnAckPacket(), timeout.Token);
+        await broker.SendAsync(new MqttConnAckPacket { ProtocolVersion = protocolVersion }, timeout.Token);
         await connectTask;
 
         return (client, broker, time, timeout.Token);

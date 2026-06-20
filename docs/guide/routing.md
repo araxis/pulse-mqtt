@@ -93,6 +93,50 @@ await foreach (MqttRoutedMessage routed in stream.ReadAllAsync(token))
 }
 ```
 
+## Acknowledged streams
+
+The default raw stream and route stream acknowledge inbound QoS 1/2 publishes automatically
+after Pulse accepts them into its local queue. Use an acknowledged route stream when broker
+acknowledgement must wait for application work:
+
+```csharp
+var template = MqttRouteTemplate.Parse("jobs/{jobId}");
+await client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, token);
+
+await using MqttAcknowledgedRouteStream stream = client.OpenAcknowledgedRouteStream(template);
+await foreach (MqttAcknowledgedRoutedMessage routed in stream.ReadAllAsync(token))
+{
+    try
+    {
+        await RunJobAsync(routed.Values["jobId"], routed.Message, token);
+        await routed.AcknowledgeAsync(token);
+    }
+    catch (Exception error)
+    {
+        if (routed.CanReject)
+        {
+            await routed.RejectAsync(MqttReasonCode.UnspecifiedError, error.Message, token);
+        }
+        else
+        {
+            throw;
+        }
+    }
+}
+```
+
+An acknowledged stream is a single-owner route: the first matching acknowledged stream receives
+the message and owns its `AcknowledgeAsync` / `RejectAsync` call. If no acknowledged stream
+matches, Pulse falls back to the normal auto-ack raw message stream.
+
+`RejectAsync` is available only when `CanReject` is true: MQTT 5 QoS 1/2 deliveries can carry
+negative publish acknowledgement reason codes. MQTT 3.1.1 and QoS 0 deliveries cannot, so
+`RejectAsync` throws `NotSupportedException` and leaves the message unacknowledged.
+
+Acknowledged streams are lossless-only: `MqttRouteOptions.Overflow` must be `Wait`. Lossy
+overflow modes are rejected because dropping a queued message would also drop the only pending
+protocol acknowledgement context.
+
 ## Isolation and backpressure
 
 Every route owns a **bounded queue** and a dispatcher:
