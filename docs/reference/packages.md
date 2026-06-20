@@ -11,6 +11,7 @@ compatible. MIT licensed.
 | `Pulse.Mqtt.Serialization.Json` | Source-generated `System.Text.Json` serializer | Client |
 | `Pulse.Mqtt.Serialization.MessagePack` | MessagePack serializer (compact binary, source-generated resolvers) | Core, `MessagePack` |
 | `Pulse.Mqtt.Resilience.Polly` | `PollyReconnectStrategy` over a Polly v8 `ResiliencePipeline` | Core, `Polly.Core` |
+| `Pulse.Mqtt.Storage.LiteDB` | `LiteDbSessionStore` + `LiteDbMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `LiteDB` |
 | `Pulse.Mqtt.Storage.Sqlite` | `SqliteSessionStore` + `SqliteMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `Microsoft.Data.Sqlite` |
 | `Pulse.Mqtt.Transport.WebSocket` | MQTT over `ws`/`wss` | Core |
 | `Pulse.Mqtt.Testing` | `PulseMqttTestBroker`, the in-process broker | Core |

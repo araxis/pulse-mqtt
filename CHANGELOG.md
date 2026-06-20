@@ -2,6 +2,9 @@
 
 ## 2.3.0 (unreleased)
 
+- Added `Pulse.Mqtt.Storage.LiteDB`, a LiteDB-backed durable session and offline-message
+  store package with the same restart persistence and overflow behavior as the SQLite add-on.
+
 ## 2.2.0
 
 - Added route-template `SubscribeAsync(...)` extension overloads for explicit broker

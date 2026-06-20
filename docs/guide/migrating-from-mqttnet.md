@@ -145,8 +145,8 @@ await managed.EnqueueAsync(message);
 ```
 
 In Pulse this is the baseline `ResilientMqttClient`. The queue bound and overflow policy live on
-[`OfflineQueue`](./resilience#the-offline-queue), and durable storage is the
-[`Pulse.Mqtt.Storage.Sqlite`](/reference/packages) package:
+[`OfflineQueue`](./resilience#the-offline-queue), and durable storage is available through the
+SQLite or LiteDB storage packages:
 
 ```csharp
 options.OfflineQueue = new OfflineQueueOptions { Capacity = 1000, Overflow = OverflowPolicy.DropOldest };

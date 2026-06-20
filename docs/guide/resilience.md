@@ -152,11 +152,13 @@ new ResilientMqttClientOptions
 };
 ```
 
-## Durable storage with SQLite
+## Durable storage
 
 The defaults keep everything for the lifetime of the process. To carry the subscription set, the
-offline queue, and the in-flight QoS state across a **process restart**, add the
-[`Pulse.Mqtt.Storage.Sqlite`](/reference/packages) package and point both stores at a file:
+offline queue, and the in-flight QoS state across a **process restart**, add a durable storage
+package and point both stores at a file.
+
+SQLite:
 
 ```csharp
 using Pulse.Mqtt.Storage.Sqlite;
@@ -169,13 +171,25 @@ var options = new ResilientMqttClientOptions
 };
 ```
 
-Both stores accept a plain file path or a full Microsoft.Data.Sqlite connection string, create the
-file and schema on first use, and dispose with the client. The message store preserves FIFO order
-and the same overflow policy as the in-memory default; because the flush loop peeks then removes
-the head, a crash between sending and removing re-sends the message rather than losing it. A
-missing, locked, or corrupt database fails fast with a clear `SqliteStorageException` instead of
-silently starting empty. The package is hand-written SQL over SQLite — no reflection ORM — so it
-stays Native AOT compatible.
+LiteDB:
+
+```csharp
+using Pulse.Mqtt.Storage.LiteDB;
+
+var options = new ResilientMqttClientOptions
+{
+    Connect = new MqttConnectPacket { ClientId = "device-7", CleanStart = false, SessionExpiryInterval = 300 },
+    SessionStore = new LiteDbSessionStore("device-7-session.db"),
+    MessageStore = new LiteDbMessageStore("device-7-queue.db", new OfflineQueueOptions { Capacity = 1024 }),
+};
+```
+
+Both storage packages accept a plain file path or the provider's connection string, create the
+database on first use, and dispose with the client. The message store preserves FIFO order and the
+same overflow policy as the in-memory default; because the flush loop peeks then removes the head,
+a crash between sending and removing re-sends the message rather than losing it. A missing, locked,
+or corrupt database fails fast with a provider-specific storage exception instead of silently
+starting empty.
 
 ## Sessions and re-subscription
 
