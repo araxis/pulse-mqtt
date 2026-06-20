@@ -1,5 +1,7 @@
 # Changelog
 
+## 1.3.0 (unreleased)
+
 ## 1.2.0
 
 - Added `ResilientMqttClient.WaitUntilConnectedAsync(...)` for code that needs to block until
