@@ -191,7 +191,7 @@ public sealed class MqttRouterTests
         }
 
         var template = MqttRouteTemplate.Parse("sensors/{id}");
-        var subscribeTask = client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], timeout.Token);
+        var subscribeTask = client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, timeout.Token);
 
         var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
         subscribe.TopicFilters.ShouldHaveSingleItem().Topic.ShouldBe("sensors/+");

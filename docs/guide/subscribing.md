@@ -14,6 +14,16 @@ IReadOnlyList<MqttReasonCode> granted = await client.SubscribeAsync(
 await client.UnsubscribeAsync(["sensors/+/temp"], token);
 ```
 
+For route-template subscriptions, pass the parsed template directly when you do not need MQTT
+5 subscription flags:
+
+```csharp
+await client.SubscribeAsync(
+    MqttRouteTemplate.Parse("sensors/{device}/temp"),
+    MqttQualityOfService.AtLeastOnce,
+    token);
+```
+
 The returned reason codes are the broker's per-filter grants (`GrantedQualityOfService1`,
 `NotAuthorized`, …) when a connection is live. Offline, the call still succeeds: the filters
 join the **durable subscription set** and are applied on the next connection — the result list

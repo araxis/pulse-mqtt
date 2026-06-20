@@ -10,6 +10,50 @@ namespace Pulse.Mqtt.Client;
 /// </summary>
 public static class ResilientMqttClientFluentExtensions
 {
+    /// <summary>
+    /// Subscribes the broker filter derived from <paramref name="template"/> with QoS 0.
+    /// This subscribes broker delivery only; register local routes separately.
+    /// </summary>
+    public static Task<IReadOnlyList<MqttReasonCode>> SubscribeAsync(
+        this ResilientMqttClient client,
+        MqttRouteTemplate template) =>
+        SubscribeAsync(client, template, MqttQualityOfService.AtMostOnce, CancellationToken.None);
+
+    /// <summary>
+    /// Subscribes the broker filter derived from <paramref name="template"/> with QoS 0.
+    /// This subscribes broker delivery only; register local routes separately.
+    /// </summary>
+    public static Task<IReadOnlyList<MqttReasonCode>> SubscribeAsync(
+        this ResilientMqttClient client,
+        MqttRouteTemplate template,
+        CancellationToken cancellationToken) =>
+        SubscribeAsync(client, template, MqttQualityOfService.AtMostOnce, cancellationToken);
+
+    /// <summary>
+    /// Subscribes the broker filter derived from <paramref name="template"/> with
+    /// <paramref name="maximumQualityOfService"/>.
+    /// </summary>
+    public static Task<IReadOnlyList<MqttReasonCode>> SubscribeAsync(
+        this ResilientMqttClient client,
+        MqttRouteTemplate template,
+        MqttQualityOfService maximumQualityOfService) =>
+        SubscribeAsync(client, template, maximumQualityOfService, CancellationToken.None);
+
+    /// <summary>
+    /// Subscribes the broker filter derived from <paramref name="template"/> with
+    /// <paramref name="maximumQualityOfService"/>.
+    /// </summary>
+    public static Task<IReadOnlyList<MqttReasonCode>> SubscribeAsync(
+        this ResilientMqttClient client,
+        MqttRouteTemplate template,
+        MqttQualityOfService maximumQualityOfService,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(template);
+        return client.SubscribeAsync([template.ToTopicFilter(maximumQualityOfService)], cancellationToken);
+    }
+
     /// <summary>Starts composing a publish to <paramref name="topic"/>.</summary>
     public static MqttPublishBuilder Publish(this ResilientMqttClient client, string topic)
     {

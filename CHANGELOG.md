@@ -1,6 +1,9 @@
 # Changelog
 
-## 2.2.0 (unreleased)
+## 2.2.0
+
+- Added route-template `SubscribeAsync(...)` extension overloads for explicit broker
+  subscriptions without spelling out `ToTopicFilter(...)` at every call site.
 
 ## 2.1.0
 
