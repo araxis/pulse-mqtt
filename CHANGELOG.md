@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.3.0 (unreleased)
+
 ## 2.2.0
 
 - Added route-template `SubscribeAsync(...)` extension overloads for explicit broker
