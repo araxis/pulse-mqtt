@@ -5,6 +5,7 @@ using Pulse.Mqtt;
 using Pulse.Mqtt.Client;
 using Pulse.Mqtt.DependencyInjection;
 using Pulse.Mqtt.Resilience;
+using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Sample;
 using Pulse.Mqtt.Serialization.Json;
 using Pulse.Mqtt.Testing;
@@ -52,8 +53,10 @@ _ = Task.Run(async () =>
 });
 
 // 1. Routed subscription: {deviceId} is captured from the topic of every matching message.
-using var telemetryRoute = await client.OnAsync<TelemetryReading>(
-    "sensors/{deviceId}/telemetry",
+var telemetryTemplate = MqttRouteTemplate.Parse("sensors/{deviceId}/telemetry");
+await client.SubscribeAsync([telemetryTemplate.ToTopicFilter(MqttQualityOfService.AtLeastOnce)]);
+using var telemetryRoute = client.RegisterRoute<TelemetryReading>(
+    telemetryTemplate,
     (reading, message, _) =>
     {
         Console.WriteLine(
@@ -63,8 +66,10 @@ using var telemetryRoute = await client.OnAsync<TelemetryReading>(
 
 // 2. Request/response: this client also acts as the responder for device status requests.
 var started = DateTimeOffset.UtcNow;
-using var statusResponder = await client.OnRequestAsync<StatusRequest, StatusReply>(
-    "devices/{deviceId}/status",
+var statusTemplate = MqttRouteTemplate.Parse("devices/{deviceId}/status");
+await client.SubscribeAsync([statusTemplate.ToTopicFilter(MqttQualityOfService.AtLeastOnce)]);
+using var statusResponder = client.RegisterRequestHandler<StatusRequest, StatusReply>(
+    statusTemplate,
     (request, message, _) =>
     {
         var deviceId = message.Values["deviceId"];

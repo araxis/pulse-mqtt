@@ -37,6 +37,20 @@ public sealed class MqttRouteTemplate
     /// <summary>The parameter names in template order.</summary>
     public IReadOnlyList<string> ParameterNames => _parameterNames;
 
+    /// <summary>Creates a broker subscription filter from this route template.</summary>
+    public global::Pulse.Mqtt.MqttTopicFilter ToTopicFilter(
+        global::Pulse.Mqtt.MqttQualityOfService maximumQualityOfService = global::Pulse.Mqtt.MqttQualityOfService.AtMostOnce,
+        bool noLocal = false,
+        bool retainAsPublished = false,
+        global::Pulse.Mqtt.MqttRetainHandling retainHandling = global::Pulse.Mqtt.MqttRetainHandling.SendAtSubscribe) =>
+        new(TopicFilter)
+        {
+            MaximumQualityOfService = maximumQualityOfService,
+            NoLocal = noLocal,
+            RetainAsPublished = retainAsPublished,
+            RetainHandling = retainHandling,
+        };
+
     /// <summary>Parses <paramref name="template"/>.</summary>
     /// <exception cref="ArgumentException">The template is malformed.</exception>
     public static MqttRouteTemplate Parse(string template)

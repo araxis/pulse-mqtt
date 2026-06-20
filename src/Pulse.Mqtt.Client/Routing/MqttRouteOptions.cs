@@ -25,15 +25,4 @@ public sealed record MqttRouteOptions
     /// <summary>How many handler invocations may run concurrently. 1 (the default) preserves order.</summary>
     public int MaxConcurrency { get; init; } = 1;
 
-    /// <summary>The QoS requested when the route's filter is subscribed.</summary>
-    public MqttQualityOfService SubscriptionQualityOfService { get; init; } = MqttQualityOfService.AtLeastOnce;
-
-    /// <summary>When set, the broker does not echo this client's own publications back to the route.</summary>
-    public bool NoLocal { get; init; }
-
-    /// <summary>When set, forwarded messages keep the RETAIN flag they were published with.</summary>
-    public bool RetainAsPublished { get; init; }
-
-    /// <summary>Controls when retained messages are sent for the route's subscription.</summary>
-    public MqttRetainHandling RetainHandling { get; init; } = MqttRetainHandling.SendAtSubscribe;
 }

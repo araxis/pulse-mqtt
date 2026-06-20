@@ -103,8 +103,8 @@ templates and captured parameters:
 ```csharp
 await client.SubscribeAsync([new MqttTopicFilter("sensors/+/temp") { MaximumQualityOfService = MqttQualityOfService.AtLeastOnce }], ct);
 
-using IDisposable route = await client.OnAsync<TelemetryReading>(
-    "sensors/{deviceId}/temp",
+using IDisposable route = client.RegisterRoute<TelemetryReading>(
+    MqttRouteTemplate.Parse("sensors/{deviceId}/temp"),
     (reading, message, token) => { Handle(message.Values["deviceId"], reading); return ValueTask.CompletedTask; });
 ```
 

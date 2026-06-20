@@ -41,7 +41,7 @@ public sealed record ResilientMqttClientOptions
     public IMessageStore? MessageStore { get; init; }
 
     /// <summary>
-    /// Converts typed payloads for <c>PublishAsync&lt;T&gt;</c> / <c>OnAsync&lt;T&gt;</c>. No default —
+    /// Converts typed payloads for <c>PublishAsync&lt;T&gt;</c> / <c>RegisterRoute&lt;T&gt;</c>. No default —
     /// typed messaging throws until one is configured (for example the JSON serializer add-on).
     /// </summary>
     public IMqttSerializer? Serializer { get; init; }

@@ -1,5 +1,6 @@
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
+using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Resilience;
 using Pulse.Mqtt.Serialization.Json;
 using Pulse.Mqtt.Testing;
@@ -85,14 +86,17 @@ public sealed class FluentApiTests
         var received = new TaskCompletionSource<(TelemetryReading Value, string Device)>(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
-        using var route = await client.Route("sensors/{device}/telemetry")
+        var route = client.Route("sensors/{device}/telemetry");
+        await client.SubscribeAsync([route.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
+
+        using var registration = route
             .WithQueue(capacity: 8, RouteOverflow.DropOldest)
             .WithConcurrency(2)
-            .HandleAsync<TelemetryReading>((value, message, _) =>
+            .Handle<TelemetryReading>((value, message, _) =>
             {
                 received.TrySetResult((value, message.Values["device"]));
                 return ValueTask.CompletedTask;
-            }, ct);
+            });
 
         await broker.PublishAsync(new MqttPublishPacket
         {
@@ -111,11 +115,12 @@ public sealed class FluentApiTests
         var (client, _, ct) = await ConnectedAsync();
         await using var _1 = client;
 
-        using var responder = await client.OnRequestAsync<TelemetryReading, TelemetryReading>(
-            "calibrate/{device}",
+        var template = MqttRouteTemplate.Parse("calibrate/{device}");
+        await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
+        using var responder = client.RegisterRequestHandler<TelemetryReading, TelemetryReading>(
+            template,
             (request, message, _) =>
-                ValueTask.FromResult(request with { Value = request.Value * 2 }),
-            cancellationToken: ct);
+                ValueTask.FromResult(request with { Value = request.Value * 2 }));
 
         var reply = await client.Request("calibrate/boiler-1")
             .WithTimeout(TimeSpan.FromSeconds(5))

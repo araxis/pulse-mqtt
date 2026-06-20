@@ -4,6 +4,7 @@ using Pulse.Mqtt.Codec;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Resilience;
+using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Serialization.Json;
 using Shouldly;
 using Xunit;
@@ -50,14 +51,16 @@ public sealed class RequestStreamTests
         var (client, broker, _, ct) = await ConnectedAsync();
         await using var _1 = client;
 
-        var onTask = client.OnRequestStreamAsync<TelemetryReading, TelemetryReading>(
-            "svc/{op}",
-            (request, _, _) => Sequence(request, 2),
-            cancellationToken: ct);
+        var template = MqttRouteTemplate.Parse("svc/{op}");
+        var subscribeTask = client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
         var subscribe = (await broker.ReadPacketAsync(ct)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
         subscribe.TopicFilters.ShouldHaveSingleItem().Topic.ShouldBe("svc/+");
         await broker.SendAsync(new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] }, ct);
-        await onTask;
+        await subscribeTask;
+
+        using var responder = client.RegisterRequestStreamHandler<TelemetryReading, TelemetryReading>(
+            template,
+            (request, _, _) => Sequence(request, 2));
 
         await broker.SendAsync(new MqttPublishPacket
         {

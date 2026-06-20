@@ -42,8 +42,11 @@ rejects packets that pre-set them.
 ## Responder
 
 ```csharp
-using IDisposable responder = await client.OnRequestAsync<StatusRequest, StatusReply>(
-    "devices/{deviceId}/status",
+var template = MqttRouteTemplate.Parse("devices/{deviceId}/status");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+
+using IDisposable responder = client.RegisterRequestHandler<StatusRequest, StatusReply>(
+    template,
     async (request, message, token) =>
     {
         var deviceId = message.Values["deviceId"];
@@ -51,8 +54,9 @@ using IDisposable responder = await client.OnRequestAsync<StatusRequest, StatusR
     });
 ```
 
-The responder is a [route](./routing) — templates, captured values, bounded queue, fault
-isolation all apply. For each request it:
+The responder is a [route](./routing): subscribe the broker filter with `SubscribeAsync`, then
+register the local responder with `RegisterRequestHandler`. Templates, captured values, bounded
+queues, and fault isolation all apply. For each request it:
 
 1. Deserializes the payload to `TRequest`.
 2. Runs your handler.
@@ -79,8 +83,11 @@ await foreach (var row in client.RequestStreamAsync<Query, Row>("reports/run", q
 The responder yields its results and Pulse publishes each one, then the marker, automatically:
 
 ```csharp
-using IDisposable responder = await client.OnRequestStreamAsync<Query, Row>(
-    "reports/run",
+var template = MqttRouteTemplate.Parse("reports/run");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+
+using IDisposable responder = client.RegisterRequestStreamHandler<Query, Row>(
+    template,
     (query, message, token) => RunReportAsync(query, token));   // returns IAsyncEnumerable<Row>
 ```
 

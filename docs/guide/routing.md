@@ -7,7 +7,7 @@ jump minimal APIs made over raw HTTP handling.
 
 A template is a topic filter with named captures:
 
-| Template | Subscribes | Captures |
+| Template | Broker filter | Captures |
 | --- | --- | --- |
 | `sensors/{deviceId}/temp` | `sensors/+/temp` | `deviceId` |
 | `plant/{line}/sensors/{kind}` | `plant/+/sensors/+` | `line`, `kind` |
@@ -19,8 +19,11 @@ captures).
 ## Handlers
 
 ```csharp
-using IDisposable route = await client.OnAsync(
-    "sensors/{deviceId}/temp",
+var template = MqttRouteTemplate.Parse("sensors/{deviceId}/temp");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+
+using IDisposable route = client.RegisterRoute(
+    template,
     async (message, values, token) =>
     {
         await store.SaveAsync(values["deviceId"], message.Payload, token);
@@ -28,16 +31,30 @@ using IDisposable route = await client.OnAsync(
     new MqttRouteOptions { MaxConcurrency = 4 });
 ```
 
-Registering a route also subscribes its filter (at
-`MqttRouteOptions.SubscriptionQualityOfService`, default QoS 1). Disposing the registration
-removes the route; the broker subscription stays until `UnsubscribeAsync` — other routes may
-share the same filter.
+`SubscribeAsync` owns broker delivery. `RegisterRoute` owns local dispatch. Disposing the route
+registration removes the local handler only; use `UnsubscribeAsync` when the broker should stop
+delivering that filter.
+
+`MqttRouteTemplate.ToTopicFilter(...)` keeps the subscription side readable while still making
+MQTT 5 subscription options explicit:
+
+```csharp
+await client.SubscribeAsync([
+    template.ToTopicFilter(
+        MqttQualityOfService.AtLeastOnce,
+        noLocal: true,
+        retainHandling: MqttRetainHandling.DoNotSendAtSubscribe),
+], token);
+```
 
 Typed handlers deserialize through the configured [serializer](./typed-messaging):
 
 ```csharp
-using var route = await client.OnAsync<TelemetryReading>(
-    "sensors/{deviceId}/telemetry",
+var template = MqttRouteTemplate.Parse("sensors/{deviceId}/telemetry");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+
+using var route = client.RegisterRoute<TelemetryReading>(
+    template,
     (reading, message, token) => Handle(reading, message.Values["deviceId"]));
 ```
 
@@ -46,7 +63,10 @@ using var route = await client.OnAsync<TelemetryReading>(
 Prefer pull over callbacks where it reads better:
 
 ```csharp
-await using MqttRouteStream stream = await client.OpenStreamAsync("sensors/{deviceId}/temp");
+var template = MqttRouteTemplate.Parse("sensors/{deviceId}/temp");
+await client.SubscribeAsync([template.ToTopicFilter()], token);
+
+await using MqttRouteStream stream = client.OpenRouteStream(template);
 await foreach (MqttRoutedMessage routed in stream.ReadAllAsync(token))
 {
     Process(routed.Values["deviceId"], routed.Message);
@@ -62,10 +82,6 @@ Every route owns a **bounded queue** and a dispatcher:
 | `Capacity` | 64 | Bound of the route's queue |
 | `Overflow` | `Wait` | What happens when it is full |
 | `MaxConcurrency` | 1 | Concurrent handler invocations; 1 preserves per-route order |
-| `SubscriptionQualityOfService` | `AtLeastOnce` | QoS requested for the route's filter |
-| `NoLocal` | `false` | Ask the broker not to echo this client's own publications |
-| `RetainAsPublished` | `false` | Preserve the incoming RETAIN flag instead of clearing it |
-| `RetainHandling` | `SendAtSubscribe` | When retained messages are sent for the route's subscription |
 
 Overflow choices:
 

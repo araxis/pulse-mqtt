@@ -1,1 +1,33 @@
 #nullable enable
+Pulse.Mqtt.Client.MqttRouteBuilder.Handle(Pulse.Mqtt.Client.MqttRouteHandler! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.MqttRouteBuilder.Handle<T>(Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.MqttRouteBuilder.Stream() -> Pulse.Mqtt.Client.MqttRouteStream!
+Pulse.Mqtt.Client.MqttRouteBuilder.ToTopicFilter(Pulse.Mqtt.MqttQualityOfService maximumQualityOfService = Pulse.Mqtt.MqttQualityOfService.AtMostOnce, bool noLocal = false, bool retainAsPublished = false, Pulse.Mqtt.MqttRetainHandling retainHandling = Pulse.Mqtt.MqttRetainHandling.SendAtSubscribe) -> Pulse.Mqtt.MqttTopicFilter!
+Pulse.Mqtt.Client.MqttRouter.OpenRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template) -> Pulse.Mqtt.Client.MqttRouteStream!
+Pulse.Mqtt.Client.MqttRouter.OpenRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttRouteStream!
+Pulse.Mqtt.Client.MqttRouter.OpenRouteStream(string! template) -> Pulse.Mqtt.Client.MqttRouteStream!
+Pulse.Mqtt.Client.MqttRouter.OpenRouteStream(string! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttRouteStream!
+Pulse.Mqtt.Client.MqttRouter.RegisterRoute(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteHandler! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.MqttRouter.RegisterRoute(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.MqttRouter.RegisterRoute(string! template, Pulse.Mqtt.Client.MqttRouteHandler! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.MqttRouter.RegisterRoute(string! template, Pulse.Mqtt.Client.MqttRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.OpenRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template) -> Pulse.Mqtt.Client.MqttRouteStream!
+Pulse.Mqtt.Client.ResilientMqttClient.OpenRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttRouteStream!
+Pulse.Mqtt.Client.ResilientMqttClient.OpenRouteStream(string! template) -> Pulse.Mqtt.Client.MqttRouteStream!
+Pulse.Mqtt.Client.ResilientMqttClient.OpenRouteStream(string! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttRouteStream!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRequestHandler<TRequest, TResponse>(Pulse.Mqtt.Routing.MqttRouteTemplate! template, System.Func<TRequest, Pulse.Mqtt.Client.MqttRoutedMessage, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<TResponse>>! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRequestHandler<TRequest, TResponse>(Pulse.Mqtt.Routing.MqttRouteTemplate! template, System.Func<TRequest, Pulse.Mqtt.Client.MqttRoutedMessage, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<TResponse>>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRequestHandler<TRequest, TResponse>(string! template, System.Func<TRequest, Pulse.Mqtt.Client.MqttRoutedMessage, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<TResponse>>! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRequestHandler<TRequest, TResponse>(string! template, System.Func<TRequest, Pulse.Mqtt.Client.MqttRoutedMessage, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<TResponse>>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRequestStreamHandler<TRequest, TResponse>(Pulse.Mqtt.Routing.MqttRouteTemplate! template, System.Func<TRequest, Pulse.Mqtt.Client.MqttRoutedMessage, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<TResponse>!>! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRequestStreamHandler<TRequest, TResponse>(Pulse.Mqtt.Routing.MqttRouteTemplate! template, System.Func<TRequest, Pulse.Mqtt.Client.MqttRoutedMessage, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<TResponse>!>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRequestStreamHandler<TRequest, TResponse>(string! template, System.Func<TRequest, Pulse.Mqtt.Client.MqttRoutedMessage, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<TResponse>!>! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRequestStreamHandler<TRequest, TResponse>(string! template, System.Func<TRequest, Pulse.Mqtt.Client.MqttRoutedMessage, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<TResponse>!>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRoute(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteHandler! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRoute(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRoute(string! template, Pulse.Mqtt.Client.MqttRouteHandler! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRoute(string! template, Pulse.Mqtt.Client.MqttRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRoute<T>(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRoute<T>(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRoute<T>(string! template, Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterRoute<T>(string! template, Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!

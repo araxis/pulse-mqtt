@@ -38,15 +38,8 @@ Pulse.Mqtt.Client.MqttRequestStreamOptions.IdleTimeout.init -> void
 Pulse.Mqtt.Client.MqttRequestStreamOptions.QualityOfService.get -> Pulse.Mqtt.MqttQualityOfService
 Pulse.Mqtt.Client.MqttRequestStreamOptions.QualityOfService.init -> void
 Pulse.Mqtt.Client.MqttRouteBuilder
-Pulse.Mqtt.Client.MqttRouteBuilder.HandleAsync(Pulse.Mqtt.Client.MqttRouteHandler! handler, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IDisposable!>!
-Pulse.Mqtt.Client.MqttRouteBuilder.HandleAsync<T>(Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IDisposable!>!
-Pulse.Mqtt.Client.MqttRouteBuilder.StreamAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttRouteStream!>!
 Pulse.Mqtt.Client.MqttRouteBuilder.WithConcurrency(int maxConcurrency) -> Pulse.Mqtt.Client.MqttRouteBuilder!
-Pulse.Mqtt.Client.MqttRouteBuilder.WithNoLocal(bool noLocal = true) -> Pulse.Mqtt.Client.MqttRouteBuilder!
 Pulse.Mqtt.Client.MqttRouteBuilder.WithQueue(int capacity, Pulse.Mqtt.Client.RouteOverflow overflow = Pulse.Mqtt.Client.RouteOverflow.Wait) -> Pulse.Mqtt.Client.MqttRouteBuilder!
-Pulse.Mqtt.Client.MqttRouteBuilder.WithRetainAsPublished(bool retainAsPublished = true) -> Pulse.Mqtt.Client.MqttRouteBuilder!
-Pulse.Mqtt.Client.MqttRouteBuilder.WithRetainHandling(Pulse.Mqtt.MqttRetainHandling retainHandling) -> Pulse.Mqtt.Client.MqttRouteBuilder!
-Pulse.Mqtt.Client.MqttRouteBuilder.WithSubscriptionQualityOfService(Pulse.Mqtt.MqttQualityOfService qualityOfService) -> Pulse.Mqtt.Client.MqttRouteBuilder!
 Pulse.Mqtt.Client.MqttRoutedMessage
 Pulse.Mqtt.Client.MqttRoutedMessage.Message.get -> Pulse.Mqtt.Packets.MqttPublishPacket!
 Pulse.Mqtt.Client.MqttRoutedMessage.Message.init -> void
@@ -60,24 +53,12 @@ Pulse.Mqtt.Client.MqttRouteOptions.Capacity.get -> int
 Pulse.Mqtt.Client.MqttRouteOptions.Capacity.init -> void
 Pulse.Mqtt.Client.MqttRouteOptions.MaxConcurrency.get -> int
 Pulse.Mqtt.Client.MqttRouteOptions.MaxConcurrency.init -> void
-Pulse.Mqtt.Client.MqttRouteOptions.NoLocal.get -> bool
-Pulse.Mqtt.Client.MqttRouteOptions.NoLocal.init -> void
 Pulse.Mqtt.Client.MqttRouteOptions.Overflow.get -> Pulse.Mqtt.Client.RouteOverflow
 Pulse.Mqtt.Client.MqttRouteOptions.Overflow.init -> void
-Pulse.Mqtt.Client.MqttRouteOptions.RetainAsPublished.get -> bool
-Pulse.Mqtt.Client.MqttRouteOptions.RetainAsPublished.init -> void
-Pulse.Mqtt.Client.MqttRouteOptions.RetainHandling.get -> Pulse.Mqtt.MqttRetainHandling
-Pulse.Mqtt.Client.MqttRouteOptions.RetainHandling.init -> void
-Pulse.Mqtt.Client.MqttRouteOptions.SubscriptionQualityOfService.get -> Pulse.Mqtt.MqttQualityOfService
-Pulse.Mqtt.Client.MqttRouteOptions.SubscriptionQualityOfService.init -> void
 Pulse.Mqtt.Client.MqttRouter
 Pulse.Mqtt.Client.MqttRouter.DisposeAsync() -> System.Threading.Tasks.ValueTask
 Pulse.Mqtt.Client.MqttRouter.HandlerFaulted -> System.Action<string!, System.Exception!>?
 Pulse.Mqtt.Client.MqttRouter.MqttRouter(System.Threading.Channels.ChannelReader<Pulse.Mqtt.Packets.MqttPublishPacket!>! source) -> void
-Pulse.Mqtt.Client.MqttRouter.On(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options = null) -> System.IDisposable!
-Pulse.Mqtt.Client.MqttRouter.On(string! template, Pulse.Mqtt.Client.MqttRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options = null) -> System.IDisposable!
-Pulse.Mqtt.Client.MqttRouter.OpenStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteOptions? options = null) -> Pulse.Mqtt.Client.MqttRouteStream!
-Pulse.Mqtt.Client.MqttRouter.OpenStream(string! template, Pulse.Mqtt.Client.MqttRouteOptions? options = null) -> Pulse.Mqtt.Client.MqttRouteStream!
 Pulse.Mqtt.Client.MqttRouter.Start() -> void
 Pulse.Mqtt.Client.MqttRouter.Unmatched.get -> System.Threading.Channels.ChannelReader<Pulse.Mqtt.Packets.MqttPublishPacket!>!
 Pulse.Mqtt.Client.MqttRouteStream
@@ -136,11 +117,6 @@ Pulse.Mqtt.Client.PulseMqttDiagnostics
 Pulse.Mqtt.Client.ResilientMqttClient
 Pulse.Mqtt.Client.ResilientMqttClient.DisposeAsync() -> System.Threading.Tasks.ValueTask
 Pulse.Mqtt.Client.ResilientMqttClient.Messages.get -> System.Threading.Channels.ChannelReader<Pulse.Mqtt.Packets.MqttPublishPacket!>!
-Pulse.Mqtt.Client.ResilientMqttClient.OnAsync(string! template, Pulse.Mqtt.Client.MqttRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IDisposable!>!
-Pulse.Mqtt.Client.ResilientMqttClient.OnAsync<T>(string! template, Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IDisposable!>!
-Pulse.Mqtt.Client.ResilientMqttClient.OnRequestAsync<TRequest, TResponse>(string! template, System.Func<TRequest, Pulse.Mqtt.Client.MqttRoutedMessage, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<TResponse>>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IDisposable!>!
-Pulse.Mqtt.Client.ResilientMqttClient.OnRequestStreamAsync<TRequest, TResponse>(string! template, System.Func<TRequest, Pulse.Mqtt.Client.MqttRoutedMessage, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<TResponse>!>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IDisposable!>!
-Pulse.Mqtt.Client.ResilientMqttClient.OpenStreamAsync(string! template, Pulse.Mqtt.Client.MqttRouteOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttRouteStream!>!
 Pulse.Mqtt.Client.ResilientMqttClient.PublishAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.PublishOutcome>!
 Pulse.Mqtt.Client.ResilientMqttClient.PublishAsync<T>(string! topic, T value, Pulse.Mqtt.MqttQualityOfService qualityOfService = Pulse.Mqtt.MqttQualityOfService.AtMostOnce, bool retain = false, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.PublishOutcome>!
 Pulse.Mqtt.Client.ResilientMqttClient.ReAuthenticateAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!

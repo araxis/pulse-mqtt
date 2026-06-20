@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
+using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Serialization.Json;
 using Shouldly;
 using Xunit;
@@ -53,18 +54,21 @@ public sealed class TypedMessagingTests
         var (client, broker, ct) = await ConnectedAsync();
         await using var _ = client;
 
-        var received = new TaskCompletionSource<(TelemetryReading Value, string Device)>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var onTask = client.OnAsync<TelemetryReading>("telemetry/{device}", (value, message, _) =>
-        {
-            received.TrySetResult((value, message.Values["device"]));
-            return ValueTask.CompletedTask;
-        }, cancellationToken: ct);
+        var template = MqttRouteTemplate.Parse("telemetry/{device}");
+        var subscribeTask = client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
 
         var subscribe = (await broker.ReadPacketAsync(ct)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
         subscribe.TopicFilters.ShouldHaveSingleItem().Topic.ShouldBe("telemetry/+");
         await broker.SendAsync(
             new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] }, ct);
-        await onTask;
+        await subscribeTask;
+
+        var received = new TaskCompletionSource<(TelemetryReading Value, string Device)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = client.RegisterRoute<TelemetryReading>(template, (value, message, _) =>
+        {
+            received.TrySetResult((value, message.Values["device"]));
+            return ValueTask.CompletedTask;
+        });
 
         await broker.SendAsync(new MqttPublishPacket
         {

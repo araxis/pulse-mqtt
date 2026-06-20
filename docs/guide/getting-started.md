@@ -66,8 +66,11 @@ var outcome = await client.PublishAsync(
 ## Subscribe
 
 ```csharp
-using var route = await client.OnAsync<TelemetryReading>(
-    "sensors/{deviceId}/telemetry",
+var template = MqttRouteTemplate.Parse("sensors/{deviceId}/telemetry");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+
+using var route = client.RegisterRoute<TelemetryReading>(
+    template,
     (reading, message, token) =>
     {
         Console.WriteLine($"{message.Values["deviceId"]}: {reading.Value}{reading.Unit}");
@@ -75,8 +78,9 @@ using var route = await client.OnAsync<TelemetryReading>(
     });
 ```
 
-The template subscribes `sensors/+/telemetry` and captures `{deviceId}` from every matching
-topic. Each route has its own bounded queue, and a throwing handler faults only its route.
+`SubscribeAsync` tells the broker to deliver `sensors/+/telemetry`; `RegisterRoute` captures
+`{deviceId}` and dispatches locally. Each route has its own bounded queue, and a throwing
+handler faults only its route.
 
 ## Request and response
 
@@ -86,8 +90,11 @@ var reply = await client.RequestAsync<StatusRequest, StatusReply>(
     "devices/boiler-1/status", new StatusRequest("dashboard"));
 
 // …the other answers.
-using var responder = await client.OnRequestAsync<StatusRequest, StatusReply>(
-    "devices/{deviceId}/status",
+var statusTemplate = MqttRouteTemplate.Parse("devices/{deviceId}/status");
+await client.SubscribeAsync([statusTemplate.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
+
+using var responder = client.RegisterRequestHandler<StatusRequest, StatusReply>(
+    statusTemplate,
     (request, message, token) =>
         ValueTask.FromResult(new StatusReply(message.Values["deviceId"], "online")));
 ```

@@ -33,3 +33,14 @@ That phase is over at 1.0.0.
 
 Where possible, an API slated for removal is first marked `[Obsolete]` with a pointer to the
 replacement for at least one minor release before it is removed in the next major.
+
+## 2.0.0 route/subscription split
+
+Version 2.0.0 separates broker subscription from local routing:
+
+- Use `SubscribeAsync` / `UnsubscribeAsync` for MQTT broker delivery.
+- Use `RegisterRoute(...)`, `OpenRouteStream(...)`, `RegisterRequestHandler(...)`, and
+  `RegisterRequestStreamHandler(...)` for local dispatch.
+- Convert route templates to broker filters with `MqttRouteTemplate.ToTopicFilter(...)`.
+- `MqttRouteOptions` now controls only local route delivery: capacity, overflow, and
+  concurrency.

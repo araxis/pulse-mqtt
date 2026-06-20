@@ -28,7 +28,7 @@ public sealed class MqttRouterTests
         await using var _ = router;
         var received = new TaskCompletionSource<(string Topic, string Id)>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        router.On("sensors/{id}/temp", (message, values, _) =>
+        router.RegisterRoute("sensors/{id}/temp", (message, values, _) =>
         {
             received.TrySetResult((message.Topic, values["id"]));
             return ValueTask.CompletedTask;
@@ -49,8 +49,8 @@ public sealed class MqttRouterTests
         var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        router.On("a/#", (_, _, _) => { first.TrySetResult(); return ValueTask.CompletedTask; });
-        router.On("a/+", (_, _, _) => { second.TrySetResult(); return ValueTask.CompletedTask; });
+        router.RegisterRoute("a/#", (_, _, _) => { first.TrySetResult(); return ValueTask.CompletedTask; });
+        router.RegisterRoute("a/+", (_, _, _) => { second.TrySetResult(); return ValueTask.CompletedTask; });
 
         source.Writer.TryWrite(Message("a/b"));
 
@@ -62,7 +62,7 @@ public sealed class MqttRouterTests
     {
         var (source, router) = NewRouter();
         await using var _ = router;
-        router.On("known/#", (_, _, _) => ValueTask.CompletedTask);
+        router.RegisterRoute("known/#", (_, _, _) => ValueTask.CompletedTask);
 
         source.Writer.TryWrite(Message("other/topic"));
 
@@ -78,8 +78,8 @@ public sealed class MqttRouterTests
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var fastDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        router.On("slow/#", async (_, _, _) => await gate.Task);
-        router.On("fast/#", (_, _, _) => { fastDone.TrySetResult(); return ValueTask.CompletedTask; });
+        router.RegisterRoute("slow/#", async (_, _, _) => await gate.Task);
+        router.RegisterRoute("fast/#", (_, _, _) => { fastDone.TrySetResult(); return ValueTask.CompletedTask; });
 
         source.Writer.TryWrite(Message("slow/1"));
         source.Writer.TryWrite(Message("fast/1"));
@@ -98,7 +98,7 @@ public sealed class MqttRouterTests
         var first = true;
 
         router.HandlerFaulted += (template, error) => faulted.TrySetResult((template, error));
-        router.On("t/#", (_, _, _) =>
+        router.RegisterRoute("t/#", (_, _, _) =>
         {
             if (first)
             {
@@ -124,7 +124,7 @@ public sealed class MqttRouterTests
     {
         var (source, router) = NewRouter();
         await using var _ = router;
-        var registration = router.On("gone/#", (_, _, _) => ValueTask.CompletedTask);
+        var registration = router.RegisterRoute("gone/#", (_, _, _) => ValueTask.CompletedTask);
 
         registration.Dispose();
         source.Writer.TryWrite(Message("gone/1"));
@@ -138,7 +138,7 @@ public sealed class MqttRouterTests
     {
         var (source, router) = NewRouter();
         await using var _ = router;
-        await using var stream = router.OpenStream("s/#", new MqttRouteOptions
+        await using var stream = router.OpenRouteStream("s/#", new MqttRouteOptions
         {
             Capacity = 1,
             Overflow = RouteOverflow.DropOldest,
@@ -158,7 +158,7 @@ public sealed class MqttRouterTests
     {
         var (source, router) = NewRouter();
         await using var _ = router;
-        await using var stream = router.OpenStream("n/{x}");
+        await using var stream = router.OpenRouteStream("n/{x}");
 
         source.Writer.TryWrite(Message("n/42"));
 
@@ -171,7 +171,7 @@ public sealed class MqttRouterTests
     }
 
     [Fact]
-    public async Task Client_OnAsync_subscribes_the_template_filter_and_routes()
+    public async Task Client_routes_after_explicit_subscription()
     {
         var factory = new SequencedTransportFactory();
         await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
@@ -190,19 +190,22 @@ public sealed class MqttRouterTests
             await Task.Delay(1, timeout.Token);
         }
 
-        var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var onTask = client.OnAsync("sensors/{id}", (_, values, _) =>
-        {
-            received.TrySetResult(values["id"]);
-            return ValueTask.CompletedTask;
-        }, cancellationToken: timeout.Token);
+        var template = MqttRouteTemplate.Parse("sensors/{id}");
+        var subscribeTask = client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], timeout.Token);
 
         var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
         subscribe.TopicFilters.ShouldHaveSingleItem().Topic.ShouldBe("sensors/+");
         await broker.SendAsync(
             new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] },
             timeout.Token);
-        await onTask;
+        await subscribeTask;
+
+        var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = client.RegisterRoute(template, (_, values, _) =>
+        {
+            received.TrySetResult(values["id"]);
+            return ValueTask.CompletedTask;
+        });
 
         await broker.SendAsync(Message("sensors/9"), timeout.Token);
 
@@ -210,7 +213,7 @@ public sealed class MqttRouterTests
     }
 
     [Fact]
-    public async Task Client_OnAsync_preserves_subscription_options_on_the_route_filter()
+    public async Task Route_template_creates_subscription_filter_with_explicit_options()
     {
         var factory = new SequencedTransportFactory();
         await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
@@ -224,17 +227,14 @@ public sealed class MqttRouterTests
         await broker.AcceptConnectionAsync(timeout.Token);
         await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
 
-        var route = client.OnAsync(
-            "sensors/{id}",
-            (_, _, _) => ValueTask.CompletedTask,
-            new MqttRouteOptions
-            {
-                SubscriptionQualityOfService = MqttQualityOfService.ExactlyOnce,
-                NoLocal = true,
-                RetainAsPublished = true,
-                RetainHandling = MqttRetainHandling.DoNotSendAtSubscribe,
-            },
-            timeout.Token);
+        var template = MqttRouteTemplate.Parse("sensors/{id}");
+        var subscribeTask = client.SubscribeAsync([
+            template.ToTopicFilter(
+                MqttQualityOfService.ExactlyOnce,
+                noLocal: true,
+                retainAsPublished: true,
+                retainHandling: MqttRetainHandling.DoNotSendAtSubscribe),
+        ], timeout.Token);
 
         var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
         var filter = subscribe.TopicFilters.ShouldHaveSingleItem();
@@ -247,6 +247,6 @@ public sealed class MqttRouterTests
         await broker.SendAsync(
             new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService2] },
             timeout.Token);
-        (await route).Dispose();
+        await subscribeTask;
     }
 }

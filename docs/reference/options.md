@@ -85,10 +85,9 @@ For direct construction; with DI these come from `PulseMqttClientOptions` plus b
 | `Capacity` | `64` | Bound of the route's queue |
 | `Overflow` | `Wait` | `Wait` \| `DropOldest` \| `DropNewest` |
 | `MaxConcurrency` | `1` | Concurrent handler invocations; 1 preserves order |
-| `SubscriptionQualityOfService` | `AtLeastOnce` | QoS requested for the route's filter |
-| `NoLocal` | `false` | Ask the broker not to echo this client's own publications |
-| `RetainAsPublished` | `false` | Preserve the incoming RETAIN flag instead of clearing it |
-| `RetainHandling` | `SendAtSubscribe` | When retained messages are sent for the route's subscription |
+
+Broker subscription options live on `MqttTopicFilter`; for route templates, create one with
+`MqttRouteTemplate.ToTopicFilter(...)`.
 
 ## MqttRequestOptions
 
