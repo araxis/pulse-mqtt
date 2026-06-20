@@ -404,9 +404,13 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     private Task SubscribeToTemplateAsync(MqttRouteTemplate template, MqttRouteOptions? options, CancellationToken cancellationToken)
     {
+        var routeOptions = options ?? new MqttRouteOptions();
         var filter = new MqttTopicFilter(template.TopicFilter)
         {
-            MaximumQualityOfService = (options ?? new MqttRouteOptions()).SubscriptionQualityOfService,
+            MaximumQualityOfService = routeOptions.SubscriptionQualityOfService,
+            NoLocal = routeOptions.NoLocal,
+            RetainAsPublished = routeOptions.RetainAsPublished,
+            RetainHandling = routeOptions.RetainHandling,
         };
         return SubscribeAsync([filter], cancellationToken);
     }
@@ -864,6 +868,80 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         }
         finally
         {
+            lock (_stateGate)
+            {
+                _watchers.Remove(watcher);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Waits until the client reaches <see cref="ConnectionState.Connected"/> or throws if it
+    /// faults first. If the state is already connected, the returned task completes immediately.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="timeout"/> is negative and not <see cref="Timeout.InfiniteTimeSpan"/>.
+    /// </exception>
+    /// <exception cref="TimeoutException">The client did not connect before <paramref name="timeout"/> elapsed.</exception>
+    /// <exception cref="InvalidOperationException">The client reached <see cref="ConnectionState.Faulted"/>.</exception>
+    public async Task WaitUntilConnectedAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (timeout < TimeSpan.Zero && timeout != Timeout.InfiniteTimeSpan)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeout), timeout, "The timeout must be non-negative or InfiniteTimeSpan.");
+        }
+
+        var watcher = Channel.CreateBounded<ConnectionStateChanged>(new BoundedChannelOptions(64)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+        });
+
+        lock (_stateGate)
+        {
+            if (State == ConnectionState.Connected)
+            {
+                return;
+            }
+
+            if (State == ConnectionState.Faulted)
+            {
+                throw new InvalidOperationException("The MQTT client is faulted.");
+            }
+
+            _watchers.Add(watcher);
+        }
+
+        CancellationTokenSource? timeoutSource = null;
+        CancellationTokenSource? linkedSource = null;
+        try
+        {
+            timeoutSource = timeout == Timeout.InfiniteTimeSpan ? null : new CancellationTokenSource(timeout, _time);
+            linkedSource = timeoutSource is null
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
+
+            await foreach (var change in watcher.Reader.ReadAllAsync(linkedSource.Token).ConfigureAwait(false))
+            {
+                if (change.Current == ConnectionState.Connected)
+                {
+                    return;
+                }
+
+                if (change.Current == ConnectionState.Faulted)
+                {
+                    throw new InvalidOperationException("The MQTT client is faulted.");
+                }
+            }
+        }
+        catch (OperationCanceledException) when (timeoutSource?.IsCancellationRequested == true && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"The MQTT client did not reach Connected within {timeout}.");
+        }
+        finally
+        {
+            linkedSource?.Dispose();
+            timeoutSource?.Dispose();
             lock (_stateGate)
             {
                 _watchers.Remove(watcher);

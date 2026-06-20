@@ -208,4 +208,45 @@ public sealed class MqttRouterTests
 
         (await received.Task.WaitAsync(SafetyTimeout)).ShouldBe("9");
     }
+
+    [Fact]
+    public async Task Client_OnAsync_preserves_subscription_options_on_the_route_filter()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "router-options", KeepAliveSeconds = 0 },
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.StartAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var route = client.OnAsync(
+            "sensors/{id}",
+            (_, _, _) => ValueTask.CompletedTask,
+            new MqttRouteOptions
+            {
+                SubscriptionQualityOfService = MqttQualityOfService.ExactlyOnce,
+                NoLocal = true,
+                RetainAsPublished = true,
+                RetainHandling = MqttRetainHandling.DoNotSendAtSubscribe,
+            },
+            timeout.Token);
+
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        var filter = subscribe.TopicFilters.ShouldHaveSingleItem();
+        filter.Topic.ShouldBe("sensors/+");
+        filter.MaximumQualityOfService.ShouldBe(MqttQualityOfService.ExactlyOnce);
+        filter.NoLocal.ShouldBeTrue();
+        filter.RetainAsPublished.ShouldBeTrue();
+        filter.RetainHandling.ShouldBe(MqttRetainHandling.DoNotSendAtSubscribe);
+
+        await broker.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService2] },
+            timeout.Token);
+        (await route).Dispose();
+    }
 }

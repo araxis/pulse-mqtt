@@ -64,6 +64,8 @@ using var route = await client.Route("sensors/{deviceId}/temp")
     .WithQueue(capacity: 128, RouteOverflow.DropOldest)
     .WithConcurrency(4)
     .WithSubscriptionQualityOfService(MqttQualityOfService.AtLeastOnce)
+    .WithNoLocal()
+    .WithRetainHandling(MqttRetainHandling.DoNotSendAtSubscribe)
     .HandleAsync<TelemetryReading>((reading, message, ct) =>
         Handle(reading, message.Values["deviceId"]));
 ```

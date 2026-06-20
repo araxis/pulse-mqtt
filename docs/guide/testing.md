@@ -81,10 +81,7 @@ Assert against signals, never `Task.Delay`-and-hope:
 
 ```csharp
 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-await foreach (var change in client.WatchState(timeout.Token))
-{
-    if (change.Current == ConnectionState.Connected) break;
-}
+await client.WaitUntilConnectedAsync(TimeSpan.FromSeconds(10), timeout.Token);
 ```
 
 ::: tip Publish before connected?

@@ -49,6 +49,27 @@ public sealed class MqttRouteBuilder
         return this;
     }
 
+    /// <summary>Prevents the broker from echoing this client's own publications back to the route.</summary>
+    public MqttRouteBuilder WithNoLocal(bool noLocal = true)
+    {
+        _options = _options with { NoLocal = noLocal };
+        return this;
+    }
+
+    /// <summary>Preserves the original RETAIN flag on messages forwarded to the route.</summary>
+    public MqttRouteBuilder WithRetainAsPublished(bool retainAsPublished = true)
+    {
+        _options = _options with { RetainAsPublished = retainAsPublished };
+        return this;
+    }
+
+    /// <summary>Controls when retained messages are sent for the route's subscription.</summary>
+    public MqttRouteBuilder WithRetainHandling(MqttRetainHandling retainHandling)
+    {
+        _options = _options with { RetainHandling = retainHandling };
+        return this;
+    }
+
     /// <summary>Registers a raw handler and subscribes the filter. Dispose the result to remove the route.</summary>
     public Task<IDisposable> HandleAsync(MqttRouteHandler handler, CancellationToken cancellationToken = default) =>
         _client.OnAsync(_template, handler, _options, cancellationToken);

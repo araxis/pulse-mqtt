@@ -1,6 +1,14 @@
 # Changelog
 
-## 1.2.0 (unreleased)
+## 1.2.0
+
+- Added `ResilientMqttClient.WaitUntilConnectedAsync(...)` for code that needs to block until
+  the resilient client is fully connected, with timeout handling driven by the client's
+  `TimeProvider`.
+- Added full MQTT 5 subscription options to routed subscriptions:
+  `MqttRouteOptions.NoLocal`, `RetainAsPublished`, and `RetainHandling`, plus matching fluent
+  route-builder methods. Route-created subscriptions now preserve the same option set available
+  through raw `MqttTopicFilter`.
 
 ## 1.1.0
 

@@ -26,7 +26,9 @@ one line, not a fork.
 | `Pulse.Mqtt.Client` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Client?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Client) | The resilient client: supervisor, topic routing, typed messaging, request/response. |
 | `Pulse.Mqtt.DependencyInjection` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.DependencyInjection?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.DependencyInjection) | `AddPulseMqttClient`, named clients, hosted lifecycle, health checks. |
 | `Pulse.Mqtt.Serialization.Json` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Serialization.Json?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Serialization.Json) | Source-generated `System.Text.Json` payload serialization (AOT-safe). |
+| `Pulse.Mqtt.Serialization.MessagePack` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Serialization.MessagePack?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Serialization.MessagePack) | MessagePack payload serialization for compact binary messages. |
 | `Pulse.Mqtt.Resilience.Polly` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Resilience.Polly?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Resilience.Polly) | Reconnect strategy backed by a Polly v8 `ResiliencePipeline`. |
+| `Pulse.Mqtt.Storage.Sqlite` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Storage.Sqlite?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Storage.Sqlite) | Durable SQLite session and offline-message stores. |
 | `Pulse.Mqtt.Transport.WebSocket` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Transport.WebSocket?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Transport.WebSocket) | MQTT over WebSocket (`ws`/`wss`). |
 | `Pulse.Mqtt.Testing` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Testing?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Testing) | `PulseMqttTestBroker` — an in-process broker for millisecond tests with no Docker. |
 
@@ -56,7 +58,8 @@ await using var client = new ResilientMqttClient(factory, new ResilientMqttClien
 {
     Connect = new MqttConnectPacket { ClientId = "service-1" },
 });
-await client.StartAsync(ct); // connects in the background; watch client.State
+await client.StartAsync(ct); // connects in the background
+await client.WaitUntilConnectedAsync(TimeSpan.FromSeconds(10), ct); // when readiness matters
 ```
 
 ### Route topics to handlers
@@ -151,8 +154,9 @@ Measured with BenchmarkDotNet (`MemoryDiagnoser`) on .NET 10:
 | Route template match (2 captures) | ~56 ns | 104 B (the captured values) |
 | Variable-length integer round-trip | ~26 ns | 0 B |
 
-Head-to-head against MQTTnet over a real broker — higher throughput, lower allocations in
-every scenario, faster connects: [the full comparison](docs/Benchmark-vs-MQTTnet.md).
+Head-to-head against MQTTnet over a real broker — lower allocations in every measured
+scenario, comparable throughput, and protocol-compliance differences:
+[the full comparison](docs/Benchmark-vs-MQTTnet.md).
 
 Everything is bounded: inbound queues, per-route queues, the offline queue. Backpressure flows
 to the socket instead of buffering without limits. All timing goes through `TimeProvider`, so
@@ -168,9 +172,8 @@ the whole stack is testable with a fake clock.
 
 ## Scope notes
 
-MQTT over QUIC, MessagePack/Protobuf serializers, automatic topic-alias negotiation, fine-grained
-flow-control tuning, and MQTT 5 enhanced authentication are tracked as backlog; the contracts
-they plug into already exist.
+MQTT over QUIC, a Protobuf serializer, broker-side feature probes, and an analyzer package for
+common misuse are tracked as post-1.0 horizon items.
 
 ## Documentation
 

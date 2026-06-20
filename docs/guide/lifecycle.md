@@ -81,15 +81,13 @@ means living with that. When code genuinely needs a live connection first:
 
 ```csharp
 await client.StartAsync(token);
-await foreach (var change in client.WatchState(token))
-{
-    if (change.Current == ConnectionState.Connected) break;
-    if (change.Current == ConnectionState.Faulted) throw new InvalidOperationException($"MQTT faulted: {change.Reason}");
-}
+await client.WaitUntilConnectedAsync(TimeSpan.FromSeconds(10), token);
 ```
 
 Most code should not wait: publishes [queue while offline](./resilience#the-offline-queue) and
 subscriptions apply on connect, so working through the client is safe in every state.
+For custom readiness rules, use `WatchState` directly and react to the transitions that matter
+to your application.
 
 ## Health checks
 

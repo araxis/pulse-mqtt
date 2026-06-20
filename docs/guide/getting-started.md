@@ -95,6 +95,8 @@ using var responder = await client.OnRequestAsync<StatusRequest, StatusReply>(
 ## Watch the connection
 
 ```csharp
+await client.WaitUntilConnectedAsync(TimeSpan.FromSeconds(10), token);   // readiness gate
+
 await foreach (var change in client.WatchState(token))
 {
     logger.LogInformation("MQTT: {Previous} -> {Current}", change.Previous, change.Current);

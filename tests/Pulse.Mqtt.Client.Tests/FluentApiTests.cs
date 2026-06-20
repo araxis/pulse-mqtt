@@ -27,7 +27,7 @@ public sealed class FluentApiTests
             .WithOfflineQueue(capacity: 16, OverflowPolicy.DropOldest)
             .BuildAndStartAsync(timeout.Token);
 
-        await WaitUntilConnectedAsync(client, timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
         client.State.ShouldBe(ConnectionState.Connected);
     }
 
@@ -136,15 +136,7 @@ public sealed class FluentApiTests
             .WithSerializer(new JsonMqttSerializer(TestJsonContext.Default))
             .BuildAndStartAsync(timeout.Token);
 
-        await WaitUntilConnectedAsync(client, timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
         return (client, broker, timeout.Token);
-    }
-
-    private static async Task WaitUntilConnectedAsync(ResilientMqttClient client, CancellationToken cancellationToken)
-    {
-        while (client.State != ConnectionState.Connected)
-        {
-            await Task.Delay(1, cancellationToken);
-        }
     }
 }

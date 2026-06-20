@@ -3,6 +3,7 @@ using Pulse.Mqtt.Connection;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Resilience;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
 
@@ -43,6 +44,68 @@ public sealed class ResilientMqttClientTests
             states.ShouldContain(ConnectionState.Connecting);
             states.Last().ShouldBe(ConnectionState.Connected);
         }
+    }
+
+    [Fact]
+    public async Task Wait_until_connected_completes_on_connected_state()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, NewOptions());
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.StartAsync(timeout.Token);
+        var wait = client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+
+        await wait;
+        client.State.ShouldBe(ConnectionState.Connected);
+    }
+
+    [Fact]
+    public async Task Wait_until_connected_returns_immediately_when_already_connected()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, NewOptions());
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.StartAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        await client.WaitUntilConnectedAsync(TimeSpan.Zero, timeout.Token);
+    }
+
+    [Fact]
+    public async Task Wait_until_connected_throws_when_client_faults()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, NewOptions());
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.StartAsync(timeout.Token);
+        var wait = client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
+        await broker.SendAsync(new MqttConnAckPacket { ReasonCode = MqttReasonCode.NotAuthorized }, timeout.Token);
+
+        await Should.ThrowAsync<InvalidOperationException>(wait);
+    }
+
+    [Fact]
+    public async Task Wait_until_connected_uses_the_client_time_provider_for_timeout()
+    {
+        var time = new FakeTimeProvider();
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, NewOptions(), time);
+
+        var wait = client.WaitUntilConnectedAsync(TimeSpan.FromSeconds(5));
+        time.Advance(TimeSpan.FromSeconds(5));
+
+        await Should.ThrowAsync<TimeoutException>(wait);
     }
 
     [Fact]

@@ -1,1 +1,11 @@
 #nullable enable
+Pulse.Mqtt.Client.MqttRouteBuilder.WithNoLocal(bool noLocal = true) -> Pulse.Mqtt.Client.MqttRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteBuilder.WithRetainAsPublished(bool retainAsPublished = true) -> Pulse.Mqtt.Client.MqttRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteBuilder.WithRetainHandling(Pulse.Mqtt.MqttRetainHandling retainHandling) -> Pulse.Mqtt.Client.MqttRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteOptions.NoLocal.get -> bool
+Pulse.Mqtt.Client.MqttRouteOptions.NoLocal.init -> void
+Pulse.Mqtt.Client.MqttRouteOptions.RetainAsPublished.get -> bool
+Pulse.Mqtt.Client.MqttRouteOptions.RetainAsPublished.init -> void
+Pulse.Mqtt.Client.MqttRouteOptions.RetainHandling.get -> Pulse.Mqtt.MqttRetainHandling
+Pulse.Mqtt.Client.MqttRouteOptions.RetainHandling.init -> void
+Pulse.Mqtt.Client.ResilientMqttClient.WaitUntilConnectedAsync(System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
