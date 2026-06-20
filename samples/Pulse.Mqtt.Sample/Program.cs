@@ -53,10 +53,9 @@ _ = Task.Run(async () =>
 });
 
 // 1. Routed subscription: {deviceId} is captured from the topic of every matching message.
-var telemetryTemplate = MqttRouteTemplate.Parse("sensors/{deviceId}/telemetry");
-await client.SubscribeAsync([telemetryTemplate.ToTopicFilter(MqttQualityOfService.AtLeastOnce)]);
-using var telemetryRoute = client.RegisterRoute<TelemetryReading>(
-    telemetryTemplate,
+await using var telemetryRoute = await client.OnAsync<TelemetryReading>(
+    "sensors/{deviceId}/telemetry",
+    MqttQualityOfService.AtLeastOnce,
     (reading, message, _) =>
     {
         Console.WriteLine(

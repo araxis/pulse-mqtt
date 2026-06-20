@@ -110,6 +110,110 @@ public sealed class FluentApiTests
     }
 
     [Fact]
+    public async Task OnAsync_subscribes_and_routes_typed_messages_in_one_call()
+    {
+        var (client, broker, ct) = await ConnectedAsync();
+        await using var _ = client;
+
+        var received = new TaskCompletionSource<(TelemetryReading Value, string Device)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await using var route = await client.OnAsync<TelemetryReading>(
+            "sensors/{device}/telemetry",
+            MqttQualityOfService.AtLeastOnce,
+            (value, message, _) =>
+            {
+                received.TrySetResult((value, message.Values["device"]));
+                return ValueTask.CompletedTask;
+            },
+            ct);
+
+        route.TopicFilter.Topic.ShouldBe("sensors/+/telemetry");
+        route.TopicFilter.MaximumQualityOfService.ShouldBe(MqttQualityOfService.AtLeastOnce);
+
+        await broker.PublishAsync(new MqttPublishPacket
+        {
+            Topic = "sensors/boiler-10/telemetry",
+            Payload = new JsonMqttSerializer(TestJsonContext.Default).Serialize(new TelemetryReading("d-10", 84.0)),
+        }, ct);
+
+        var (value, device) = await received.Task.WaitAsync(SafetyTimeout);
+        value.ShouldBe(new TelemetryReading("d-10", 84.0));
+        device.ShouldBe("boiler-10");
+    }
+
+    [Fact]
+    public async Task OnAsync_disposal_unsubscribes_the_broker_filter()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var transport = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(
+            transport,
+            new ResilientMqttClientOptions
+            {
+                Connect = new MqttConnectPacket
+                {
+                    ClientId = "on-async",
+                    KeepAliveSeconds = 0,
+                },
+            });
+
+        await client.StartAsync(timeout.Token);
+        var broker = await transport.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var received = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var routeTask = client.OnAsync(
+            "jobs/{id}",
+            MqttQualityOfService.AtLeastOnce,
+            (message, values, _) =>
+            {
+                received.TrySetResult(values["id"]);
+                return ValueTask.CompletedTask;
+            },
+            cancellationToken: timeout.Token);
+
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token))
+            .ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        subscribe.TopicFilters.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            filter => filter.Topic.ShouldBe("jobs/+"),
+            filter => filter.MaximumQualityOfService.ShouldBe(MqttQualityOfService.AtLeastOnce));
+        await broker.SendAsync(
+            new MqttSubAckPacket
+            {
+                PacketIdentifier = subscribe.PacketIdentifier,
+                ReasonCodes = [MqttReasonCode.GrantedQualityOfService1],
+            },
+            timeout.Token);
+
+        await using var route = await routeTask.WaitAsync(SafetyTimeout);
+
+        await broker.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "jobs/42",
+                Payload = "created"u8.ToArray(),
+            },
+            timeout.Token);
+        (await received.Task.WaitAsync(SafetyTimeout)).ShouldBe("42");
+
+        var disposeTask = route.DisposeAsync().AsTask();
+        var unsubscribe = (await broker.ReadPacketAsync(timeout.Token))
+            .ShouldBeOfTypeOrThrow<MqttUnsubscribePacket>();
+        unsubscribe.TopicFilters.ShouldBe(["jobs/+"]);
+        await broker.SendAsync(
+            new MqttUnsubAckPacket
+            {
+                PacketIdentifier = unsubscribe.PacketIdentifier,
+                ReasonCodes = [MqttReasonCode.Success],
+            },
+            timeout.Token);
+        await disposeTask.WaitAsync(SafetyTimeout);
+    }
+
+    [Fact]
     public async Task A_fluent_request_round_trips_through_a_responder()
     {
         var (client, _, ct) = await ConnectedAsync();

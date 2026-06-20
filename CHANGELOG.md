@@ -1,6 +1,10 @@
 # Changelog
 
-## 2.1.0 (unreleased)
+## 2.1.0
+
+- Added endpoint-style `OnAsync(...)` fluent routing helpers. They subscribe the route's broker
+  filter and register the local route in one call, while returning an async-disposable handle
+  that unregisters the route and unsubscribes the broker filter.
 
 ## 2.0.0
 

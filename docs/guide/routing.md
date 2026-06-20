@@ -18,6 +18,25 @@ captures).
 
 ## Handlers
 
+For the common "subscribe and handle this route" case, use endpoint-style `OnAsync`:
+
+```csharp
+await using var route = await client.OnAsync(
+    "sensors/{deviceId}/temp",
+    MqttQualityOfService.AtLeastOnce,
+    async (message, values, token) =>
+    {
+        await store.SaveAsync(values["deviceId"], message.Payload, token);
+    },
+    token);
+```
+
+`OnAsync` is shorthand, not a second routing model. It registers the local route, subscribes
+the route's broker filter, and returns a handle whose async disposal removes both.
+
+Use the explicit form when you want separate broker subscription ownership or advanced route
+queue/concurrency settings:
+
 ```csharp
 var template = MqttRouteTemplate.Parse("sensors/{deviceId}/temp");
 await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
