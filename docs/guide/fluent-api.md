@@ -59,6 +59,22 @@ the payload format stamped), or raw bytes. `WithContentType`, `WithResponseTopic
 
 ## Routing
 
+For endpoint-style routing, `OnAsync` subscribes the broker filter and registers the local
+route in one call:
+
+```csharp
+await using var route = await client.OnAsync<TelemetryReading>(
+    "sensors/{deviceId}/temp",
+    MqttQualityOfService.AtLeastOnce,
+    (reading, message, ct) =>
+        Handle(reading, message.Values["deviceId"]),
+    ct);
+```
+
+Async disposal unregisters the local route and unsubscribes the broker filter.
+
+When you want queue/concurrency tuning or explicit subscription ownership, use the route builder:
+
 ```csharp
 var route = client.Route("sensors/{deviceId}/temp");
 await client.SubscribeAsync([route.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);

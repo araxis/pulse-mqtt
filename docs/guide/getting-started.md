@@ -66,21 +66,21 @@ var outcome = await client.PublishAsync(
 ## Subscribe
 
 ```csharp
-var template = MqttRouteTemplate.Parse("sensors/{deviceId}/telemetry");
-await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], token);
-
-using var route = client.RegisterRoute<TelemetryReading>(
-    template,
+await using var route = await client.OnAsync<TelemetryReading>(
+    "sensors/{deviceId}/telemetry",
+    MqttQualityOfService.AtLeastOnce,
     (reading, message, token) =>
     {
         Console.WriteLine($"{message.Values["deviceId"]}: {reading.Value}{reading.Unit}");
         return ValueTask.CompletedTask;
-    });
+    },
+    token);
 ```
 
-`SubscribeAsync` tells the broker to deliver `sensors/+/telemetry`; `RegisterRoute` captures
-`{deviceId}` and dispatches locally. Each route has its own bounded queue, and a throwing
-handler faults only its route.
+`OnAsync` tells the broker to deliver `sensors/+/telemetry`, captures `{deviceId}`, and
+dispatches locally. Async disposal unregisters the local route and unsubscribes the broker
+filter. For advanced queue settings or separate subscription ownership, use the explicit
+`SubscribeAsync` plus `RegisterRoute` APIs.
 
 ## Request and response
 
