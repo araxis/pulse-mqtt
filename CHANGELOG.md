@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.9.0 (unreleased)
+
 ## 2.8.0
 
 - Added `ResilientMqttClient.GetDiagnosticsSnapshot()` and
