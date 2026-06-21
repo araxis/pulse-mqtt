@@ -158,7 +158,13 @@ public sealed class AddPulseMqttClientTests
         var check = new PulseMqttHealthCheck(client);
         var context = new HealthCheckContext { Registration = registration };
 
-        (await check.CheckHealthAsync(context)).Status.ShouldBe(HealthStatus.Unhealthy); // Disconnected
+        var disconnected = await check.CheckHealthAsync(context);
+        disconnected.Status.ShouldBe(HealthStatus.Unhealthy); // Disconnected
+        disconnected.Data["client.id"].ShouldBe("test-client");
+        disconnected.Data["state"].ShouldBe(ConnectionState.Disconnected.ToString());
+        disconnected.Data["attempt"].ShouldBe(0);
+        disconnected.Data["offline.queue.depth"].ShouldBe(0);
+        disconnected.Data["offline.queue.dropped"].ShouldBe(0L);
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
         await client.ConnectAsync(timeout.Token);
@@ -167,9 +173,14 @@ public sealed class AddPulseMqttClientTests
             await Task.Delay(5, timeout.Token);
         }
 
-        (await check.CheckHealthAsync(context)).Status.ShouldBe(HealthStatus.Degraded); // connecting/retrying
+        var connecting = await check.CheckHealthAsync(context);
+        connecting.Status.ShouldBe(HealthStatus.Degraded); // connecting/retrying
+        connecting.Data["state"].ShouldBe(client.GetDiagnosticsSnapshot().State.ToString());
+        connecting.Data.ContainsKey("state.changed_at").ShouldBeTrue();
 
         await client.DisconnectAsync(timeout.Token);
-        (await check.CheckHealthAsync(context)).Status.ShouldBe(HealthStatus.Unhealthy); // Stopped
+        var stopped = await check.CheckHealthAsync(context);
+        stopped.Status.ShouldBe(HealthStatus.Unhealthy); // Stopped
+        stopped.Data["state"].ShouldBe(ConnectionState.Stopped.ToString());
     }
 }

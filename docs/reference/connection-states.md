@@ -17,9 +17,9 @@ Notes:
 
 - `Connected` is only entered **after** the lifecycle hook ran (re-subscription) and the
   offline queue flushed — by the time you observe it, the session is fully restored.
-- `Faulted` and drop transitions carry the broker's reason code on the
-  `ConnectionStateChanged.Reason` field — for example `SessionTakenOver` after a broker
-  DISCONNECT, or `NotAuthorized` after a rejected CONNECT.
+- `Faulted` and drop transitions carry broker or connection details on
+  `ConnectionStateChanged` — for example `SessionTakenOver` after a broker DISCONNECT, or
+  `NotAuthorized` after a rejected CONNECT.
 - Health checks map these as healthy (`Connected`), degraded (`Connecting`, `Reconnecting`,
   `WaitingRetry`), and unhealthy (the rest).
 
@@ -30,3 +30,16 @@ Notes:
 | `Previous` / `Current` | The transition |
 | `Attempt` | The connection attempt number, for retry telemetry |
 | `Reason` | The broker's reason code, populated on drops and faults when one is known |
+| `ReasonString` | MQTT 5 reason string text, when the broker supplied it |
+| `ServerReference` | MQTT 5 server reference, useful for redirect-aware deployments |
+| `Error` | The triggering exception for rejected connects, retry failures, disconnects, and terminal faults |
+
+`ResilientMqttClient.GetDiagnosticsSnapshot()` gives the same state as a synchronous snapshot
+for dashboards and support tools:
+
+| Field | Meaning |
+| --- | --- |
+| `ClientId`, `State`, `Attempt`, `IsRunning`, `StateChangedAt` | Current lifecycle state |
+| `LastReason`, `LastReasonString`, `LastServerReference`, `LastError` | Last known broker or fault detail |
+| `OfflineQueueDepth`, `OfflineQueueDroppedCount` | Offline queue counters, or `null` if a custom store cannot report them |
+| `SubscriptionCount`, `PendingSubscribeCount`, `PendingUnsubscribeCount` | Subscription bookkeeping |

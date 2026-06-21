@@ -7,13 +7,30 @@ public sealed class MqttConnectRejectedException : MqttException
 {
     /// <summary>Initializes a new instance carrying the broker's <paramref name="reasonCode"/>.</summary>
     public MqttConnectRejectedException(MqttReasonCode reasonCode)
+        : this(reasonCode, null, null)
+    {
+    }
+
+    /// <summary>Initializes a new instance carrying the broker's CONNACK details.</summary>
+    public MqttConnectRejectedException(
+        MqttReasonCode reasonCode,
+        string? reasonString,
+        string? serverReference)
         : base($"The broker rejected the connection with reason 0x{(byte)reasonCode:X2} ({reasonCode}).")
     {
         ReasonCode = reasonCode;
+        ReasonString = reasonString;
+        ServerReference = serverReference;
     }
 
     /// <summary>The CONNACK reason code the broker returned.</summary>
     public MqttReasonCode ReasonCode { get; }
+
+    /// <summary>The CONNACK reason string the broker returned, if any.</summary>
+    public string? ReasonString { get; }
+
+    /// <summary>The CONNACK server reference the broker returned, if any.</summary>
+    public string? ServerReference { get; }
 }
 
 /// <summary>A connection attempt failed in a way the reconnect policy considers retryable.</summary>

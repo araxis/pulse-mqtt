@@ -189,6 +189,35 @@ builder.Logging.AddOpenTelemetry(o =>
 });
 ```
 
+## Diagnostics snapshot
+
+For polling-style diagnostics, `ResilientMqttClient.GetDiagnosticsSnapshot()` returns a
+synchronous, in-memory view of the client. It does not inspect payloads, credentials, queued
+messages, or topic lists.
+
+```csharp
+var snapshot = client.GetDiagnosticsSnapshot();
+
+logger.LogInformation(
+    "MQTT {State} attempt {Attempt}, queue {QueueDepth}, last reason {Reason}",
+    snapshot.State,
+    snapshot.Attempt,
+    snapshot.OfflineQueueDepth,
+    snapshot.LastReason);
+```
+
+The snapshot includes:
+
+| Field | Meaning |
+| --- | --- |
+| `ClientId`, `State`, `Attempt`, `IsRunning`, `StateChangedAt` | Lifecycle position and when it last changed |
+| `LastReason`, `LastReasonString`, `LastServerReference`, `LastError` | Last broker disconnect, rejected CONNECT, retry failure, or terminal fault details |
+| `OfflineQueueDepth`, `OfflineQueueDroppedCount` | Queue counters, or `null` if a custom store cannot provide them during collection |
+| `SubscriptionCount`, `PendingSubscribeCount`, `PendingUnsubscribeCount` | Durable subscription set and offline subscription deltas |
+
+Successful `Connected` transitions clear stale fault details, so `LastError` describes the
+current problem, not an old outage that has already recovered.
+
 ## State as a stream or event
 
 For in-process reactions — a UI badge, a circuit indicator, paging — you do not need the
@@ -199,7 +228,7 @@ metrics pipeline. Two surfaces expose state directly:
 await foreach (var change in client.WatchState(token))
 {
     if (change.Current == ConnectionState.Faulted)
-        alerting.Page($"MQTT faulted: {change.Reason}");
+        alerting.Page($"MQTT faulted: {change.Reason} {change.ReasonString}");
 }
 
 // Push: a plain event, if that fits better.
@@ -207,8 +236,10 @@ client.StateChanged += change =>
     metrics.SetGauge("mqtt_up", change.Current == ConnectionState.Connected ? 1 : 0);
 ```
 
-`ConnectionStateChanged` carries `Previous`, `Current`, `Attempt`, and `Error` (the triggering
-exception, when there is one). The router exposes a matching `HandlerFaulted` event
+`ConnectionStateChanged` carries `Previous`, `Current`, `Attempt`, `Reason`, `ReasonString`,
+`ServerReference`, and `Error` (the triggering exception, when there is one). The original
+constructor and deconstruction shape remain the four core fields, so existing handlers keep
+compiling. The router exposes a matching `HandlerFaulted` event
 (`Action<string, Exception>` — the route template and the exception) if you want to react to
 handler faults beyond the `RouteHandlerFaulted` log.
 

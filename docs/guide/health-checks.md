@@ -21,17 +21,30 @@ app.MapHealthChecks("/health");
 
 ## The state mapping
 
-The check reads `ResilientMqttClient.State` and maps it exactly:
+The check reads `ResilientMqttClient.GetDiagnosticsSnapshot()` and maps the snapshot state
+exactly:
 
 | Connection state | Health status | Description |
 | --- | --- | --- |
-| `Connected` | **Healthy** | `Connected.` |
-| `Connecting`, `Reconnecting`, `WaitingRetry` | **Degraded** | `The connection is being established (<state>).` |
-| `Disconnected`, `Faulted`, `Stopped` | **Unhealthy** | `The client is <state>.` |
+| `Connected` | **Healthy** | `Connected (attempt <attempt>).` |
+| `Connecting`, `Reconnecting`, `WaitingRetry` | **Degraded** | `The connection is being established (<state>, attempt <attempt>).` |
+| `Disconnected`, `Faulted`, `Stopped` | **Unhealthy** | `The client is <state>.`, or `The client is <state> (<reason>).` when a reason is known |
 
 `Degraded` is the deliberate middle ground: the client is doing its job (reconnecting), so a
 transient blip does not flap your readiness probe, but the dashboard still shows it is not fully
 up. `Faulted` is `Unhealthy` because the client has stopped retrying — it needs intervention.
+
+## Result data
+
+The built-in check attaches snapshot data for dashboards and probe logs:
+
+| Key | Meaning |
+| --- | --- |
+| `client.id`, `state`, `attempt`, `is.running`, `state.changed_at` | Lifecycle position |
+| `subscription.count`, `pending.subscribe.count`, `pending.unsubscribe.count` | Subscription bookkeeping |
+| `reason`, `reason.string`, `server.reference` | Last broker or connect reason details, when available |
+| `error.type`, `error.message` | Last exception details, when available |
+| `offline.queue.depth`, `offline.queue.dropped` | Queue counters, when the store can report them |
 
 ## Separating liveness from readiness
 
@@ -87,25 +100,25 @@ HealthCheckResult result = await check.CheckHealthAsync(
 ## A custom health check
 
 If you want a different definition of healthy — say, also requiring the offline queue to be
-below a threshold — write your own over the same surfaces:
+below a threshold — write your own over the same snapshot:
 
 ```csharp
-public sealed class MqttBacklogHealthCheck(
-    IPulseMqttClientFactory clients,
-    IMessageStore offlineQueue) : IHealthCheck
+public sealed class MqttBacklogHealthCheck(IPulseMqttClientFactory clients) : IHealthCheck
 {
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct)
     {
         var client = clients.GetClient("devices");
-        if (client.State != ConnectionState.Connected)
+        var snapshot = client.GetDiagnosticsSnapshot();
+
+        if (snapshot.State != ConnectionState.Connected)
         {
-            return Task.FromResult(HealthCheckResult.Unhealthy($"MQTT is {client.State}."));
+            return Task.FromResult(HealthCheckResult.Unhealthy($"MQTT is {snapshot.State}."));
         }
 
-        // Count and DroppedCount are part of the IMessageStore contract.
-        if (offlineQueue.Count > 500)
+        if (snapshot.OfflineQueueDepth is > 500)
         {
-            return Task.FromResult(HealthCheckResult.Degraded($"Offline backlog {offlineQueue.Count}."));
+            return Task.FromResult(
+                HealthCheckResult.Degraded($"Offline backlog {snapshot.OfflineQueueDepth}."));
         }
 
         return Task.FromResult(HealthCheckResult.Healthy());
@@ -117,5 +130,5 @@ public sealed class MqttBacklogHealthCheck(
 builder.Services.AddHealthChecks().AddCheck<MqttBacklogHealthCheck>("mqtt-backlog");
 ```
 
-The state stream behind the built-in check is also available directly for non-HTTP reactions —
-see [Observability](./observability#state-as-a-stream-or-event).
+The diagnostics snapshot and state stream behind the built-in check are also available directly
+for non-HTTP reactions — see [Observability](./observability#diagnostics-snapshot).

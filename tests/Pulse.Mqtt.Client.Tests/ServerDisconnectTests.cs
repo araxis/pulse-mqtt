@@ -29,7 +29,9 @@ public sealed class ServerDisconnectTests
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
 
         transitions.ShouldContain(change =>
-            change.Current == ConnectionState.Reconnecting && change.Reason == MqttReasonCode.ServerShuttingDown);
+            change.Current == ConnectionState.Reconnecting &&
+            change.Reason == MqttReasonCode.ServerShuttingDown &&
+            change.Error is MqttServerDisconnectedException);
     }
 
     [Fact]
@@ -49,7 +51,9 @@ public sealed class ServerDisconnectTests
         await WaitForStateAsync(client, ConnectionState.Faulted, timeout.Token);
         factory.ConnectionsHandedOut.ShouldBe(1); // no reconnect attempt — the session has a new owner
         transitions.ShouldContain(change =>
-            change.Current == ConnectionState.Faulted && change.Reason == MqttReasonCode.SessionTakenOver);
+            change.Current == ConnectionState.Faulted &&
+            change.Reason == MqttReasonCode.SessionTakenOver &&
+            change.Error is MqttServerDisconnectedException);
     }
 
     [Fact]
@@ -57,11 +61,13 @@ public sealed class ServerDisconnectTests
     {
         var factory = new SequencedTransportFactory();
         var lifecycle = new RecordingLifecycle();
+        var transitions = new List<ConnectionStateChanged>();
         await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
         {
             Connect = new MqttConnectPacket { ClientId = "down-context", KeepAliveSeconds = 0 },
             Lifecycle = lifecycle,
         });
+        client.StateChanged += transitions.Add;
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
         await client.ConnectAsync(timeout.Token);
@@ -85,6 +91,13 @@ public sealed class ServerDisconnectTests
         context.ReasonString.ShouldBe("rebalancing");
         context.ServerReference.ShouldBe("backup.example:1883");
         context.Error.ShouldBeOfType<MqttServerDisconnectedException>();
+
+        transitions.ShouldContain(change =>
+            change.Current == ConnectionState.Faulted &&
+            change.Reason == MqttReasonCode.UseAnotherServer &&
+            change.ReasonString == "rebalancing" &&
+            change.ServerReference == "backup.example:1883" &&
+            change.Error is MqttServerDisconnectedException);
     }
 
     private sealed class RecordingLifecycle : IConnectionLifecycle

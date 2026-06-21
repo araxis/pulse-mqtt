@@ -74,6 +74,29 @@ _ = Task.Run(async () =>
 Each watcher gets an independent bounded view (oldest entries drop if a watcher lags — it
 never blocks the client). Subscribe before the transitions you care about; there is no replay.
 
+`ConnectionStateChanged` also carries `Reason`, `ReasonString`, `ServerReference`, and `Error`
+when a broker disconnect, rejected CONNECT, retry failure, or terminal fault has details to
+report.
+
+## Reading diagnostics
+
+For a synchronous point-in-time view, call `GetDiagnosticsSnapshot()`:
+
+```csharp
+var snapshot = client.GetDiagnosticsSnapshot();
+
+logger.LogInformation(
+    "MQTT {State} attempt {Attempt}, subscriptions {SubscriptionCount}, queued {Queued}",
+    snapshot.State,
+    snapshot.Attempt,
+    snapshot.SubscriptionCount,
+    snapshot.OfflineQueueDepth);
+```
+
+The snapshot includes the current state, when it changed, the last reason/error details, offline
+queue counters, and subscription bookkeeping. Queue counters are nullable so a custom store can
+fail diagnostics collection without failing the caller.
+
 ## Waiting for connected
 
 `ConnectAsync` deliberately does not block until connected — brokers can be down, and resilience

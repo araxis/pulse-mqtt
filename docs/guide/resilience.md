@@ -59,9 +59,10 @@ See [Extending](./extending#custom-reconnect-strategy).
 A broker that sends DISCONNECT gets an orderly close, not a guessing game. The reason code,
 reason string, and server reference are surfaced everywhere they matter: in-flight operations
 fail with `MqttServerDisconnectedException` carrying all three, the
-`ConnectionStateChanged.Reason` field carries the code, the lifecycle's down-context carries
-the details (including `ServerReference` for redirect-aware deployments), and the
-`ServerDisconnected` log event records it.
+`ConnectionStateChanged` transition carries the code, reason string, server reference, and
+error, the lifecycle's down-context carries the details (including `ServerReference` for
+redirect-aware deployments), `GetDiagnosticsSnapshot()` exposes the last details for polling,
+and the `ServerDisconnected` log event records it.
 
 What happens next depends on the reason, through the same `IReconnectDecision`:
 
@@ -210,7 +211,8 @@ the lifecycle to add cache warming, announcements, or custom ordering.
 ```csharp
 await foreach (var change in client.WatchState(token))
 {
-    // change.Previous, change.Current, change.Attempt, change.Error
+    // change.Previous, change.Current, change.Attempt, change.Reason,
+    // change.ReasonString, change.ServerReference, change.Error
 }
 ```
 

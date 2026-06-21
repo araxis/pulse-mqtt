@@ -2,6 +2,12 @@
 
 ## 2.8.0 (unreleased)
 
+- Added `ResilientMqttClient.GetDiagnosticsSnapshot()` and
+  `MqttClientDiagnosticsSnapshot` for synchronous production inspection of state, attempts,
+  last disconnect/fault details, offline queue counters, and subscription bookkeeping. State
+  transitions now also carry reason string, server reference, and error details, and the
+  built-in health check includes the same snapshot data without changing its status mapping.
+
 ## 2.7.0
 
 - Added `Pulse.Mqtt.Serialization.Protobuf`, an opt-in Protocol Buffers serializer package

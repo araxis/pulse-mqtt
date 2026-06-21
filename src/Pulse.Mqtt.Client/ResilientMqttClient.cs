@@ -55,6 +55,11 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     private Task? _supervisor;
     private volatile RawMqttClient? _raw;
     private int _attempt;
+    private DateTimeOffset _stateChangedAt;
+    private MqttReasonCode? _lastReason;
+    private string? _lastReasonString;
+    private string? _lastServerReference;
+    private Exception? _lastError;
     private volatile bool _disposed;
 
     /// <summary>Creates a resilient client that connects through <paramref name="transportFactory"/>.</summary>
@@ -69,6 +74,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         _transportFactory = transportFactory;
         _options = options;
         _time = timeProvider ?? TimeProvider.System;
+        _stateChangedAt = _time.GetUtcNow();
 
         _sessionStore = options.SessionStore ?? new InMemorySessionStore();
         _messageStore = options.MessageStore ?? new InMemoryMessageStore(options.OfflineQueue);
@@ -135,6 +141,41 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// then on the router owns the message stream — do not also read <see cref="Messages"/> directly.
     /// </summary>
     public MqttRouter Router => _router.Value;
+
+    /// <summary>Returns a synchronous point-in-time diagnostics snapshot for this client.</summary>
+    public MqttClientDiagnosticsSnapshot GetDiagnosticsSnapshot()
+    {
+        var (offlineQueueDepth, offlineQueueDroppedCount) = ReadOfflineQueueCounters(_messageStore);
+
+        int subscriptionCount;
+        int pendingSubscribeCount;
+        int pendingUnsubscribeCount;
+        lock (_subscriptionGate)
+        {
+            subscriptionCount = _subscriptions.Count;
+            pendingSubscribeCount = _pendingSubscribe.Count;
+            pendingUnsubscribeCount = _pendingUnsubscribe.Count;
+        }
+
+        lock (_stateGate)
+        {
+            return new MqttClientDiagnosticsSnapshot(
+                _clientId,
+                State,
+                _attempt,
+                _supervisor is { IsCompleted: false },
+                _stateChangedAt,
+                _lastReason,
+                _lastReasonString,
+                _lastServerReference,
+                _lastError,
+                offlineQueueDepth,
+                offlineQueueDroppedCount,
+                subscriptionCount,
+                pendingSubscribeCount,
+                pendingUnsubscribeCount);
+        }
+    }
 
     /// <summary>
     /// Connects this resilient client. The first connection attempt starts immediately, while
@@ -1204,13 +1245,18 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     private async Task SuperviseAsync(CancellationToken cancellationToken)
     {
-        MqttReasonCode? dropReason = null;
+        MqttServerDisconnectedException? serverDrop = null;
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                Transition(_attempt == 0 ? ConnectionState.Connecting : ConnectionState.Reconnecting, dropReason);
-                dropReason = null;
+                Transition(
+                    _attempt == 0 ? ConnectionState.Connecting : ConnectionState.Reconnecting,
+                    serverDrop?.ReasonCode,
+                    serverDrop?.ReasonString,
+                    serverDrop?.ServerReference,
+                    serverDrop);
+                serverDrop = null;
 
                 RawMqttClient? raw = null;
                 MqttConnAckPacket? connAck = null;
@@ -1266,7 +1312,10 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                                 var ack = await candidate.ConnectAsync(connect, _inFlightSession, token).ConfigureAwait(false);
                                 if (ack.ReasonCode != MqttReasonCode.Success)
                                 {
-                                    throw new MqttConnectRejectedException(ack.ReasonCode);
+                                    throw new MqttConnectRejectedException(
+                                        ack.ReasonCode,
+                                        ack.ReasonString,
+                                        ack.ServerReference);
                                 }
 
                                 if (heldInFlight > 0 && !ack.SessionPresent && _options.Logger is { } discardLogger)
@@ -1376,7 +1425,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 }
 
                 _attempt++;
-                dropReason = serverDisconnect?.ReasonCode;
+                serverDrop = serverDisconnect;
                 try
                 {
                     await _lifecycle.OnConnectionDownAsync(
@@ -1471,9 +1520,8 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     private void Fault(Exception error)
     {
-        var reason = (error as MqttConnectRejectedException ?? error.InnerException as MqttConnectRejectedException)?.ReasonCode
-            ?? (error as MqttServerDisconnectedException ?? error.InnerException as MqttServerDisconnectedException)?.ReasonCode;
-        Transition(ConnectionState.Faulted, reason);
+        var details = TransitionDetails.From(error);
+        Transition(ConnectionState.Faulted, details.Reason, details.ReasonString, details.ServerReference, error);
     }
 
     private sealed record ConnectionDownContext(
@@ -1482,14 +1530,38 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         string? ServerReference,
         Exception? Error) : IConnectionDownContext;
 
-    private void Transition(ConnectionState next, MqttReasonCode? reason = null)
+    private void Transition(
+        ConnectionState next,
+        MqttReasonCode? reason = null,
+        string? reasonString = null,
+        string? serverReference = null,
+        Exception? error = null)
     {
         ConnectionStateChanged changed;
         Channel<ConnectionStateChanged>[] watchers;
         lock (_stateGate)
         {
-            changed = new ConnectionStateChanged(State, next, _attempt, reason);
+            if (next == ConnectionState.Connected)
+            {
+                reason = null;
+                reasonString = null;
+                serverReference = null;
+                error = null;
+            }
+
+            changed = new ConnectionStateChanged(State, next, _attempt, reason)
+            {
+                ReasonString = reasonString,
+                ServerReference = serverReference,
+                Error = error,
+            };
+
             State = next;
+            _stateChangedAt = _time.GetUtcNow();
+            _lastReason = reason;
+            _lastReasonString = reasonString;
+            _lastServerReference = serverReference;
+            _lastError = error;
             watchers = [.. _watchers];
         }
 
@@ -1533,8 +1605,65 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 PulseMqttLog.ConnectAttemptFailed(logger, client._clientId, attempt, error);
             }
 
-            var reason = (error as MqttConnectRejectedException)?.ReasonCode;
-            client.Transition(ConnectionState.WaitingRetry, reason);
+            var details = TransitionDetails.From(error);
+            client.Transition(ConnectionState.WaitingRetry, details.Reason, details.ReasonString, details.ServerReference, error);
+        }
+    }
+
+    private static (int? Depth, long? DroppedCount) ReadOfflineQueueCounters(IMessageStore store)
+    {
+        try
+        {
+            return (store.Count, store.DroppedCount);
+        }
+        catch (Exception)
+        {
+            return (null, null);
+        }
+    }
+
+    private readonly record struct TransitionDetails(
+        MqttReasonCode? Reason,
+        string? ReasonString,
+        string? ServerReference)
+    {
+        public static TransitionDetails From(Exception error)
+        {
+            var rejected = Find<MqttConnectRejectedException>(error);
+            if (rejected is not null)
+            {
+                return new TransitionDetails(
+                    rejected.ReasonCode,
+                    rejected.ReasonString,
+                    rejected.ServerReference);
+            }
+
+            var serverDisconnected = Find<MqttServerDisconnectedException>(error);
+            if (serverDisconnected is not null)
+            {
+                return new TransitionDetails(
+                    serverDisconnected.ReasonCode,
+                    serverDisconnected.ReasonString,
+                    serverDisconnected.ServerReference);
+            }
+
+            return default;
+        }
+
+        private static T? Find<T>(Exception? error)
+            where T : Exception
+        {
+            while (error is not null)
+            {
+                if (error is T typed)
+                {
+                    return typed;
+                }
+
+                error = error.InnerException;
+            }
+
+            return null;
         }
     }
 
