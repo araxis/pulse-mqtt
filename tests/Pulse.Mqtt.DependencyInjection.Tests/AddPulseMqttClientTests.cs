@@ -5,7 +5,9 @@ using Microsoft.Extensions.Options;
 using Pulse.Mqtt;
 using Pulse.Mqtt.Client;
 using Pulse.Mqtt.DependencyInjection;
+using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Resilience;
+using Pulse.Mqtt.Testing;
 using Pulse.Mqtt.Transport;
 using Shouldly;
 using Xunit;
@@ -165,6 +167,7 @@ public sealed class AddPulseMqttClientTests
         disconnected.Data["attempt"].ShouldBe(0);
         disconnected.Data["offline.queue.depth"].ShouldBe(0);
         disconnected.Data["offline.queue.dropped"].ShouldBe(0L);
+        disconnected.Data.ContainsKey("broker.protocol.version").ShouldBeFalse();
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
         await client.ConnectAsync(timeout.Token);
@@ -182,5 +185,50 @@ public sealed class AddPulseMqttClientTests
         var stopped = await check.CheckHealthAsync(context);
         stopped.Status.ShouldBe(HealthStatus.Unhealthy); // Stopped
         stopped.Data["state"].ShouldBe(ConnectionState.Stopped.ToString());
+        stopped.Data.ContainsKey("broker.protocol.version").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Health_check_includes_broker_capabilities_only_when_connected()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        var services = new ServiceCollection();
+        services.AddPulseMqttClient("capabilities", ValidOptions)
+            .UseTransportFactory(_ => broker)
+            .AddHealthCheck();
+        await using var provider = services.BuildServiceProvider();
+
+        var registration = provider
+            .GetRequiredService<IOptions<HealthCheckServiceOptions>>()
+            .Value
+            .Registrations
+            .ShouldHaveSingleItem();
+        var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("capabilities");
+        var check = new PulseMqttHealthCheck(client);
+        var context = new HealthCheckContext { Registration = registration };
+
+        var disconnected = await check.CheckHealthAsync(context);
+        disconnected.Data.ContainsKey("broker.protocol.version").ShouldBeFalse();
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        while (client.State != ConnectionState.Connected)
+        {
+            await Task.Delay(5, timeout.Token);
+        }
+
+        var connected = await check.CheckHealthAsync(context);
+        connected.Status.ShouldBe(HealthStatus.Healthy);
+        connected.Data["broker.protocol.version"].ShouldBe(MqttProtocolVersion.V500.ToString());
+        connected.Data["broker.session.present"].ShouldBe(false);
+        connected.Data["broker.receive.maximum.effective"].ShouldBe(ushort.MaxValue);
+        connected.Data["broker.maximum.qos.effective"].ShouldBe(MqttQualityOfService.ExactlyOnce.ToString());
+        connected.Data["broker.retained.messages"].ShouldBe(MqttBrokerFeatureSupport.Supported.ToString());
+        connected.Data["broker.topic.alias.maximum.effective"].ShouldBe((ushort)0);
+        connected.Data["broker.topic.aliases"].ShouldBe(MqttBrokerFeatureSupport.NotSupported.ToString());
+
+        await client.DisconnectAsync(timeout.Token);
+        var stopped = await check.CheckHealthAsync(context);
+        stopped.Data.ContainsKey("broker.protocol.version").ShouldBeFalse();
     }
 }

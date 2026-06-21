@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.11.0 (unreleased)
+
+- Added a negotiated broker capabilities snapshot on `ResilientMqttClient` so applications,
+  diagnostics snapshots, and health checks can inspect the current connection's protocol version,
+  CONNACK limits, effective defaults, and feature support without active broker probing or wire
+  behavior changes.
+
 ## 2.10.0 (unreleased)
 
 - Added `Pulse.Mqtt.Dataflow`, an opt-in package that exposes client messages, route streams,

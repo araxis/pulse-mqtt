@@ -214,6 +214,7 @@ The snapshot includes:
 | `LastReason`, `LastReasonString`, `LastServerReference`, `LastError` | Last broker disconnect, rejected CONNECT, retry failure, or terminal fault details |
 | `OfflineQueueDepth`, `OfflineQueueDroppedCount` | Queue counters, or `null` if a custom store cannot provide them during collection |
 | `SubscriptionCount`, `PendingSubscribeCount`, `PendingUnsubscribeCount` | Durable subscription set and offline subscription deltas |
+| `BrokerCapabilities` | Negotiated broker capabilities for the current connection, or `null` when not connected |
 
 Successful `Connected` transitions clear stale fault details, so `LastError` describes the
 current problem, not an old outage that has already recovered.
@@ -261,6 +262,41 @@ For reconnect and fault triage, start with `State`, `Attempt`, and `StateChanged
 at `LastReason`, `LastReasonString`, `LastServerReference`, and `LastError`. A missing
 `LastError` means the current state was not caused by a captured exception; a missing queue
 counter means the store could not report it, not that the queue is empty.
+
+### Negotiated broker capabilities
+
+`ResilientMqttClient.GetBrokerCapabilitiesSnapshot()` returns the same current broker snapshot
+directly. It is `null` until the client reaches `Connected`, and it is cleared as soon as the
+client leaves `Connected`, so consumers never see stale CONNACK details from an old session.
+
+```csharp
+var capabilities = client.GetBrokerCapabilitiesSnapshot();
+
+if (capabilities?.TopicAliases == MqttBrokerFeatureSupport.Supported)
+{
+    logger.LogInformation(
+        "Broker topic alias maximum is {Maximum}.",
+        capabilities.EffectiveTopicAliasMaximum);
+}
+```
+
+The snapshot includes the raw negotiated values the broker sent, such as receive maximum,
+maximum QoS, maximum packet size, topic alias maximum, retain availability, wildcard
+availability, shared-subscription availability, server keep-alive, response information, server
+reference, and authentication method. It also includes effective values after MQTT defaults are
+applied: receive maximum, maximum QoS, topic alias maximum, and keep-alive seconds.
+
+Feature support uses `MqttBrokerFeatureSupport`:
+
+| Value | Meaning |
+| --- | --- |
+| `Supported` | The broker reported or implied support on the current connection |
+| `NotSupported` | The broker reported or implied the feature is unavailable |
+| `Unknown` | The protocol did not negotiate this feature, so support cannot be known from CONNACK |
+
+For MQTT 5, omitted CONNACK availability flags use the MQTT defaults. For MQTT 3.1.1, features
+that are not negotiated are reported as `Unknown`, while MQTT 5-only features such as topic
+aliases and subscription identifiers are `NotSupported`.
 
 ## State as a stream or event
 

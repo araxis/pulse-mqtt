@@ -43,3 +43,4 @@ for dashboards and support tools:
 | `LastReason`, `LastReasonString`, `LastServerReference`, `LastError` | Last known broker or fault detail |
 | `OfflineQueueDepth`, `OfflineQueueDroppedCount` | Offline queue counters, or `null` if a custom store cannot report them |
 | `SubscriptionCount`, `PendingSubscribeCount`, `PendingUnsubscribeCount` | Subscription bookkeeping |
+| `BrokerCapabilities` | Current negotiated broker capabilities while connected; `null` in disconnected, retrying, stopped, or faulted states |

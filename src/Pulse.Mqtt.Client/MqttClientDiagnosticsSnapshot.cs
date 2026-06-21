@@ -18,4 +18,8 @@ public sealed record MqttClientDiagnosticsSnapshot(
     long? OfflineQueueDroppedCount,
     int SubscriptionCount,
     int PendingSubscribeCount,
-    int PendingUnsubscribeCount);
+    int PendingUnsubscribeCount)
+{
+    /// <summary>The broker capabilities for the current connection, or <c>null</c> when disconnected.</summary>
+    public MqttBrokerCapabilitiesSnapshot? BrokerCapabilities { get; init; }
+}

@@ -46,6 +46,13 @@ when the snapshot has no value for them:
 | `reason`, `reason.string`, `server.reference` | Last broker disconnect or connect rejection details, when available |
 | `error.type`, `error.message` | Last exception details, when available |
 | `offline.queue.depth`, `offline.queue.dropped` | Queue counters, when the store can report them |
+| `broker.protocol.version`, `broker.session.present` | Current connection protocol and session-resume flag, only while connected |
+| `broker.receive.maximum`, `broker.receive.maximum.effective` | Raw and effective receive maximum, when negotiated |
+| `broker.maximum.qos`, `broker.maximum.qos.effective` | Raw and effective maximum QoS |
+| `broker.retained.messages`, `broker.wildcard.subscriptions`, `broker.subscription.identifiers`, `broker.shared.subscriptions`, `broker.topic.aliases` | Feature support as `Supported`, `NotSupported`, or `Unknown` |
+| `broker.topic.alias.maximum`, `broker.topic.alias.maximum.effective` | Raw and effective topic-alias maximum |
+| `broker.maximum.packet.size`, `broker.server.keep_alive`, `broker.keep_alive.effective` | Packet-size and keep-alive limits, when available |
+| `broker.assigned.client.id`, `broker.response.information`, `broker.server.reference`, `broker.authentication.method` | Optional broker-supplied connection metadata |
 
 Treat missing queue keys as *unknown*, not zero. A custom message store can fail counter reads,
 and the health check will still return the connection-state result instead of failing diagnostics
@@ -53,6 +60,10 @@ collection. `reason` is the last `MqttReasonCode` name; `reason.string` and `ser
 come from broker/connect packets when the broker supplied them. `error.message` is useful in
 dashboards, but avoid exposing raw health JSON to untrusted callers if exception messages may
 include deployment details.
+
+Broker capability keys are emitted only while the client is connected. If the client is
+reconnecting, stopped, disconnected, or faulted, those keys are omitted instead of reporting stale
+values from an earlier session.
 
 ## Separating liveness from readiness
 

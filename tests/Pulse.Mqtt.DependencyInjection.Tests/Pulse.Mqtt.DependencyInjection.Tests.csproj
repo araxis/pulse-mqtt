@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\src\Pulse.Mqtt.DependencyInjection\Pulse.Mqtt.DependencyInjection.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Client\Pulse.Mqtt.Client.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Core\Pulse.Mqtt.Core.csproj" />
+    <ProjectReference Include="..\..\src\Pulse.Mqtt.Testing\Pulse.Mqtt.Testing.csproj" />
   </ItemGroup>
 
 </Project>
