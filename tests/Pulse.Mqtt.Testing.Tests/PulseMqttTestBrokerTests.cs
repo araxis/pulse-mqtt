@@ -277,6 +277,275 @@ public sealed class PulseMqttTestBrokerTests
         await client.DisconnectAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task ConnAck_factory_can_stamp_success_properties()
+    {
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+        {
+            ConnAckFactory = context =>
+            {
+                context.ClientId.ShouldBe("connack-success");
+                context.ProtocolVersion.ShouldBe(MqttProtocolVersion.V500);
+                context.SessionPresent.ShouldBeFalse();
+
+                return context.DefaultConnAck with
+                {
+                    AssignedClientIdentifier = "assigned-connack-success",
+                    ReceiveMaximum = 7,
+                    ServerReference = "mqtt://alternate",
+                };
+            },
+        });
+        await using var client = new RawMqttClient(broker);
+
+        var connAck = await client.ConnectAsync(NewConnect("connack-success"), CancellationToken.None)
+            .WaitAsync(SafetyTimeout);
+
+        connAck.ReasonCode.ShouldBe(MqttReasonCode.Success);
+        connAck.ProtocolVersion.ShouldBe(MqttProtocolVersion.V500);
+        connAck.AssignedClientIdentifier.ShouldBe("assigned-connack-success");
+        connAck.ReceiveMaximum.ShouldBe((ushort)7);
+        connAck.ServerReference.ShouldBe("mqtt://alternate");
+    }
+
+    [Fact]
+    public async Task ConnAck_factory_can_reject_without_creating_persistent_session_state()
+    {
+        var reject = true;
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+        {
+            PersistentSessions = true,
+            ConnAckFactory = context => reject
+                ? context.DefaultConnAck with
+                {
+                    ReasonCode = MqttReasonCode.NotAuthorized,
+                    ReasonString = "blocked",
+                }
+                : context.DefaultConnAck,
+        });
+
+        await using (var rejected = new RawMqttClient(broker))
+        {
+            var connAck = await rejected.ConnectAsync(
+                    NewConnect("rejected-session", cleanStart: false),
+                    CancellationToken.None)
+                .WaitAsync(SafetyTimeout);
+            connAck.ReasonCode.ShouldBe(MqttReasonCode.NotAuthorized);
+            await Should.ThrowAsync<InvalidOperationException>(() => rejected.SubscribeAsync(
+                [new MqttTopicFilter("rejected/unused")],
+                CancellationToken.None));
+        }
+
+        reject = false;
+        await using var accepted = new RawMqttClient(broker);
+        var resumed = await accepted.ConnectAsync(
+                NewConnect("rejected-session", cleanStart: false),
+                CancellationToken.None)
+            .WaitAsync(SafetyTimeout);
+
+        resumed.ReasonCode.ShouldBe(MqttReasonCode.Success);
+        resumed.SessionPresent.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task SubAck_factory_denies_one_filter_while_allowing_another()
+    {
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+        {
+            SubAckFactory = context =>
+            {
+                context.ClientId.ShouldBe("suback-deny-one");
+
+                return context.DefaultSubAck with
+                {
+                    ReasonCodes =
+                    [
+                        MqttReasonCode.NotAuthorized,
+                        MqttReasonCode.GrantedQualityOfService1,
+                    ],
+                };
+            },
+        });
+        await using var client = await ConnectRawAsync(broker, "suback-deny-one");
+
+        var results = await client.SubscribeAsync(
+            [
+                new MqttTopicFilter("script/denied"),
+                new MqttTopicFilter("script/allowed") { MaximumQualityOfService = MqttQualityOfService.AtLeastOnce },
+            ],
+            CancellationToken.None);
+        results.ShouldBe([MqttReasonCode.NotAuthorized, MqttReasonCode.GrantedQualityOfService1]);
+
+        await broker.PublishAsync(new MqttPublishPacket { Topic = "script/denied", Payload = "miss"u8.ToArray() });
+        await broker.PublishAsync(new MqttPublishPacket { Topic = "script/allowed", Payload = "hit"u8.ToArray() });
+
+        var received = await client.Messages.ReadAsync(CancellationToken.None).AsTask().WaitAsync(SafetyTimeout);
+        received.Topic.ShouldBe("script/allowed");
+        Encoding.UTF8.GetString(received.Payload.Span).ShouldBe("hit");
+        (await TryReadAsync(client)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Denied_subscriptions_are_not_retained_in_persistent_sessions()
+    {
+        var deny = true;
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+        {
+            PersistentSessions = true,
+            SubAckFactory = context => deny
+                ? context.DefaultSubAck with { ReasonCodes = [MqttReasonCode.NotAuthorized] }
+                : context.DefaultSubAck,
+        });
+
+        await using (var first = await ConnectRawAsync(broker, "denied-persistent", cleanStart: false))
+        {
+            var results = await first.SubscribeAsync([new MqttTopicFilter("session/denied")], CancellationToken.None);
+            results.ShouldBe([MqttReasonCode.NotAuthorized]);
+            await first.DisconnectAsync(CancellationToken.None);
+        }
+
+        deny = false;
+        await using var second = new RawMqttClient(broker);
+        var connAck = await second.ConnectAsync(
+                NewConnect("denied-persistent", cleanStart: false),
+                CancellationToken.None)
+            .WaitAsync(SafetyTimeout);
+
+        connAck.SessionPresent.ShouldBeTrue();
+        await broker.PublishAsync(new MqttPublishPacket { Topic = "session/denied", Payload = "miss"u8.ToArray() });
+        (await TryReadAsync(second)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task PublishAck_factory_failure_surfaces_to_publishers_and_does_not_route()
+    {
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+        {
+            PublishAckFactory = context =>
+            {
+                context.ClientId.ShouldBe("ack-failure-publisher");
+
+                return context.DefaultAcknowledgement with
+                {
+                    ReasonCode = MqttReasonCode.NotAuthorized,
+                    ReasonString = "publish denied",
+                };
+            },
+        });
+        await using var subscriber = await ConnectRawAsync(broker, "ack-failure-subscriber");
+        await using var publisher = await ConnectRawAsync(broker, "ack-failure-publisher");
+
+        await subscriber.SubscribeAsync([new MqttTopicFilter("ack/failure/#")], CancellationToken.None);
+
+        var qos1 = await publisher.PublishAsync(
+            new MqttPublishPacket
+            {
+                Topic = "ack/failure/qos1",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+            },
+            CancellationToken.None);
+        qos1.ShouldBe(MqttReasonCode.NotAuthorized);
+        (await broker.ClientPublishes.ReadAsync(CancellationToken.None).AsTask().WaitAsync(SafetyTimeout))
+            .Topic.ShouldBe("ack/failure/qos1");
+
+        var qos2 = await publisher.PublishAsync(
+            new MqttPublishPacket
+            {
+                Topic = "ack/failure/qos2",
+                QualityOfService = MqttQualityOfService.ExactlyOnce,
+            },
+            CancellationToken.None);
+        qos2.ShouldBe(MqttReasonCode.NotAuthorized);
+        (await broker.ClientPublishes.ReadAsync(CancellationToken.None).AsTask().WaitAsync(SafetyTimeout))
+            .Topic.ShouldBe("ack/failure/qos2");
+        (await TryReadAsync(subscriber)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task PublishAck_factory_can_withhold_acknowledgement_without_killing_broker()
+    {
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+        {
+            PublishAckFactory = context => context.Publish.Topic == "ack/withheld"
+                ? null
+                : context.DefaultAcknowledgement,
+        });
+        await using var publisher = new RawMqttClient(
+            broker,
+            new RawMqttClientOptions { AcknowledgementTimeout = TimeSpan.FromMilliseconds(100) });
+
+        await publisher.ConnectAsync(NewConnect("withheld-publisher"), CancellationToken.None)
+            .WaitAsync(SafetyTimeout);
+
+        await Should.ThrowAsync<MqttException>(() => publisher.PublishAsync(
+            new MqttPublishPacket
+            {
+                Topic = "ack/withheld",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+            },
+            CancellationToken.None));
+        (await broker.ClientPublishes.ReadAsync(CancellationToken.None).AsTask().WaitAsync(SafetyTimeout))
+            .Topic.ShouldBe("ack/withheld");
+
+        await using var subscriber = await ConnectRawAsync(broker, "withheld-broker-still-routes");
+        await subscriber.SubscribeAsync([new MqttTopicFilter("ack/after-timeout")], CancellationToken.None);
+        await broker.PublishAsync(new MqttPublishPacket { Topic = "ack/after-timeout", Payload = "ok"u8.ToArray() });
+
+        var received = await subscriber.Messages.ReadAsync(CancellationToken.None).AsTask().WaitAsync(SafetyTimeout);
+        received.Topic.ShouldBe("ack/after-timeout");
+    }
+
+    [Fact]
+    public async Task DisconnectClientAsync_sends_disconnect_details_and_only_affects_matching_client_id()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        await using var first = await ConnectRawAsync(broker, "disconnect-one");
+        await using var second = await ConnectRawAsync(broker, "disconnect-two");
+
+        await second.SubscribeAsync([new MqttTopicFilter("disconnect/still-connected")], CancellationToken.None);
+
+        var disconnected = await broker.DisconnectClientAsync(
+            "disconnect-one",
+            new MqttDisconnectPacket
+            {
+                ReasonCode = MqttReasonCode.ServerMoved,
+                ReasonString = "move",
+                ServerReference = "mqtt://next",
+            },
+            CancellationToken.None);
+
+        disconnected.ShouldBe(1);
+        await first.Completion.WaitAsync(SafetyTimeout);
+        first.ServerDisconnect.ShouldNotBeNull();
+        first.ServerDisconnect.ReasonCode.ShouldBe(MqttReasonCode.ServerMoved);
+        first.ServerDisconnect.ReasonString.ShouldBe("move");
+        first.ServerDisconnect.ServerReference.ShouldBe("mqtt://next");
+
+        await broker.PublishAsync(new MqttPublishPacket { Topic = "disconnect/still-connected", Payload = "still"u8.ToArray() });
+        var received = await second.Messages.ReadAsync(CancellationToken.None).AsTask().WaitAsync(SafetyTimeout);
+        Encoding.UTF8.GetString(received.Payload.Span).ShouldBe("still");
+    }
+
+    [Fact]
+    public async Task DisconnectAllAsync_drops_all_active_sessions()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        await using var first = await ConnectRawAsync(broker, "disconnect-all-one");
+        await using var second = await ConnectRawAsync(broker, "disconnect-all-two");
+
+        var disconnected = await broker.DisconnectAllAsync(
+            new MqttDisconnectPacket { ReasonCode = MqttReasonCode.ServerShuttingDown },
+            CancellationToken.None);
+
+        disconnected.ShouldBe(2);
+        await first.Completion.WaitAsync(SafetyTimeout);
+        await second.Completion.WaitAsync(SafetyTimeout);
+        first.ServerDisconnect.ShouldNotBeNull();
+        first.ServerDisconnect.ReasonCode.ShouldBe(MqttReasonCode.ServerShuttingDown);
+        second.ServerDisconnect.ShouldNotBeNull();
+        second.ServerDisconnect.ReasonCode.ShouldBe(MqttReasonCode.ServerShuttingDown);
+    }
+
     private static async Task<RawMqttClient> ConnectRawAsync(
         PulseMqttTestBroker broker,
         string clientId,

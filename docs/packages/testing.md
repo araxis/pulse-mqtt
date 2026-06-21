@@ -37,5 +37,16 @@ await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
 The broker is an `IMqttTransportFactory`, so it plugs into dependency injection with
 `UseTransportFactory`.
 
-See [Testing](/guide/testing) for retained messages, persistent sessions, QoS forwarding, and
-deterministic time patterns.
+## Scripted responses
+
+`PulseMqttTestBrokerOptions` can script common broker responses:
+
+- `ConnAckFactory` customizes or rejects CONNECT.
+- `SubAckFactory` grants or denies individual subscription filters.
+- `PublishAckFactory` fails or withholds QoS 1/2 publish acknowledgements.
+
+The broker also exposes `DisconnectClientAsync` and `DisconnectAllAsync` to simulate
+broker-initiated connection loss.
+
+See [Testing](/guide/testing) for retained messages, persistent sessions, QoS forwarding,
+scripted responses, broker disconnects, and deterministic time patterns.
