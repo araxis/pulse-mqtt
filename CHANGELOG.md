@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.15.0 (unreleased)
+
+- Hardened `Pulse.Mqtt.Testing` broker-side routing so stale or closing in-memory sessions do
+  not fail broker publishes or retained replay to unrelated subscribers.
+
 ## 2.14.0
 
 - Added opt-in health-check policy thresholds for offline queue depth, dropped offline

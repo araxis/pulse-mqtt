@@ -242,6 +242,72 @@ public sealed class PulseMqttTestBrokerTests
     }
 
     [Fact]
+    public async Task Broker_publish_ignores_stale_disconnected_subscriber_and_continues_routing()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        var stale = await ConnectRawAsync(broker, "stale-subscriber");
+        await using var live = await ConnectRawAsync(broker, "live-subscriber");
+
+        try
+        {
+            await stale.SubscribeAsync([new MqttTopicFilter("stale/race")], CancellationToken.None);
+            await live.SubscribeAsync([new MqttTopicFilter("stale/race")], CancellationToken.None);
+
+            var staleDispose = stale.DisposeAsync().AsTask();
+            await broker.PublishAsync(
+                new MqttPublishPacket { Topic = "stale/race", Payload = "live"u8.ToArray() },
+                CancellationToken.None);
+
+            var received = await live.Messages.ReadAsync(CancellationToken.None).AsTask().WaitAsync(SafetyTimeout);
+            Encoding.UTF8.GetString(received.Payload.Span).ShouldBe("live");
+            await staleDispose.WaitAsync(SafetyTimeout);
+        }
+        finally
+        {
+            await stale.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Retained_replay_remains_usable_after_subscriber_closes_during_replay_window()
+    {
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions { RetainedMessages = true });
+        await broker.PublishAsync(Retained("retain/replay-close", "current"));
+        var stale = await ConnectRawAsync(broker, "retained-replay-close");
+
+        try
+        {
+            await stale.SubscribeAsync([new MqttTopicFilter("retain/replay-close")], CancellationToken.None);
+            var staleDispose = stale.DisposeAsync().AsTask();
+
+            await using var live = await ConnectRawAsync(broker, "retained-replay-live");
+            await live.SubscribeAsync([new MqttTopicFilter("retain/replay-close")], CancellationToken.None);
+
+            var received = await live.Messages.ReadAsync(CancellationToken.None).AsTask().WaitAsync(SafetyTimeout);
+            received.Topic.ShouldBe("retain/replay-close");
+            Encoding.UTF8.GetString(received.Payload.Span).ShouldBe("current");
+            await staleDispose.WaitAsync(SafetyTimeout);
+        }
+        finally
+        {
+            await stale.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Broker_publish_preserves_caller_cancellation()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        await using var client = await ConnectRawAsync(broker, "cancelled-broker-publish");
+        await client.SubscribeAsync([new MqttTopicFilter("cancelled/publish")], CancellationToken.None);
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(async () =>
+            await broker.PublishAsync(new MqttPublishPacket { Topic = "cancelled/publish" }, cancelled.Token));
+    }
+
+    [Fact]
     public async Task Forwarded_qos_is_capped_at_qos1_by_default()
     {
         await using var broker = new PulseMqttTestBroker();
