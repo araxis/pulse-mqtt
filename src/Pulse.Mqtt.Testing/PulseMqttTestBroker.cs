@@ -149,7 +149,7 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
         BrokerSession[] sessions;
         lock (_gate)
         {
-            sessions = [.. _sessions.Where(predicate)];
+            sessions = [.. _sessions.Where(session => !session.IsClosed && predicate(session))];
         }
 
         foreach (var session in sessions)
@@ -168,18 +168,23 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
         BrokerSession[] sessions;
         lock (_gate)
         {
-            sessions = [.. _sessions];
+            sessions = [.. _sessions.Where(session => !session.IsClosed)];
         }
 
         foreach (var session in sessions)
         {
+            if (session.IsClosed)
+            {
+                continue;
+            }
+
             var filter = session.MatchSubscription(message.Topic, origin);
             if (filter is null)
             {
                 continue;
             }
 
-            await ForwardAsync(
+            await TryForwardAsync(
                     session,
                     message,
                     filter,
@@ -207,7 +212,33 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
 
         foreach (var message in retained)
         {
-            await ForwardAsync(session, message, filter, retainedReplay: true, cancellationToken).ConfigureAwait(false);
+            if (session.IsClosed)
+            {
+                return;
+            }
+
+            await TryForwardAsync(session, message, filter, retainedReplay: true, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask TryForwardAsync(
+        BrokerSession session,
+        MqttPublishPacket message,
+        MqttTopicFilter filter,
+        bool retainedReplay,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ForwardAsync(session, message, filter, retainedReplay, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (IsClosedSessionSendFailure(ex))
+        {
+            await CloseStaleSessionAsync(session).ConfigureAwait(false);
         }
     }
 
@@ -233,6 +264,24 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
 
         await session.SendAsync(forward, cancellationToken).ConfigureAwait(false);
     }
+
+    private async ValueTask CloseStaleSessionAsync(BrokerSession session)
+    {
+        Remove(session);
+        try
+        {
+            await session.CloseTransportAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // The stale peer is already closing; pruning it from routing is the important part.
+        }
+    }
+
+    private static bool IsClosedSessionSendFailure(Exception exception) =>
+        exception is ObjectDisposedException
+            or ChannelClosedException
+            or MqttException { Message: "The transport closed while sending." };
 
     private ushort NextPacketId()
     {
@@ -330,6 +379,7 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
         private readonly MqttConnection _connection;
         private BrokerSessionState _state = new();
         private Task? _loop;
+        private int _closed;
 
         public BrokerSession(PulseMqttTestBroker broker, IMqttTransport transport)
         {
@@ -341,6 +391,8 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
 
         public string? ClientId { get; private set; }
 
+        public bool IsClosed => Volatile.Read(ref _closed) != 0;
+
         public void Start(CancellationToken cancellationToken)
         {
             _connection.Start();
@@ -349,8 +401,18 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
 
         public MqttTopicFilter? MatchSubscription(string topic, BrokerSession? origin)
         {
+            if (IsClosed)
+            {
+                return null;
+            }
+
             lock (_state.Gate)
             {
+                if (IsClosed)
+                {
+                    return null;
+                }
+
                 MqttTopicFilter? best = null;
                 foreach (var filter in _state.Subscriptions.Values)
                 {
@@ -396,9 +458,15 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
 
         public async ValueTask DisposeAsync()
         {
+            MarkClosed();
             await _connection.DisposeAsync().ConfigureAwait(false);
             if (_loop is { } loop)
             {
+                if (Task.CurrentId == loop.Id)
+                {
+                    return;
+                }
+
                 try
                 {
                     await loop.ConfigureAwait(false);
@@ -409,6 +477,14 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
                 }
             }
         }
+
+        public async ValueTask CloseTransportAsync()
+        {
+            MarkClosed();
+            await _connection.DisposeAsync().ConfigureAwait(false);
+        }
+
+        private void MarkClosed() => Interlocked.Exchange(ref _closed, 1);
 
         private async Task ServeAsync(CancellationToken cancellationToken)
         {
@@ -435,6 +511,7 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
             }
             finally
             {
+                MarkClosed();
                 _broker.Remove(this);
 
                 // Close the broker's half so the peer's transport observes the disconnect. A real socket
@@ -610,6 +687,7 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
                     break; // acknowledgements for forwarded messages
 
                 case MqttDisconnectPacket:
+                    MarkClosed();
                     return false;
             }
 
