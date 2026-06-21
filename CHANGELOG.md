@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.5.0 (unreleased)
+## 2.5.0
 
 - Added MQTT-named resilient lifecycle APIs: `ConnectAsync` / `DisconnectAsync` on
   `ResilientMqttClient`, `BuildAndConnectAsync(...)` on the fluent builder, and

@@ -1,1 +1,25 @@
 #nullable enable
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.Count.get -> int
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.Dispose() -> void
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.DroppedCount.get -> long
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.LiteDbMessageStore(string! connectionString, Pulse.Mqtt.Resilience.OfflineQueueOptions! options) -> void
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.PeekAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Packets.MqttPublishPacket?>
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.RemoveHeadAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.Dispose() -> void
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.LiteDbSessionStore(string! connectionString) -> void
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.LoadInFlightAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttInFlightState?>
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.LoadSubscriptionsAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>!>
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.RemoveSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<string!>! topics, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.SaveInFlightAsync(Pulse.Mqtt.Resilience.MqttInFlightState! state, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.SaveSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.UpsertSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbStorageException
+Pulse.Mqtt.Storage.LiteDB.LiteDbStorageException.LiteDbStorageException(string! message) -> void
+Pulse.Mqtt.Storage.LiteDB.LiteDbStorageException.LiteDbStorageException(string! message, System.Exception! innerException) -> void

@@ -1,3 +1,1 @@
 #nullable enable
-Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.ConnectWithHost.get -> bool
-Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.ConnectWithHost.set -> void

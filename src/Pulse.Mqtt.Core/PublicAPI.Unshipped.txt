@@ -1,9 +1,1 @@
 #nullable enable
-Pulse.Mqtt.Connection.MqttInboundPublishContext
-Pulse.Mqtt.Connection.MqttInboundPublishContext.AcknowledgeAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
-Pulse.Mqtt.Connection.MqttInboundPublishContext.CanReject.get -> bool
-Pulse.Mqtt.Connection.MqttInboundPublishContext.IsAcknowledged.get -> bool
-Pulse.Mqtt.Connection.MqttInboundPublishContext.Message.get -> Pulse.Mqtt.Packets.MqttPublishPacket!
-Pulse.Mqtt.Connection.MqttInboundPublishContext.RejectAsync(Pulse.Mqtt.Protocol.MqttReasonCode reasonCode = Pulse.Mqtt.Protocol.MqttReasonCode.UnspecifiedError, string? reasonString = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
-Pulse.Mqtt.Connection.RawMqttClient.AcknowledgedMessageSink.get -> System.Func<Pulse.Mqtt.Connection.MqttInboundPublishContext!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>?
-Pulse.Mqtt.Connection.RawMqttClient.AcknowledgedMessageSink.set -> void
