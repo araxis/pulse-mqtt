@@ -297,3 +297,35 @@ static Pulse.Mqtt.Client.MqttTraceEnvelopeExtensions.RegisterTraceEnvelopeRoute<
 static Pulse.Mqtt.Client.MqttTraceEnvelopeExtensions.RegisterTraceEnvelopeRoute<T>(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
 static Pulse.Mqtt.Client.MqttTraceEnvelopeExtensions.RegisterTraceEnvelopeRoute<T>(this Pulse.Mqtt.Client.ResilientMqttClient! client, string! template, Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler) -> System.IDisposable!
 static Pulse.Mqtt.Client.MqttTraceEnvelopeExtensions.RegisterTraceEnvelopeRoute<T>(this Pulse.Mqtt.Client.ResilientMqttClient! client, string! template, Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.AssignedClientIdentifier.get -> string?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.AuthenticationMethod.get -> string?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.EffectiveKeepAliveSeconds.get -> ushort
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.EffectiveMaximumQoS.get -> Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.EffectiveReceiveMaximum.get -> ushort?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.EffectiveTopicAliasMaximum.get -> ushort
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.MaximumPacketSize.get -> uint?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.MaximumQoS.get -> Pulse.Mqtt.MqttQualityOfService?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.ReceiveMaximum.get -> ushort?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.ResponseInformation.get -> string?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.RetainAvailable.get -> bool?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.RetainedMessages.get -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.ServerKeepAlive.get -> ushort?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.ServerReference.get -> string?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.SessionPresent.get -> bool
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.SharedSubscriptionAvailable.get -> bool?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.SharedSubscriptions.get -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.SubscriptionIdentifiers.get -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.SubscriptionIdentifiersAvailable.get -> bool?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.TopicAliasMaximum.get -> ushort?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.TopicAliases.get -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.WildcardSubscriptionAvailable.get -> bool?
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.WildcardSubscriptions.get -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
+Pulse.Mqtt.Client.MqttBrokerFeatureSupport
+Pulse.Mqtt.Client.MqttBrokerFeatureSupport.NotSupported = 2 -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
+Pulse.Mqtt.Client.MqttBrokerFeatureSupport.Supported = 1 -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
+Pulse.Mqtt.Client.MqttBrokerFeatureSupport.Unknown = 0 -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.BrokerCapabilities.get -> Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot?
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.BrokerCapabilities.init -> void
+Pulse.Mqtt.Client.ResilientMqttClient.GetBrokerCapabilitiesSnapshot() -> Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot?

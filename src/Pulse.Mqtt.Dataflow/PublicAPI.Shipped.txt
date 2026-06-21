@@ -1,1 +1,18 @@
 #nullable enable
+Pulse.Mqtt.Dataflow.MqttDataflowExtensions
+static Pulse.Mqtt.Dataflow.MqttDataflowExtensions.ToAcknowledgedRouteSourceBlock(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteOptions? routeOptions = null, Pulse.Mqtt.Dataflow.MqttDataflowSourceOptions? sourceOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Pulse.Mqtt.Dataflow.MqttDataflowSource<Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage!>!
+static Pulse.Mqtt.Dataflow.MqttDataflowExtensions.ToAcknowledgedRouteSourceBlock(this Pulse.Mqtt.Client.ResilientMqttClient! client, string! template, Pulse.Mqtt.Client.MqttRouteOptions? routeOptions = null, Pulse.Mqtt.Dataflow.MqttDataflowSourceOptions? sourceOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Pulse.Mqtt.Dataflow.MqttDataflowSource<Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage!>!
+static Pulse.Mqtt.Dataflow.MqttDataflowExtensions.ToMessageSourceBlock(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Dataflow.MqttDataflowSourceOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Pulse.Mqtt.Dataflow.MqttDataflowSource<Pulse.Mqtt.Packets.MqttPublishPacket!>!
+static Pulse.Mqtt.Dataflow.MqttDataflowExtensions.ToRouteSourceBlock(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteOptions? routeOptions = null, Pulse.Mqtt.Dataflow.MqttDataflowSourceOptions? sourceOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Pulse.Mqtt.Dataflow.MqttDataflowSource<Pulse.Mqtt.Client.MqttRoutedMessage>!
+static Pulse.Mqtt.Dataflow.MqttDataflowExtensions.ToRouteSourceBlock(this Pulse.Mqtt.Client.ResilientMqttClient! client, string! template, Pulse.Mqtt.Client.MqttRouteOptions? routeOptions = null, Pulse.Mqtt.Dataflow.MqttDataflowSourceOptions? sourceOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Pulse.Mqtt.Dataflow.MqttDataflowSource<Pulse.Mqtt.Client.MqttRoutedMessage>!
+static Pulse.Mqtt.Dataflow.MqttDataflowExtensions.ToStateSourceBlock(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Dataflow.MqttDataflowSourceOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> Pulse.Mqtt.Dataflow.MqttDataflowSource<Pulse.Mqtt.Resilience.ConnectionStateChanged>!
+Pulse.Mqtt.Dataflow.MqttDataflowSource<T>
+Pulse.Mqtt.Dataflow.MqttDataflowSource<T>.Complete() -> void
+Pulse.Mqtt.Dataflow.MqttDataflowSource<T>.Completion.get -> System.Threading.Tasks.Task!
+Pulse.Mqtt.Dataflow.MqttDataflowSource<T>.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Dataflow.MqttDataflowSource<T>.Fault(System.Exception! exception) -> void
+Pulse.Mqtt.Dataflow.MqttDataflowSource<T>.LinkTo(System.Threading.Tasks.Dataflow.ITargetBlock<T>! target, System.Threading.Tasks.Dataflow.DataflowLinkOptions! linkOptions) -> System.IDisposable!
+Pulse.Mqtt.Dataflow.MqttDataflowSourceOptions
+Pulse.Mqtt.Dataflow.MqttDataflowSourceOptions.BoundedCapacity.get -> int
+Pulse.Mqtt.Dataflow.MqttDataflowSourceOptions.BoundedCapacity.init -> void
+Pulse.Mqtt.Dataflow.MqttDataflowSourceOptions.MqttDataflowSourceOptions() -> void
