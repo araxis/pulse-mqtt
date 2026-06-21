@@ -11,6 +11,7 @@ namespace Pulse.Mqtt.Client.Tests;
 internal sealed record TelemetryReading(string DeviceId, double Value);
 
 [JsonSerializable(typeof(TelemetryReading))]
+[JsonSerializable(typeof(MqttTraceEnvelope<TelemetryReading>))]
 internal sealed partial class TestJsonContext : JsonSerializerContext;
 
 public sealed class TypedMessagingTests

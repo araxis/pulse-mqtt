@@ -4,6 +4,8 @@ using System.Threading.Channels;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Resilience;
+using Pulse.Mqtt.Routing;
+using Pulse.Mqtt.Serialization.Json;
 using Shouldly;
 using Xunit;
 
@@ -173,6 +175,144 @@ public sealed class ObservabilityCompletionTests
         await publish;
 
         sent.UserProperties.ShouldNotContain(p => p.Name == "traceparent");
+    }
+
+    [Fact]
+    public async Task Publish_does_not_write_trace_context_user_properties_for_mqtt_3_1_1()
+    {
+        var activities = new List<Activity>();
+        using var listener = NewActivityListener(activities);
+
+        var clientId = $"trace-v311-{Guid.NewGuid():N}";
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket
+            {
+                ClientId = clientId,
+                KeepAliveSeconds = 0,
+                ProtocolVersion = MqttProtocolVersion.V311,
+            },
+            PropagateTraceContext = true,
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await WaitForConnectedAsync(client, timeout.Token);
+
+        var publish = client.PublishAsync(
+            new MqttPublishPacket { Topic = $"trace/{Guid.NewGuid():N}", QualityOfService = MqttQualityOfService.AtMostOnce },
+            timeout.Token);
+        var sent = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttPublishPacket>();
+        await publish;
+
+        sent.ProtocolVersion.ShouldBe(MqttProtocolVersion.V311);
+        sent.UserProperties.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Trace_envelope_publish_captures_the_publish_span_context()
+    {
+        var activities = new List<Activity>();
+        using var listener = NewActivityListener(activities);
+
+        var clientId = $"trace-envelope-{Guid.NewGuid():N}";
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket
+            {
+                ClientId = clientId,
+                KeepAliveSeconds = 0,
+                ProtocolVersion = MqttProtocolVersion.V311,
+            },
+            Serializer = new JsonMqttSerializer(TestJsonContext.Default),
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await WaitForConnectedAsync(client, timeout.Token);
+
+        var topic = $"trace-envelope/{Guid.NewGuid():N}";
+        var publish = client.PublishWithTraceEnvelopeAsync(
+            topic,
+            new TelemetryReading("d-1", 2.5),
+            cancellationToken: timeout.Token);
+        var sent = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttPublishPacket>();
+        await publish;
+
+        sent.ProtocolVersion.ShouldBe(MqttProtocolVersion.V311);
+        sent.UserProperties.ShouldBeEmpty();
+
+        var envelope = new JsonMqttSerializer(TestJsonContext.Default)
+            .Deserialize<MqttTraceEnvelope<TelemetryReading>>(sent.Payload);
+        envelope.Payload.ShouldBe(new TelemetryReading("d-1", 2.5));
+        envelope.TraceParent.ShouldNotBeNull();
+
+        Activity publishActivity;
+        lock (activities)
+        {
+            publishActivity = activities.Single(a => a.DisplayName == $"publish {topic}");
+        }
+
+        var flags = (publishActivity.ActivityTraceFlags & ActivityTraceFlags.Recorded) != 0 ? "01" : "00";
+        envelope.TraceParent.ShouldBe($"00-{publishActivity.TraceId}-{publishActivity.SpanId}-{flags}");
+    }
+
+    [Fact]
+    public async Task Trace_envelope_route_runs_handler_under_the_remote_context()
+    {
+        var activities = new List<Activity>();
+        using var listener = NewActivityListener(activities);
+
+        var clientId = $"trace-envelope-route-{Guid.NewGuid():N}";
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = clientId, KeepAliveSeconds = 0 },
+            Serializer = new JsonMqttSerializer(TestJsonContext.Default),
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await WaitForConnectedAsync(client, timeout.Token);
+
+        Activity? handlerActivity = null;
+        var received = new TaskCompletionSource<TelemetryReading>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = client.RegisterTraceEnvelopeRoute<TelemetryReading>(
+            MqttRouteTemplate.Parse("trace-envelope/{device}"),
+            (reading, _, _) =>
+            {
+                handlerActivity = Activity.Current;
+                received.TrySetResult(reading);
+                return ValueTask.CompletedTask;
+            });
+
+        var traceId = ActivityTraceId.CreateRandom();
+        var spanId = ActivitySpanId.CreateRandom();
+        var envelope = new MqttTraceEnvelope<TelemetryReading>(
+            new TelemetryReading("d-7", 7.5),
+            $"00-{traceId}-{spanId}-01");
+
+        await broker.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "trace-envelope/d-7",
+                Payload = new JsonMqttSerializer(TestJsonContext.Default).Serialize(envelope),
+            },
+            timeout.Token);
+
+        (await received.Task.WaitAsync(SafetyTimeout)).ShouldBe(new TelemetryReading("d-7", 7.5));
+        handlerActivity.ShouldNotBeNull();
+        handlerActivity!.TraceId.ShouldBe(traceId);
+        handlerActivity.ParentSpanId.ShouldBe(spanId);
+        handlerActivity.HasRemoteParent.ShouldBeTrue();
     }
 
     [Fact]

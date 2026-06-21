@@ -95,7 +95,7 @@ builder.Services.AddOpenTelemetry()
 ### Trace context across the broker
 
 To connect a producer's `publish` span to a consumer's `receive` span across processes, opt the
-producer in to W3C trace-context propagation:
+producer in to MQTT 5 trace-context propagation:
 
 ```csharp
 var options = new ResilientMqttClientOptions
@@ -113,6 +113,53 @@ continuous distributed trace from producer through the broker to consumer. With 
 (the default) no `traceparent` is added and `receive` spans are local roots. Because extraction is
 passive, the consumer also links correctly to non-Pulse producers that set a standard
 `traceparent`.
+
+This protocol-level path is MQTT 5 only. MQTT 3.1.1 has no user properties, so there is no
+standard metadata slot for trace context. With MQTT 3.1.1, `PropagateTraceContext = true` is a
+clean no-op on the wire: publishes still get local `publish` spans, but consumers cannot parent
+on those spans unless your payload contract carries the context.
+
+### Payload envelopes for MQTT 3.1.1
+
+When you own both producer and consumer payload contracts, wrap the application payload in
+`MqttTraceEnvelope<T>`. The helper captures the actual `publish` span context and serializes it
+inside the payload:
+
+```csharp
+await client.PublishWithTraceEnvelopeAsync(
+    "sensors/boiler-1/telemetry",
+    new TelemetryReading("boiler-1", 21.5),
+    MqttQualityOfService.AtLeastOnce,
+    cancellationToken: token);
+```
+
+On the consumer side, register the matching envelope route. The route helper deserializes the
+envelope and runs your handler under a consumer activity parented to the producer context when
+one is present:
+
+```csharp
+using var route = client.RegisterTraceEnvelopeRoute<TelemetryReading>(
+    "sensors/{deviceId}/telemetry",
+    (reading, message, token) =>
+    {
+        ProcessReading(message.Values["deviceId"], reading);
+        return ValueTask.CompletedTask;
+    });
+```
+
+The envelope is an application payload shape, so serializers must know the closed generic type.
+For source-generated JSON, add it to the context:
+
+```csharp
+[JsonSerializable(typeof(TelemetryReading))]
+[JsonSerializable(typeof(MqttTraceEnvelope<TelemetryReading>))]
+internal sealed partial class AppJsonContext : JsonSerializerContext;
+```
+
+Prefer MQTT 5 user properties when the broker and clients support MQTT 5. Use the payload
+envelope only for MQTT 3.1.1 or for deployments that intentionally standardize on an envelope
+payload. Avoid putting trace context in topics; it leaks metadata and creates high-cardinality
+topic names.
 
 ## Logs
 

@@ -6,6 +6,8 @@
   `ResilientMqttClient`, `BuildAndConnectAsync(...)` on the fluent builder, and
   `ConnectWithHost` for DI configuration. The older start/stop names remain as compatibility
   aliases.
+- Added explicit payload-level trace-envelope helpers for MQTT 3.1.1 deployments that cannot use
+  MQTT 5 user properties for trace context propagation.
 
 ## 2.4.0
 

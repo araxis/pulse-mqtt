@@ -28,12 +28,9 @@ internal static class TraceContextPropagation
             }
         }
 
-        var flags = (context.TraceFlags & ActivityTraceFlags.Recorded) != 0 ? "01" : "00";
-        var traceParent = $"00-{context.TraceId}-{context.SpanId}-{flags}";
-
         var properties = new List<MqttUserProperty>(packet.UserProperties.Count + 2);
         properties.AddRange(packet.UserProperties);
-        properties.Add(new MqttUserProperty(TraceParent, traceParent));
+        properties.Add(new MqttUserProperty(TraceParent, FormatTraceParent(context)));
         if (!string.IsNullOrEmpty(context.TraceState))
         {
             properties.Add(new MqttUserProperty(TraceState, context.TraceState));
@@ -62,6 +59,17 @@ internal static class TraceContextPropagation
             }
         }
 
+        return Extract(traceParent, traceState);
+    }
+
+    internal static string FormatTraceParent(ActivityContext context)
+    {
+        var flags = (context.TraceFlags & ActivityTraceFlags.Recorded) != 0 ? "01" : "00";
+        return $"00-{context.TraceId}-{context.SpanId}-{flags}";
+    }
+
+    internal static ActivityContext? Extract(string? traceParent, string? traceState)
+    {
         if (traceParent is null)
         {
             return null;
@@ -69,4 +77,7 @@ internal static class TraceContextPropagation
 
         return ActivityContext.TryParse(traceParent, traceState, isRemote: true, out var context) ? context : null;
     }
+
+    internal static bool IsValid(ActivityContext context) =>
+        context.TraceId != default && context.SpanId != default;
 }

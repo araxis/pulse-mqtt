@@ -12,6 +12,7 @@ internal sealed class TestBroker
 {
     private readonly IMqttTransport _transport;
     private byte[] _pending = [];
+    private MqttProtocolVersion _protocolVersion = MqttProtocolVersion.V500;
 
     public TestBroker(IMqttTransport serverTransport)
     {
@@ -54,9 +55,15 @@ internal sealed class TestBroker
         bool sessionPresent = false,
         uint? maximumPacketSize = null)
     {
-        (await ReadPacketAsync(cancellationToken)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
+        var connect = (await ReadPacketAsync(cancellationToken)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
+        _protocolVersion = connect.ProtocolVersion;
         await SendAsync(
-            new MqttConnAckPacket { SessionPresent = sessionPresent, MaximumPacketSize = maximumPacketSize },
+            new MqttConnAckPacket
+            {
+                ProtocolVersion = _protocolVersion,
+                SessionPresent = sessionPresent,
+                MaximumPacketSize = maximumPacketSize,
+            },
             cancellationToken);
     }
 
@@ -71,7 +78,7 @@ internal sealed class TestBroker
             return false;
         }
 
-        packet = MqttPacketDecoder.Decode(header, body, MqttProtocolVersion.V500);
+        packet = MqttPacketDecoder.Decode(header, body, _protocolVersion);
         _pending = _pending[consumed..];
         return true;
     }

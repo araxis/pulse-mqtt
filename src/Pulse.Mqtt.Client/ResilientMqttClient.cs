@@ -192,6 +192,14 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// </summary>
     public async Task<PublishOutcome> PublishAsync(MqttPublishPacket packet, CancellationToken cancellationToken = default)
     {
+        return await PublishAsync(packet, transform: null, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal async Task<PublishOutcome> PublishAsync(
+        MqttPublishPacket packet,
+        Func<MqttPublishPacket, ActivityContext?, MqttPublishPacket>? transform,
+        CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(packet);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -206,9 +214,17 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
         // Inject the active span (ours, or an ambient one the caller already started) so a consumer
         // can parent its receive span on this publish. Off unless the caller opts in.
-        if (_options.PropagateTraceContext && Activity.Current is { } current)
+        var currentContext = Activity.Current?.Context;
+        if (_options.PropagateTraceContext &&
+            _options.Connect.ProtocolVersion == MqttProtocolVersion.V500 &&
+            currentContext is { } current)
         {
-            packet = TraceContextPropagation.Inject(packet, current.Context);
+            packet = TraceContextPropagation.Inject(packet, current);
+        }
+
+        if (transform is not null)
+        {
+            packet = transform(packet, currentContext);
         }
 
         var start = _time.GetTimestamp();
