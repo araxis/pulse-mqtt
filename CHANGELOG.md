@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.9.0 (unreleased)
+## 2.9.0
 
 - Updated repository workflows to use current action runtimes and made docs workflow maintenance
   self-verifying while preserving the existing CI, docs, broker-matrix, and release behavior.
