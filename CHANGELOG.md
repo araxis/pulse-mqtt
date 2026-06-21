@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.14.0 (unreleased)
+## 2.14.0
 
 - Added opt-in health-check policy thresholds for offline queue depth, dropped offline
   publishes, and pending subscription operations while preserving the existing default health

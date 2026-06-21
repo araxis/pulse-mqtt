@@ -1,17 +1,1 @@
 #nullable enable
-Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.AddHealthCheck(System.Action<Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions!>! configure) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheck.PulseMqttHealthCheck(Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions? options) -> void
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.DegradedOfflineQueueDepthThreshold.get -> int?
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.DegradedOfflineQueueDepthThreshold.set -> void
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.DegradedOfflineQueueDroppedCountThreshold.get -> long?
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.DegradedOfflineQueueDroppedCountThreshold.set -> void
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.DegradedPendingSubscriptionOperationsThreshold.get -> int?
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.DegradedPendingSubscriptionOperationsThreshold.set -> void
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.PulseMqttHealthCheckOptions() -> void
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.UnhealthyOfflineQueueDepthThreshold.get -> int?
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.UnhealthyOfflineQueueDepthThreshold.set -> void
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.UnhealthyOfflineQueueDroppedCountThreshold.get -> long?
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.UnhealthyOfflineQueueDroppedCountThreshold.set -> void
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.UnhealthyPendingSubscriptionOperationsThreshold.get -> int?
-Pulse.Mqtt.DependencyInjection.PulseMqttHealthCheckOptions.UnhealthyPendingSubscriptionOperationsThreshold.set -> void
