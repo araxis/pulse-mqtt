@@ -33,7 +33,7 @@ one line, not a fork.
 | `Pulse.Mqtt.Storage.LiteDB` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Storage.LiteDB?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Storage.LiteDB) | Durable LiteDB session and offline-message stores. |
 | `Pulse.Mqtt.Storage.Sqlite` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Storage.Sqlite?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Storage.Sqlite) | Durable SQLite session and offline-message stores. |
 | `Pulse.Mqtt.Transport.WebSocket` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Transport.WebSocket?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Transport.WebSocket) | MQTT over WebSocket (`ws`/`wss`). |
-| `Pulse.Mqtt.Testing` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Testing?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Testing) | `PulseMqttTestBroker` — an in-process broker for millisecond tests, with opt-in retained messages and persistent sessions. |
+| `Pulse.Mqtt.Testing` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Testing?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Testing) | `PulseMqttTestBroker` — an in-process broker for millisecond tests, with opt-in retained messages, persistent sessions, and scripted responses. |
 | `Pulse.Mqtt.Analyzers` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Analyzers?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Analyzers) | Optional C# diagnostics for common Pulse MQTT usage mistakes. |
 
 ## Quick start
@@ -133,7 +133,8 @@ await using var client = new ResilientMqttClient(broker, options);
 // Full pub/sub, QoS acknowledgements, and routing between clients — in memory, in milliseconds.
 ```
 
-Need retained-message or persistent-session behavior in a workflow test? Pass
+Need retained-message, persistent-session, denied subscription, rejected connection, publish
+acknowledgement failure, or broker-disconnect behavior in a workflow test? Pass
 `PulseMqttTestBrokerOptions` and keep the same client setup.
 
 ## Swap any major behavior

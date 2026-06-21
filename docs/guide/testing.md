@@ -101,12 +101,74 @@ When enabled, subscriptions survive reconnects for clients that use a non-empty 
 `CleanStart = false`. A clean-start connection or MQTT 5 `SessionExpiryInterval = 0` clears the
 stored session. The older `ResumeSessions = true` shortcut now maps to this same behavior.
 
+### Scripted broker responses
+
+Use scripted responses when a workflow test needs a broker policy or fault without running a
+separate broker:
+
+```csharp
+await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+{
+    ConnAckFactory = context => context.DefaultConnAck with
+    {
+        ReasonCode = MqttReasonCode.NotAuthorized,
+        ReasonString = "test rejection",
+    },
+});
+```
+
+`ConnAckFactory` can accept or reject CONNECT, and successful custom values such as
+`ReceiveMaximum`, `ServerReference`, or `AssignedClientIdentifier` are visible to the client.
+A rejected connection is closed and does not create persistent session state.
+
+`SubAckFactory` can grant some filters and deny others:
+
+```csharp
+SubAckFactory = context => context.DefaultSubAck with
+{
+    ReasonCodes =
+    [
+        MqttReasonCode.NotAuthorized,
+        MqttReasonCode.GrantedQualityOfService1,
+    ],
+};
+```
+
+The returned SUBACK must include one reason code per requested filter. Only granted filters are
+stored, so denied filters do not receive retained replay and are not resumed in persistent
+sessions.
+
+`PublishAckFactory` can fail or withhold the first QoS 1/2 acknowledgement:
+
+```csharp
+PublishAckFactory = context => context.Publish.Topic == "slow/path"
+    ? null
+    : context.DefaultAcknowledgement;
+```
+
+Returning `null` leaves the publish unacknowledged so the client timeout path can be tested.
+Returning a failure reason, such as `NotAuthorized`, surfaces to the publisher and the broker
+does not route or retain that publish. QoS 0 publishes still have no acknowledgement.
+
+To simulate a broker-initiated connection loss, close one client id or every connected session:
+
+```csharp
+await broker.DisconnectClientAsync("device-7", new MqttDisconnectPacket
+{
+    ReasonCode = MqttReasonCode.ServerMoved,
+    ServerReference = "mqtt://next-broker",
+}, ct);
+
+await broker.DisconnectAllAsync(cancellationToken: ct);
+```
+
 ### Scope
 
 The broker is built for fast deterministic workflow tests, not broker conformance. It covers
 MQTT 5.0 and 3.1.1 handshakes, subscriptions, retained replay, persistent sessions, QoS
-acknowledgements, and in-memory routing, but it does not try to model every broker policy or
-failure. Keep a handful of true end-to-end tests against a containerized broker, the way this
+acknowledgements, scripted response hooks, broker-initiated disconnects, and in-memory routing,
+but it does not try to model every broker policy or failure. Keep a handful of true end-to-end
+tests against a containerized broker, the way this
 repository runs its own
 [integration suite](https://github.com/araxis/pulse-mqtt/tree/main/tests/Pulse.Mqtt.IntegrationTests)
 against Mosquitto via Testcontainers.
@@ -144,8 +206,9 @@ first wait for `Connected`, or use QoS 1 (which queues).
 - **Handlers first**: route handlers and stores are plain code — test them directly, no broker
   at all.
 - **Test broker for workflows**: pub/sub conversations, RPC pairs, route isolation.
-- **Scripted transport for protocol edges**: the client test suite drives exact packet
-  sequences (duplicate QoS 2 deliveries, unexpected acknowledgements) through a loopback
-  transport pair.
+- **Scripted test broker for policy edges**: rejected connects, denied subscriptions,
+  publish-ack failures, and broker disconnects.
+- **Scripted transport for packet edges**: the client test suite still drives exact packet
+  sequences such as duplicate QoS 2 deliveries through a loopback transport pair.
 - **Containers for the truth**: a small Mosquitto suite proves the stack against a real
   broker.

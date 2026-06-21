@@ -39,7 +39,7 @@ codec, raw client, or swap-point contracts without the resilient client.
 | Compact binary payloads | `Pulse.Mqtt.Serialization.MessagePack` or `Pulse.Mqtt.Serialization.Protobuf` | You want smaller generated binary payloads. |
 | MQTT over WebSocket | `Pulse.Mqtt.Transport.WebSocket` | The broker is exposed through `ws` or `wss`, often behind a proxy or gateway. |
 | Custom reconnect policy | `Pulse.Mqtt.Resilience.Polly` | Reconnect attempts should be driven by an existing resilience pipeline. |
-| In-process workflow tests | `Pulse.Mqtt.Testing` | Tests need a broker in the same process, with optional retained messages and persistent sessions. |
+| In-process workflow tests | `Pulse.Mqtt.Testing` | Tests need a broker in the same process, with optional retained messages, persistent sessions, and scripted responses. |
 | Compiler warnings | `Pulse.Mqtt.Analyzers` | You want warnings for unawaited operations, missing cancellation tokens, and sync disposal mistakes. |
 
 Dedicated package pages are in [Package docs](/packages/). The full package list, targets, and
@@ -202,7 +202,8 @@ await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
 ```
 
 The broker is an `IMqttTransportFactory`, so production client code can use it in tests without a
-network port. See [Testing](./testing).
+network port. It can also script rejected connects, denied subscriptions, publish
+acknowledgement failures, timeouts, and broker-initiated disconnects. See [Testing](./testing).
 
 For compiler guidance:
 
