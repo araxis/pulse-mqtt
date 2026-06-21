@@ -149,6 +149,13 @@ A throwing authenticator fails the attempt like any connect failure; with no aut
 configured, no AUTH is ever sent and a broker that starts an exchange anyway is a protocol
 error.
 
+::: warning MQTT 5 only
+Enhanced authentication and live re-authentication use the MQTT 5 AUTH exchange. Configuring
+`RawMqttClientOptions.Authenticator` with `MqttProtocolVersion.V311`, or calling
+`ReAuthenticateAsync` on an MQTT 3.1.1 session, throws `NotSupportedException`. MQTT 3.1.1
+supports only the CONNECT username/password credential fields.
+:::
+
 ## Protocol version
 
 MQTT 5.0 is the default. For brokers that only speak 3.1.1:
@@ -157,8 +164,10 @@ MQTT 5.0 is the default. For brokers that only speak 3.1.1:
 options.ProtocolVersion = MqttProtocolVersion.V311;
 ```
 
-The codec implements both completely; v5-only features (properties, response topics, shared
-subscriptions) are simply absent on a 3.1.1 session.
+The codec implements both protocol versions. MQTT 5-only features are not available on a 3.1.1
+session: properties cannot travel on the wire, request/response helpers and enhanced
+authentication fail fast, and broker-negotiated limits such as receive maximum or topic aliases
+are absent.
 
 ## Keep-alive
 

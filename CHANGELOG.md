@@ -8,6 +8,8 @@
   aliases.
 - Added explicit payload-level trace-envelope helpers for MQTT 3.1.1 deployments that cannot use
   MQTT 5 user properties for trace context propagation.
+- Added fail-fast guards for MQTT 5-only request/response and enhanced-authentication features
+  when a client is configured for MQTT 3.1.1.
 
 ## 2.4.0
 

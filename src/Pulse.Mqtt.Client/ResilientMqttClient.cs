@@ -617,6 +617,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        EnsureRequestResponseSupported();
         if (request.ResponseTopic is not null || request.CorrelationData is not null)
         {
             throw new ArgumentException("The client assigns the response topic and correlation data.", nameof(request));
@@ -697,6 +698,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        EnsureRequestResponseSupported();
         if (request.ResponseTopic is not null || request.CorrelationData is not null)
         {
             throw new ArgumentException("The client assigns the response topic and correlation data.", nameof(request));
@@ -824,6 +826,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(handler);
+        EnsureRequestResponseSupported();
         var serializer = SerializerOrThrow();
 
         return RegisterRoute(
@@ -900,6 +903,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(handler);
+        EnsureRequestResponseSupported();
         var serializer = SerializerOrThrow();
 
         return RegisterRoute(
@@ -956,6 +960,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     private async Task EnsureResponseRouteCoreAsync(CancellationToken cancellationToken)
     {
+        EnsureRequestResponseSupported();
         var template = MqttRouteTemplate.Parse($"pulse-rpc/{_clientId}/{{correlation}}");
         await SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], cancellationToken).ConfigureAwait(false);
         RegisterRoute(
@@ -984,6 +989,15 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     internal IMqttSerializer SerializerOrThrow() =>
         _options.Serializer
         ?? throw new InvalidOperationException("Configure a serializer in the options to use typed messaging.");
+
+    private void EnsureRequestResponseSupported()
+    {
+        if (_options.Connect.ProtocolVersion != MqttProtocolVersion.V500)
+        {
+            throw new NotSupportedException(
+                "Request/response requires MQTT 5.0 because it uses response-topic and correlation-data publish properties. MQTT 3.1.1 applications should use an explicit payload or topic convention.");
+        }
+    }
 
     // One open request-stream's delivery target: the channel the route handler writes responses to,
     // plus a flag set when a full buffer forced the stream to fail rather than block or drop.

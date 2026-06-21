@@ -69,6 +69,28 @@ public sealed class MqttPacketDecoderTests
         Decode(o => MqttAuthCodec.Encode(o, new MqttAuthPacket { ReasonCode = MqttReasonCode.ContinueAuthentication, AuthenticationMethod = "m" }))
             .ShouldBeOfType<MqttAuthPacket>();
 
+    [Fact]
+    public void Rejects_auth_for_mqtt_3_1_1()
+    {
+        var output = new ArrayBufferWriter<byte>();
+        MqttAuthCodec.Encode(
+            output,
+            new MqttAuthPacket
+            {
+                ReasonCode = MqttReasonCode.ContinueAuthentication,
+                AuthenticationMethod = "m",
+            });
+
+        var frame = output.WrittenSpan.ToArray();
+
+        Should.Throw<MqttProtocolException>(() =>
+        {
+            var status = MqttFrameReader.TryReadFrame(frame, out var header, out var body, out _);
+            status.ShouldBe(MqttFrameStatus.Complete);
+            MqttPacketDecoder.Decode(header, body, MqttProtocolVersion.V311);
+        });
+    }
+
     private static MqttPacket Decode(Action<ArrayBufferWriter<byte>> encode)
     {
         var output = new ArrayBufferWriter<byte>();

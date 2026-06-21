@@ -43,6 +43,11 @@ public static class MqttPacketDecoder
             case MqttPacketType.Disconnect:
                 return MqttDisconnectCodec.Decode(body, version);
             case MqttPacketType.Auth:
+                if (version != MqttProtocolVersion.V500)
+                {
+                    throw new MqttProtocolException("AUTH packets are valid only in MQTT 5.0.");
+                }
+
                 return MqttAuthCodec.Decode(body);
             default:
                 throw new MqttProtocolException($"Unsupported packet type {header.PacketType}.");

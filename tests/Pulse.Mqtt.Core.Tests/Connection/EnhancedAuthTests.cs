@@ -80,6 +80,23 @@ public sealed class EnhancedAuthTests
     }
 
     [Fact]
+    public async Task Enhanced_authentication_requires_mqtt_5()
+    {
+        var (client, _, timeout) = NewClient(new ScriptedAuthenticator());
+
+        var thrown = await Should.ThrowAsync<NotSupportedException>(async () =>
+            await client.ConnectAsync(
+                new MqttConnectPacket
+                {
+                    ClientId = "c",
+                    ProtocolVersion = MqttProtocolVersion.V311,
+                },
+                timeout.Token));
+
+        thrown.Message.ShouldContain("MQTT 5.0");
+    }
+
+    [Fact]
     public async Task A_rejected_exchange_surfaces_the_connack()
     {
         var (client, broker, timeout) = NewClient(new ScriptedAuthenticator());
@@ -152,6 +169,26 @@ public sealed class EnhancedAuthTests
         await connectTask;
 
         await Should.ThrowAsync<InvalidOperationException>(() => client.ReAuthenticateAsync(timeout.Token));
+    }
+
+    [Fact]
+    public async Task Reauthentication_requires_mqtt_5()
+    {
+        var (client, broker, timeout) = NewClient(authenticator: null);
+
+        var connectTask = client.ConnectAsync(
+            new MqttConnectPacket
+            {
+                ClientId = "c",
+                ProtocolVersion = MqttProtocolVersion.V311,
+            },
+            timeout.Token);
+        await broker.ReadPacketAsync(timeout.Token);
+        await broker.SendAsync(new MqttConnAckPacket { ProtocolVersion = MqttProtocolVersion.V311 }, timeout.Token);
+        await connectTask;
+
+        var thrown = await Should.ThrowAsync<NotSupportedException>(() => client.ReAuthenticateAsync(timeout.Token));
+        thrown.Message.ShouldContain("MQTT 5.0");
     }
 
     private static (RawMqttClient Client, ScriptedBroker Broker, CancellationTokenSource Timeout) NewClient(

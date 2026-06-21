@@ -18,6 +18,9 @@ Bindable from configuration; one instance per client name.
 | `ProtocolVersion` | `V500` | `V500` or `V311` |
 | `ConnectWithHost` | `true` | `false` hands connect/disconnect to the application |
 
+`V311` keeps the MQTT 3.1.1 wire contract: no MQTT 5 properties, no response-topic based
+request/response helpers, no enhanced authentication, no re-authentication, and no topic aliases.
+
 ## ResilientMqttClientOptions
 
 For direct construction; with DI these come from `PulseMqttClientOptions` plus builder swaps.

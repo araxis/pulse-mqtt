@@ -47,6 +47,21 @@ public sealed class RpcTests
     }
 
     [Fact]
+    public async Task A_request_requires_mqtt_5()
+    {
+        var (client, _, _, ct) = await ConnectedAsync(MqttProtocolVersion.V311);
+        await using var _1 = client;
+
+        var thrown = await Should.ThrowAsync<NotSupportedException>(async () =>
+            await client.RequestAsync<TelemetryReading, TelemetryReading>(
+                "svc/echo",
+                new TelemetryReading("d", 1.0),
+                cancellationToken: ct));
+
+        thrown.Message.ShouldContain("MQTT 5.0");
+    }
+
+    [Fact]
     public async Task A_request_times_out_without_a_response()
     {
         var (client, broker, time, ct) = await ConnectedAsync();
@@ -110,6 +125,27 @@ public sealed class RpcTests
     }
 
     [Fact]
+    public async Task A_responder_requires_mqtt_5()
+    {
+        await using var client = new ResilientMqttClient(new SequencedTransportFactory(), new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket
+            {
+                ClientId = "rpc",
+                ProtocolVersion = MqttProtocolVersion.V311,
+            },
+            Serializer = new JsonMqttSerializer(TestJsonContext.Default),
+        });
+
+        var thrown = Should.Throw<NotSupportedException>(() =>
+            client.RegisterRequestHandler<TelemetryReading, TelemetryReading>(
+                MqttRouteTemplate.Parse("svc/{op}"),
+                (request, _, _) => ValueTask.FromResult(request)));
+
+        thrown.Message.ShouldContain("MQTT 5.0");
+    }
+
+    [Fact]
     public async Task An_offline_request_fails_fast()
     {
         var factory = new SequencedTransportFactory();
@@ -125,13 +161,19 @@ public sealed class RpcTests
         thrown.Message.ShouldContain("offline");
     }
 
-    private static async Task<(ResilientMqttClient Client, TestBroker Broker, FakeTimeProvider Time, CancellationToken Ct)> ConnectedAsync()
+    private static async Task<(ResilientMqttClient Client, TestBroker Broker, FakeTimeProvider Time, CancellationToken Ct)> ConnectedAsync(
+        MqttProtocolVersion protocolVersion = MqttProtocolVersion.V500)
     {
         var factory = new SequencedTransportFactory();
         var time = new FakeTimeProvider();
         var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
         {
-            Connect = new MqttConnectPacket { ClientId = "rpc", KeepAliveSeconds = 0 },
+            Connect = new MqttConnectPacket
+            {
+                ClientId = "rpc",
+                KeepAliveSeconds = 0,
+                ProtocolVersion = protocolVersion,
+            },
             Serializer = new JsonMqttSerializer(TestJsonContext.Default),
         }, time);
 

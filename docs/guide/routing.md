@@ -67,6 +67,10 @@ await client.SubscribeAsync([
 ], token);
 ```
 
+`NoLocal`, `RetainAsPublished`, `RetainHandling`, subscription identifiers, and subscription user
+properties are MQTT 5 subscription features. On MQTT 3.1.1, only the topic filter and maximum QoS
+are encoded.
+
 Typed handlers deserialize through the configured [serializer](./typed-messaging):
 
 ```csharp

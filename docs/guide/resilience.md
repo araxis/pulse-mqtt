@@ -155,6 +155,10 @@ new ResilientMqttClientOptions
 };
 ```
 
+`SessionExpiryInterval` is MQTT 5-only. With MQTT 3.1.1, `CleanStart = false` still requests a
+persistent session, but there is no portable expiry timer in the protocol; the broker's policy
+decides how long to keep it.
+
 ## Durable storage
 
 The defaults keep everything for the lifetime of the process. To carry the subscription set, the

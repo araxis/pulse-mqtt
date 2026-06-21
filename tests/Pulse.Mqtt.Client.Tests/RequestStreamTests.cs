@@ -46,6 +46,25 @@ public sealed class RequestStreamTests
     }
 
     [Fact]
+    public async Task A_request_stream_requires_mqtt_5()
+    {
+        var (client, _, _, ct) = await ConnectedAsync(MqttProtocolVersion.V311);
+        await using var _1 = client;
+
+        var thrown = await Should.ThrowAsync<NotSupportedException>(async () =>
+        {
+            await foreach (var _ in client.RequestStreamAsync<TelemetryReading, TelemetryReading>(
+                "svc/stream",
+                new TelemetryReading("d", 0),
+                cancellationToken: ct))
+            {
+            }
+        });
+
+        thrown.Message.ShouldContain("MQTT 5.0");
+    }
+
+    [Fact]
     public async Task A_streaming_responder_publishes_each_item_then_the_end_marker()
     {
         var (client, broker, _, ct) = await ConnectedAsync();
@@ -81,6 +100,27 @@ public sealed class RequestStreamTests
         marker.Topic.ShouldBe("caller/inbox");
         marker.UserProperties.ShouldContain(p => p.Name == "pulse.eos");
         Encoding.UTF8.GetString(marker.CorrelationData!.Value.Span).ShouldBe("call-1");
+    }
+
+    [Fact]
+    public async Task A_streaming_responder_requires_mqtt_5()
+    {
+        await using var client = new ResilientMqttClient(new SequencedTransportFactory(), new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket
+            {
+                ClientId = "rpc",
+                ProtocolVersion = MqttProtocolVersion.V311,
+            },
+            Serializer = new JsonMqttSerializer(TestJsonContext.Default),
+        });
+
+        var thrown = Should.Throw<NotSupportedException>(() =>
+            client.RegisterRequestStreamHandler<TelemetryReading, TelemetryReading>(
+                MqttRouteTemplate.Parse("svc/{op}"),
+                (request, _, _) => Sequence(request, 1)));
+
+        thrown.Message.ShouldContain("MQTT 5.0");
     }
 
     [Fact]
@@ -223,13 +263,19 @@ public sealed class RequestStreamTests
         }
     }
 
-    private static async Task<(ResilientMqttClient Client, TestBroker Broker, FakeTimeProvider Time, CancellationToken Ct)> ConnectedAsync()
+    private static async Task<(ResilientMqttClient Client, TestBroker Broker, FakeTimeProvider Time, CancellationToken Ct)> ConnectedAsync(
+        MqttProtocolVersion protocolVersion = MqttProtocolVersion.V500)
     {
         var factory = new SequencedTransportFactory();
         var time = new FakeTimeProvider();
         var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
         {
-            Connect = new MqttConnectPacket { ClientId = "rpc", KeepAliveSeconds = 0 },
+            Connect = new MqttConnectPacket
+            {
+                ClientId = "rpc",
+                KeepAliveSeconds = 0,
+                ProtocolVersion = protocolVersion,
+            },
             Serializer = new JsonMqttSerializer(TestJsonContext.Default),
         }, time);
 

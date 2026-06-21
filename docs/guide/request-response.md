@@ -3,6 +3,13 @@
 MQTT 5 carries a **response topic** and **correlation data** on every message, which makes RPC
 a first-class pattern instead of a hand-rolled convention. Pulse wires both sides.
 
+::: warning MQTT 5 only
+The request/response APIs use MQTT 5 response-topic and correlation-data properties. With
+`MqttProtocolVersion.V311`, `RequestAsync`, `RequestStreamAsync`, and responder registration
+throw `NotSupportedException` instead of timing out later. For MQTT 3.1.1, put reply routing
+and correlation fields in your payload or topic contract explicitly.
+:::
+
 ## Caller
 
 ```csharp
