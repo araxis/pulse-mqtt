@@ -19,6 +19,9 @@ compiled ahead of time.
   new JsonMqttSerializer(AppJsonContext.Default)
   ```
 
+- **Explicit binary serializers.** MessagePack takes source-generated resolver options, and
+  Protobuf takes an explicit parser registry; neither add-on scans assemblies or discovers
+  payload types through reflection.
 - **Source-generated logging.** All log messages are `LoggerMessage` definitions.
 - **`IsAotCompatible` on every library**, so analyzer warnings fail the build the moment a
   change would break trimming.

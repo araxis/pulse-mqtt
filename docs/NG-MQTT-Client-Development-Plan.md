@@ -243,7 +243,7 @@ Priority: **P0** = v1 must-have, **P1** = v1 stretch / fast-follow, **P2** = pos
 - P0 Pluggable `IMqttSerializer`; raw bytes default; JSON (source-gen) package. *(`IMqttSerializer`)*
 - P0 Honor MQTT5 Content-Type + Payload-Format-Indicator round-trip.
 - P0 Typed publish: `client.Publish("t", payloadObject, qos)`.
-- P1 MessagePack + Protobuf serializer packages.
+- P1 MessagePack + Protobuf serializer packages. ✅
 - P0 **Request/Response (RPC)** helper: `RequestAsync<TReq,TResp>` managing response-topic, correlation-data, timeout, cleanup.
 
 ### C.5 Hosting, DI, configuration

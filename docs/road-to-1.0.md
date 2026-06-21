@@ -336,5 +336,5 @@ Rules of the road, unchanged from the start of the project: every step lands as 
 PR with tests; quality, performance, memory, and swap-point interchangeability are
 non-negotiable; anything that would break the frozen API after 1.0.0-rc.1 waits for 2.0.
 
-The post-1.0 horizon (not planned here): MQTT over QUIC, a Protobuf serializer, broker-side
-feature probes, and an analyzer package for common misuse.
+The post-1.0 horizon (not planned here): MQTT over QUIC, broker-side feature probes, and more
+protocol-specific tooling.

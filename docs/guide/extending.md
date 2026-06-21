@@ -261,8 +261,8 @@ public interface IMqttSerializer
 ```
 
 **Default:** none — the typed APIs throw `InvalidOperationException` until one is configured.
-The JSON add-on is source-generated and AOT-safe. Full walkthrough, including a MessagePack
-example, in [Typed messaging](./typed-messaging#bring-your-own-format).
+The JSON add-on is source-generated and AOT-safe. Full walkthroughs, including MessagePack and
+Protobuf examples, are in [Typed messaging](./typed-messaging).
 
 ## Transport
 

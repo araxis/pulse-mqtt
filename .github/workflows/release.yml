@@ -92,6 +92,7 @@ jobs:
               Pulse.Mqtt.DependencyInjection \
               Pulse.Mqtt.Serialization.Json \
               Pulse.Mqtt.Serialization.MessagePack \
+              Pulse.Mqtt.Serialization.Protobuf \
               Pulse.Mqtt.Resilience.Polly \
               Pulse.Mqtt.Storage.LiteDB \
               Pulse.Mqtt.Storage.Sqlite \

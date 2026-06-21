@@ -2,6 +2,11 @@
 
 ## 2.7.0 (unreleased)
 
+- Added `Pulse.Mqtt.Serialization.Protobuf`, an opt-in Protocol Buffers serializer package
+  for generated messages. It uses explicit parser registration for deserialization, stamps
+  `application/x-protobuf` with a binary payload format, and plugs into the existing typed
+  publish, routing, stream, and request/response APIs without runtime API changes.
+
 ## 2.6.0
 
 - Added `Pulse.Mqtt.Analyzers`, an opt-in C# analyzer package with warning-only diagnostics for

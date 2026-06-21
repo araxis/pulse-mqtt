@@ -17,6 +17,7 @@
     <Project Path="src/Pulse.Mqtt.Resilience.Polly/Pulse.Mqtt.Resilience.Polly.csproj" />
     <Project Path="src/Pulse.Mqtt.Serialization.Json/Pulse.Mqtt.Serialization.Json.csproj" />
     <Project Path="src/Pulse.Mqtt.Serialization.MessagePack/Pulse.Mqtt.Serialization.MessagePack.csproj" />
+    <Project Path="src/Pulse.Mqtt.Serialization.Protobuf/Pulse.Mqtt.Serialization.Protobuf.csproj" />
     <Project Path="src/Pulse.Mqtt.Storage.LiteDB/Pulse.Mqtt.Storage.LiteDB.csproj" />
     <Project Path="src/Pulse.Mqtt.Storage.Sqlite/Pulse.Mqtt.Storage.Sqlite.csproj" />
     <Project Path="src/Pulse.Mqtt.Testing/Pulse.Mqtt.Testing.csproj" />
@@ -29,6 +30,7 @@
     <Project Path="tests/Pulse.Mqtt.DependencyInjection.Tests/Pulse.Mqtt.DependencyInjection.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.IntegrationTests/Pulse.Mqtt.IntegrationTests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Serialization.MessagePack.Tests/Pulse.Mqtt.Serialization.MessagePack.Tests.csproj" />
+    <Project Path="tests/Pulse.Mqtt.Serialization.Protobuf.Tests/Pulse.Mqtt.Serialization.Protobuf.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Storage.LiteDB.Tests/Pulse.Mqtt.Storage.LiteDB.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Storage.Sqlite.Tests/Pulse.Mqtt.Storage.Sqlite.Tests.csproj" />
   </Folder>

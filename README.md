@@ -27,6 +27,7 @@ one line, not a fork.
 | `Pulse.Mqtt.DependencyInjection` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.DependencyInjection?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.DependencyInjection) | `AddPulseMqttClient`, named clients, hosted lifecycle, health checks. |
 | `Pulse.Mqtt.Serialization.Json` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Serialization.Json?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Serialization.Json) | Source-generated `System.Text.Json` payload serialization (AOT-safe). |
 | `Pulse.Mqtt.Serialization.MessagePack` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Serialization.MessagePack?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Serialization.MessagePack) | MessagePack payload serialization for compact binary messages. |
+| `Pulse.Mqtt.Serialization.Protobuf` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Serialization.Protobuf?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Serialization.Protobuf) | Protocol Buffers payload serialization for generated binary messages. |
 | `Pulse.Mqtt.Resilience.Polly` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Resilience.Polly?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Resilience.Polly) | Reconnect strategy backed by a Polly v8 `ResiliencePipeline`. |
 | `Pulse.Mqtt.Storage.LiteDB` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Storage.LiteDB?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Storage.LiteDB) | Durable LiteDB session and offline-message stores. |
 | `Pulse.Mqtt.Storage.Sqlite` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Storage.Sqlite?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Storage.Sqlite) | Durable SQLite session and offline-message stores. |
@@ -140,7 +141,7 @@ await using var client = new ResilientMqttClient(broker, options);
 | Connection up/down | `IConnectionLifecycle` | Re-subscribe from the session store | Add cache warming on reconnect |
 | Session state | `ISessionStore` | In-memory | A durable store that survives restarts |
 | Offline queue | `IMessageStore` | Bounded in-memory, 4 overflow policies | A durable queue |
-| Payload format | `IMqttSerializer` | none (raw bytes) | JSON (source-gen), or your own |
+| Payload format | `IMqttSerializer` | none (raw bytes) | JSON, MessagePack, Protobuf, or your own |
 | Transport | `IMqttTransportFactory` | TCP / TLS | WebSocket, or the in-memory test broker |
 
 Terminal failures (for example a broker answering `NotAuthorized`) fault the client **sticky** —
@@ -188,8 +189,8 @@ the whole stack is testable with a fake clock.
 
 ## Scope notes
 
-MQTT over QUIC, a Protobuf serializer, broker-side feature probes, and more protocol-specific
-tooling are tracked as post-1.0 horizon items.
+MQTT over QUIC, broker-side feature probes, and more protocol-specific tooling are tracked as
+post-1.0 horizon items.
 
 ## Documentation
 

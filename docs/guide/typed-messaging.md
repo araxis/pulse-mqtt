@@ -76,10 +76,64 @@ new ResilientMqttClientOptions { Serializer = new MessagePackMqttSerializer(opti
 It stamps `ContentType` (`application/x-msgpack`) and a binary `PayloadFormatIndicator`
 (`Unspecified`). The payloads are materially smaller than JSON.
 
+## Protobuf
+
+For generated Protocol Buffers messages, add the `Pulse.Mqtt.Serialization.Protobuf` package:
+
+```shell
+dotnet add package Pulse.Mqtt.Serialization.Protobuf
+```
+
+Register the generated parsers explicitly. This keeps deserialization reflection-free and makes
+the message types visible to trim and Native AOT analysis:
+
+```csharp
+var protobufRegistry = ProtobufMessageRegistry.Create(registry =>
+{
+    registry.Add(TelemetryReading.Parser);
+    registry.Add(StatusRequest.Parser);
+    registry.Add(StatusReply.Parser);
+});
+
+var serializer = new ProtobufMqttSerializer(protobufRegistry);
+```
+
+Use it exactly like the other serializers:
+
+```csharp
+new ResilientMqttClientOptions
+{
+    Connect = new MqttConnectPacket { ClientId = "telemetry-service" },
+    Serializer = serializer,
+};
+```
+
+```csharp
+await client.PublishAsync(
+    "telemetry/1",
+    new TelemetryReading { DeviceId = "dev-1", Value = 21.5 },
+    cancellationToken: ct);
+
+var template = MqttRouteTemplate.Parse("telemetry/{id}");
+await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], ct);
+
+using var route = client.RegisterRoute<TelemetryReading>(
+    template,
+    (reading, message, token) => Handle(reading, message.Values["id"]));
+```
+
+It stamps `ContentType` (`application/x-protobuf`) and a binary `PayloadFormatIndicator`
+(`Unspecified`).
+
+::: warning Protobuf requirements
+`ProtobufMqttSerializer` accepts generated message instances only. Deserialization requires a
+registered parser for the target type; missing parsers and invalid payloads throw `MqttException`.
+:::
+
 ## Bring your own format
 
 `IMqttSerializer` is one small interface — `ContentType`, `PayloadFormat`, `Serialize<T>`,
-`Deserialize<T>`. Implement it for Protobuf, CBOR, or anything else, then:
+`Deserialize<T>`. Implement it for CBOR, Avro, or anything else, then:
 
 ```csharp
 .UseSerializer(_ => new MyFormatSerializer())
