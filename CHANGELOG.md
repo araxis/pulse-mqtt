@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.6.0 (unreleased)
+## 2.6.0
 
 - Added `Pulse.Mqtt.Analyzers`, an opt-in C# analyzer package with warning-only diagnostics for
   common client mistakes: unobserved Pulse MQTT async operations (`PMQ0001`), omitted available

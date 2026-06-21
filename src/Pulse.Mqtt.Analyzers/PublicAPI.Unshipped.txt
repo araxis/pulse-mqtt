@@ -1,5 +1,1 @@
 #nullable enable
-Pulse.Mqtt.Analyzers.MqttUsageAnalyzer
-Pulse.Mqtt.Analyzers.MqttUsageAnalyzer.MqttUsageAnalyzer() -> void
-override Pulse.Mqtt.Analyzers.MqttUsageAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext! context) -> void
-override Pulse.Mqtt.Analyzers.MqttUsageAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor!>
