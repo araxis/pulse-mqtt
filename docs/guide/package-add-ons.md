@@ -42,7 +42,8 @@ codec, raw client, or swap-point contracts without the resilient client.
 | In-process workflow tests | `Pulse.Mqtt.Testing` | Tests need a broker in the same process, with optional retained messages and persistent sessions. |
 | Compiler warnings | `Pulse.Mqtt.Analyzers` | You want warnings for unawaited operations, missing cancellation tokens, and sync disposal mistakes. |
 
-The full package list, targets, and dependencies are in [Packages](/reference/packages).
+Dedicated package pages are in [Package docs](/packages/). The full package list, targets, and
+dependencies are in [Packages](/reference/packages).
 
 ## Durable storage
 

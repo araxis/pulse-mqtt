@@ -33,6 +33,8 @@ BenchmarkDotNet.Artifacts/
 .nuget/
 packages/
 !**/packages/build/
+!docs/packages/
+!docs/packages/*.md
 
 # OS
 .DS_Store

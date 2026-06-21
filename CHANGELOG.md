@@ -7,6 +7,8 @@
   optional QoS 2 forwarding while keeping the default lightweight behavior backward compatible.
 - Added a package add-ons guide with install commands and setup examples for storage, pipeline,
   serializer, transport, testing, analyzer, and hosting packages.
+- Added a dedicated package docs section for dependency injection, Dataflow, SQLite and LiteDB
+  storage, serializers, WebSocket transport, reconnect policy, testing, and analyzers.
 
 ## 2.11.0
 

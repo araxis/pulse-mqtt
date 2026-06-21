@@ -8,6 +8,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/introduction' },
+      { text: 'Packages', link: '/packages/' },
       { text: 'Reference', link: '/reference/packages' },
       { text: 'Benchmarks', link: '/Benchmark-vs-MQTTnet' },
     ],
@@ -63,6 +64,23 @@ export default defineConfig({
             { text: 'Native AOT', link: '/guide/native-aot' },
             { text: 'Performance', link: '/guide/performance' },
             { text: 'Releasing', link: '/guide/releasing' },
+          ],
+        },
+      ],
+      '/packages/': [
+        {
+          text: 'Packages',
+          items: [
+            { text: 'Overview', link: '/packages/' },
+            { text: 'Dependency injection', link: '/packages/dependency-injection' },
+            { text: 'Dataflow', link: '/packages/dataflow' },
+            { text: 'SQLite storage', link: '/packages/storage-sqlite' },
+            { text: 'LiteDB storage', link: '/packages/storage-litedb' },
+            { text: 'Serializers', link: '/packages/serializers' },
+            { text: 'WebSocket transport', link: '/packages/transport-websocket' },
+            { text: 'Reconnect policy', link: '/packages/resilience-polly' },
+            { text: 'Testing', link: '/packages/testing' },
+            { text: 'Analyzers', link: '/packages/analyzers' },
           ],
         },
       ],

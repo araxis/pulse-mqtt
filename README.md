@@ -208,7 +208,7 @@ The full documentation is a VitePress site under [`docs/`](docs) — run it loca
 - [Extending the client](docs/guide/extending.md) · [The raw client](docs/guide/raw-client.md) · [Native AOT](docs/guide/native-aot.md) · [Performance](docs/guide/performance.md) · [Releasing](docs/guide/releasing.md)
 
 **Reference**
-- [Packages](docs/reference/packages.md) · [Options](docs/reference/options.md) · [Connection states](docs/reference/connection-states.md) · [Errors](docs/reference/errors.md)
+- [Package docs](docs/packages/index.md) · [Packages](docs/reference/packages.md) · [Options](docs/reference/options.md) · [Connection states](docs/reference/connection-states.md) · [Errors](docs/reference/errors.md)
 
 **Project**
 - [Benchmark suite](docs/Benchmark-Suite.md) · [MQTTnet comparison](docs/Benchmark-vs-MQTTnet.md)
