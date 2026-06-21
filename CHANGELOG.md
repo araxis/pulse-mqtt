@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.6.0 (unreleased)
+
 ## 2.5.0
 
 - Added MQTT-named resilient lifecycle APIs: `ConnectAsync` / `DisconnectAsync` on
