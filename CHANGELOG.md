@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.8.0 (unreleased)
+
 ## 2.7.0
 
 - Added `Pulse.Mqtt.Serialization.Protobuf`, an opt-in Protocol Buffers serializer package
