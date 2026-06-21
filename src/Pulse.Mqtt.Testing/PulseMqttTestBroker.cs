@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Pulse.Mqtt.Codec;
 using Pulse.Mqtt.Connection;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
@@ -8,33 +9,55 @@ using Pulse.Mqtt.Transport;
 namespace Pulse.Mqtt.Testing;
 
 /// <summary>
-/// An in-process MQTT 5 broker for tests: hand it to a client as its transport factory and the
+/// An in-process MQTT broker for tests: hand it to a client as its transport factory and the
 /// whole stack — handshake, keep-alive, QoS acknowledgements, subscriptions, and topic routing
 /// between connected clients — works in memory with no external process and no setup.
 /// </summary>
 /// <remarks>
-/// Scope: MQTT 5 clients, no retained messages, no session persistence; messages forward at
-/// most at QoS 1. Built for fast deterministic tests, not broker conformance.
+/// Defaults match the original lightweight harness: no retained storage, no persistent sessions,
+/// and forwarded messages capped at QoS 1. Enable options when a test needs more broker realism.
+/// Built for fast deterministic tests, not broker conformance.
 /// </remarks>
 public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposable
 {
+    private readonly PulseMqttTestBrokerOptions _options;
     private readonly List<BrokerSession> _sessions = [];
+    private readonly Dictionary<string, BrokerSessionState> _persistentSessions = [];
+    private readonly Dictionary<string, MqttPublishPacket> _retainedMessages = [];
     private readonly object _gate = new();
+    private readonly object _retainedGate = new();
     private readonly Channel<MqttPublishPacket> _clientPublishes = Channel.CreateUnbounded<MqttPublishPacket>();
     private readonly CancellationTokenSource _lifetime = new();
     private int _packetId;
     private volatile bool _disposed;
 
-    private readonly HashSet<string> _seenSessions = [];
-    private readonly object _seenGate = new();
+    /// <summary>Creates a broker with the backward-compatible lightweight defaults.</summary>
+    public PulseMqttTestBroker()
+        : this(new PulseMqttTestBrokerOptions())
+    {
+    }
+
+    /// <summary>Creates a broker with explicit test behavior options.</summary>
+    public PulseMqttTestBroker(PulseMqttTestBrokerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (!Enum.IsDefined(options.MaximumForwardQualityOfService))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.MaximumForwardQualityOfService,
+                "Maximum forward QoS must be a defined MQTT QoS value.");
+        }
+
+        _options = options;
+    }
 
     /// <summary>Every message a client published, in arrival order, for assertions.</summary>
     public ChannelReader<MqttPublishPacket> ClientPublishes => _clientPublishes.Reader;
 
     /// <summary>
-    /// When set, the broker models persistent-session resume: a non-clean reconnect by a client id it
-    /// has already seen answers CONNACK with <c>SessionPresent = true</c>. Off by default — every
-    /// CONNACK reports no session — so existing tests are unaffected.
+    /// Compatibility shortcut for the old session-resume toggle. When set, it enables the same
+    /// persistent-session behavior as <see cref="PulseMqttTestBrokerOptions.PersistentSessions"/>.
     /// </summary>
     public bool ResumeSessions { get; init; }
 
@@ -55,10 +78,11 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
     }
 
     /// <summary>Publishes a message from the broker side to every matching subscriber.</summary>
-    public ValueTask PublishAsync(MqttPublishPacket message, CancellationToken cancellationToken = default)
+    public async ValueTask PublishAsync(MqttPublishPacket message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
-        return RouteAsync(message, cancellationToken);
+        StoreRetainedMessage(message);
+        await RouteAsync(message, origin: null, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -88,7 +112,12 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
         _lifetime.Dispose();
     }
 
-    private async ValueTask RouteAsync(MqttPublishPacket message, CancellationToken cancellationToken)
+    private bool PersistentSessionsEnabled => _options.PersistentSessions || ResumeSessions;
+
+    private async ValueTask RouteAsync(
+        MqttPublishPacket message,
+        BrokerSession? origin,
+        CancellationToken cancellationToken)
     {
         BrokerSession[] sessions;
         lock (_gate)
@@ -98,25 +127,65 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
 
         foreach (var session in sessions)
         {
-            var maximum = session.MatchSubscription(message.Topic);
-            if (maximum is null)
+            var filter = session.MatchSubscription(message.Topic, origin);
+            if (filter is null)
             {
                 continue;
             }
 
-            var qos = (MqttQualityOfService)Math.Min(
-                Math.Min((byte)message.QualityOfService, (byte)maximum.Value),
-                (byte)MqttQualityOfService.AtLeastOnce);
-
-            var forward = message with
-            {
-                QualityOfService = qos,
-                PacketIdentifier = qos > MqttQualityOfService.AtMostOnce ? NextPacketId() : null,
-                Dup = false,
-                Retain = false,
-            };
-            await session.SendAsync(forward, cancellationToken).ConfigureAwait(false);
+            await ForwardAsync(
+                    session,
+                    message,
+                    filter,
+                    retainedReplay: false,
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
+    }
+
+    private async ValueTask ReplayRetainedAsync(
+        BrokerSession session,
+        MqttTopicFilter filter,
+        CancellationToken cancellationToken)
+    {
+        if (!_options.RetainedMessages)
+        {
+            return;
+        }
+
+        MqttPublishPacket[] retained;
+        lock (_retainedGate)
+        {
+            retained = [.. _retainedMessages.Values.Where(message => MqttTopicFilterMatcher.Matches(filter.Topic, message.Topic))];
+        }
+
+        foreach (var message in retained)
+        {
+            await ForwardAsync(session, message, filter, retainedReplay: true, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask ForwardAsync(
+        BrokerSession session,
+        MqttPublishPacket message,
+        MqttTopicFilter filter,
+        bool retainedReplay,
+        CancellationToken cancellationToken)
+    {
+        var qos = (MqttQualityOfService)Math.Min(
+            Math.Min((byte)message.QualityOfService, (byte)filter.MaximumQualityOfService),
+            (byte)_options.MaximumForwardQualityOfService);
+
+        var forward = message with
+        {
+            ProtocolVersion = session.ProtocolVersion,
+            QualityOfService = qos,
+            PacketIdentifier = qos > MqttQualityOfService.AtMostOnce ? NextPacketId() : null,
+            Dup = false,
+            Retain = retainedReplay || (filter.RetainAsPublished && message.Retain),
+        };
+
+        await session.SendAsync(forward, cancellationToken).ConfigureAwait(false);
     }
 
     private ushort NextPacketId()
@@ -135,34 +204,69 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
 
     private void RecordClientPublish(MqttPublishPacket message) => _clientPublishes.Writer.TryWrite(message);
 
-    // Decides the CONNACK SessionPresent flag. A clean start always reports no session (and resets the
-    // record); a non-clean reconnect by a previously seen client id reports a resumed session.
-    private bool ResumeSession(string clientId, bool cleanStart)
+    private void StoreRetainedMessage(MqttPublishPacket message)
     {
-        if (!ResumeSessions)
+        if (!_options.RetainedMessages || !message.Retain)
         {
-            return false;
+            return;
         }
 
-        lock (_seenGate)
+        lock (_retainedGate)
         {
-            if (cleanStart)
+            if (message.Payload.IsEmpty)
             {
-                _seenSessions.Add(clientId);
-                return false;
+                _retainedMessages.Remove(message.Topic);
+                return;
             }
 
-            // HashSet.Add returns false when the id was already present — i.e. a session to resume.
-            return !_seenSessions.Add(clientId);
+            _retainedMessages[message.Topic] = message with
+            {
+                PacketIdentifier = null,
+                Dup = false,
+            };
         }
+    }
+
+    private BrokerSessionState OpenSession(MqttConnectPacket connect, out bool sessionPresent)
+    {
+        sessionPresent = false;
+        if (!PersistentSessionsEnabled || string.IsNullOrEmpty(connect.ClientId))
+        {
+            return new BrokerSessionState();
+        }
+
+        lock (_gate)
+        {
+            if (connect.CleanStart || connect.SessionExpiryInterval == 0)
+            {
+                _persistentSessions.Remove(connect.ClientId);
+                return new BrokerSessionState();
+            }
+
+            if (!_persistentSessions.TryGetValue(connect.ClientId, out var state))
+            {
+                state = new BrokerSessionState();
+                _persistentSessions[connect.ClientId] = state;
+                return state;
+            }
+
+            sessionPresent = true;
+            return state;
+        }
+    }
+
+    private sealed class BrokerSessionState
+    {
+        public object Gate { get; } = new();
+
+        public Dictionary<string, MqttTopicFilter> Subscriptions { get; } = [];
     }
 
     private sealed class BrokerSession : IAsyncDisposable
     {
         private readonly PulseMqttTestBroker _broker;
         private readonly MqttConnection _connection;
-        private readonly Dictionary<string, MqttTopicFilter> _subscriptions = [];
-        private readonly object _subscriptionGate = new();
+        private BrokerSessionState _state = new();
         private Task? _loop;
 
         public BrokerSession(PulseMqttTestBroker broker, IMqttTransport transport)
@@ -171,23 +275,30 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
             _connection = new MqttConnection(transport, new MqttConnectionOptions());
         }
 
+        public MqttProtocolVersion ProtocolVersion { get; private set; } = MqttProtocolVersion.V500;
+
         public void Start(CancellationToken cancellationToken)
         {
             _connection.Start();
             _loop = Task.Run(() => ServeAsync(cancellationToken), CancellationToken.None);
         }
 
-        public MqttQualityOfService? MatchSubscription(string topic)
+        public MqttTopicFilter? MatchSubscription(string topic, BrokerSession? origin)
         {
-            lock (_subscriptionGate)
+            lock (_state.Gate)
             {
-                MqttQualityOfService? best = null;
-                foreach (var filter in _subscriptions.Values)
+                MqttTopicFilter? best = null;
+                foreach (var filter in _state.Subscriptions.Values)
                 {
-                    if (MqttTopicFilterMatcher.Matches(filter.Topic, topic)
-                        && (best is null || filter.MaximumQualityOfService > best))
+                    if (this == origin && filter.NoLocal)
                     {
-                        best = filter.MaximumQualityOfService;
+                        continue;
+                    }
+
+                    if (MqttTopicFilterMatcher.Matches(filter.Topic, topic)
+                        && (best is null || filter.MaximumQualityOfService > best.MaximumQualityOfService))
+                    {
+                        best = filter;
                     }
                 }
 
@@ -253,49 +364,69 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
             switch (packet)
             {
                 case MqttConnectPacket connect:
+                {
+                    ProtocolVersion = connect.ProtocolVersion;
+                    _state = _broker.OpenSession(connect, out var sessionPresent);
                     await SendAsync(
                         new MqttConnAckPacket
                         {
-                            ProtocolVersion = connect.ProtocolVersion,
-                            SessionPresent = _broker.ResumeSession(connect.ClientId, connect.CleanStart),
+                            ProtocolVersion = ProtocolVersion,
+                            SessionPresent = sessionPresent,
                         },
                         cancellationToken).ConfigureAwait(false);
                     break;
+                }
 
                 case MqttPingReqPacket:
                     await SendAsync(new MqttPingRespPacket(), cancellationToken).ConfigureAwait(false);
                     break;
 
                 case MqttSubscribePacket subscribe:
-                    lock (_subscriptionGate)
+                {
+                    List<MqttTopicFilter> retainedFilters = [];
+                    lock (_state.Gate)
                     {
                         foreach (var filter in subscribe.TopicFilters)
                         {
-                            _subscriptions[filter.Topic] = filter;
+                            var existed = _state.Subscriptions.ContainsKey(filter.Topic);
+                            _state.Subscriptions[filter.Topic] = filter;
+                            if (ShouldReplayRetained(filter, existed))
+                            {
+                                retainedFilters.Add(filter);
+                            }
                         }
                     }
 
                     await SendAsync(
                         new MqttSubAckPacket
                         {
+                            ProtocolVersion = ProtocolVersion,
                             PacketIdentifier = subscribe.PacketIdentifier,
                             ReasonCodes = [.. subscribe.TopicFilters.Select(f => (MqttReasonCode)f.MaximumQualityOfService)],
                         },
                         cancellationToken).ConfigureAwait(false);
+
+                    foreach (var filter in retainedFilters)
+                    {
+                        await _broker.ReplayRetainedAsync(this, filter, cancellationToken).ConfigureAwait(false);
+                    }
+
                     break;
+                }
 
                 case MqttUnsubscribePacket unsubscribe:
-                    lock (_subscriptionGate)
+                    lock (_state.Gate)
                     {
                         foreach (var topic in unsubscribe.TopicFilters)
                         {
-                            _subscriptions.Remove(topic);
+                            _state.Subscriptions.Remove(topic);
                         }
                     }
 
                     await SendAsync(
                         new MqttUnsubAckPacket
                         {
+                            ProtocolVersion = ProtocolVersion,
                             PacketIdentifier = unsubscribe.PacketIdentifier,
                             ReasonCodes = [.. unsubscribe.TopicFilters.Select(_ => MqttReasonCode.Success)],
                         },
@@ -304,13 +435,15 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
 
                 case MqttPublishPacket publish:
                     _broker.RecordClientPublish(publish);
+                    _broker.StoreRetainedMessage(publish);
                     switch (publish.QualityOfService)
                     {
                         case MqttQualityOfService.AtLeastOnce:
                             await SendAsync(
                                 new MqttPublishAckPacket
                                 {
-                                    PacketType = Codec.MqttPacketType.PubAck,
+                                    ProtocolVersion = ProtocolVersion,
+                                    PacketType = MqttPacketType.PubAck,
                                     PacketIdentifier = publish.PacketIdentifier!.Value,
                                 },
                                 cancellationToken).ConfigureAwait(false);
@@ -319,21 +452,34 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
                             await SendAsync(
                                 new MqttPublishAckPacket
                                 {
-                                    PacketType = Codec.MqttPacketType.PubRec,
+                                    ProtocolVersion = ProtocolVersion,
+                                    PacketType = MqttPacketType.PubRec,
                                     PacketIdentifier = publish.PacketIdentifier!.Value,
                                 },
                                 cancellationToken).ConfigureAwait(false);
                             break;
                     }
 
-                    await _broker.RouteAsync(publish, cancellationToken).ConfigureAwait(false);
+                    await _broker.RouteAsync(publish, origin: this, cancellationToken).ConfigureAwait(false);
                     break;
 
-                case MqttPublishAckPacket { PacketType: Codec.MqttPacketType.PubRel } release:
+                case MqttPublishAckPacket { PacketType: MqttPacketType.PubRec } pubRec:
                     await SendAsync(
                         new MqttPublishAckPacket
                         {
-                            PacketType = Codec.MqttPacketType.PubComp,
+                            ProtocolVersion = ProtocolVersion,
+                            PacketType = MqttPacketType.PubRel,
+                            PacketIdentifier = pubRec.PacketIdentifier,
+                        },
+                        cancellationToken).ConfigureAwait(false);
+                    break;
+
+                case MqttPublishAckPacket { PacketType: MqttPacketType.PubRel } release:
+                    await SendAsync(
+                        new MqttPublishAckPacket
+                        {
+                            ProtocolVersion = ProtocolVersion,
+                            PacketType = MqttPacketType.PubComp,
                             PacketIdentifier = release.PacketIdentifier,
                         },
                         cancellationToken).ConfigureAwait(false);
@@ -347,6 +493,22 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
             }
 
             return true;
+        }
+
+        private bool ShouldReplayRetained(MqttTopicFilter filter, bool subscriptionExisted)
+        {
+            if (!_broker._options.RetainedMessages)
+            {
+                return false;
+            }
+
+            return filter.RetainHandling switch
+            {
+                MqttRetainHandling.SendAtSubscribe => true,
+                MqttRetainHandling.SendAtSubscribeIfNewSubscription => !subscriptionExisted,
+                MqttRetainHandling.DoNotSendAtSubscribe => false,
+                _ => false,
+            };
         }
     }
 }

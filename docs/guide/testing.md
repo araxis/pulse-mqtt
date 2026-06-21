@@ -5,8 +5,9 @@ tools make it so: the **in-process broker** and **injected time**.
 
 ## The in-process broker
 
-`Pulse.Mqtt.Testing` ships `PulseMqttTestBroker` — a real MQTT 5 broker living in your test
-process. It **is** a transport factory, so it plugs into the client like any other transport:
+`Pulse.Mqtt.Testing` ships `PulseMqttTestBroker` — an in-process MQTT 5.0 / 3.1.1 broker
+living in your test process. It **is** a transport factory, so it plugs into the client like
+any other transport:
 
 ```csharp
 await using var broker = new PulseMqttTestBroker();
@@ -25,8 +26,21 @@ services.AddPulseMqttClient("devices", o => { o.Host = "in-process"; o.ClientId 
     .UseTransportFactory(_ => broker);
 ```
 
-The whole stack runs for real — handshake, keep-alive, QoS 1/2 acknowledgements,
-subscriptions, topic matching, routing between clients — in memory, in milliseconds.
+The whole stack runs for real — handshake, keep-alive, QoS acknowledgements, subscriptions,
+topic matching, routing between clients — in memory, in milliseconds.
+
+The default constructor keeps the broker lightweight and backward compatible: retained storage
+and persistent sessions are off, and forwarded messages are capped at QoS 1. Turn on more
+realistic behavior only in tests that need it:
+
+```csharp
+await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+{
+    RetainedMessages = true,
+    PersistentSessions = true,
+    MaximumForwardQualityOfService = MqttQualityOfService.ExactlyOnce,
+});
+```
 
 ### Inject messages
 
@@ -51,14 +65,49 @@ published.Topic.ShouldBe("alerts/overheat");
 ### Multiple clients
 
 Each client connecting through the broker gets its own session; messages route between them
-through real topic matching (forwarded at up to QoS 1). Wire a publisher service and a
-consumer service to the same broker and test their conversation.
+through real topic matching. Wire a publisher service and a consumer service to the same broker
+and test their conversation. By default forwarded messages are capped at QoS 1; set
+`MaximumForwardQualityOfService = MqttQualityOfService.ExactlyOnce` when the test needs the
+broker-to-client QoS 2 exchange.
+
+### Retained messages
+
+Retained storage is opt-in:
+
+```csharp
+await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+{
+    RetainedMessages = true,
+});
+```
+
+When enabled, a retained publish is stored by exact topic and replayed to later matching
+subscriptions. A retained publish with an empty payload clears the stored value. MQTT 5
+subscription flags are honored: `RetainHandling` controls replay, and `RetainAsPublished`
+preserves the retain flag on live forwarded messages.
+
+### Persistent sessions
+
+Persistent sessions are opt-in:
+
+```csharp
+await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+{
+    PersistentSessions = true,
+});
+```
+
+When enabled, subscriptions survive reconnects for clients that use a non-empty client id and
+`CleanStart = false`. A clean-start connection or MQTT 5 `SessionExpiryInterval = 0` clears the
+stored session. The older `ResumeSessions = true` shortcut now maps to this same behavior.
 
 ### Scope
 
-No retained messages, no session persistence, forwarding capped at QoS 1 — built for fast
-deterministic tests, not broker conformance. Keep a handful of true end-to-end tests against a
-containerized broker, the way this repository runs its own
+The broker is built for fast deterministic workflow tests, not broker conformance. It covers
+MQTT 5.0 and 3.1.1 handshakes, subscriptions, retained replay, persistent sessions, QoS
+acknowledgements, and in-memory routing, but it does not try to model every broker policy or
+failure. Keep a handful of true end-to-end tests against a containerized broker, the way this
+repository runs its own
 [integration suite](https://github.com/araxis/pulse-mqtt/tree/main/tests/Pulse.Mqtt.IntegrationTests)
 against Mosquitto via Testcontainers.
 

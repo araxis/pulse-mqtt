@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Pulse.Mqtt.Buffers;
 using Pulse.Mqtt.Codec;
 using Pulse.Mqtt.Packets;
+using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Transport;
 
 namespace Pulse.Mqtt.Connection;
@@ -21,6 +22,7 @@ public sealed class MqttConnection : IAsyncDisposable
     private readonly Channel<MqttPacket> _inbound;
     private readonly CancellationTokenSource _lifetime = new();
     private Task? _receiveLoop;
+    private MqttProtocolVersion _protocolVersion;
     private volatile bool _disposed;
 
     /// <summary>Creates an engine over <paramref name="transport"/>. The connection owns the transport.</summary>
@@ -31,6 +33,7 @@ public sealed class MqttConnection : IAsyncDisposable
 
         _transport = transport;
         _options = options;
+        _protocolVersion = options.ProtocolVersion;
         _inbound = Channel.CreateBounded<MqttPacket>(new BoundedChannelOptions(options.InboundQueueCapacity)
         {
             SingleWriter = true,
@@ -241,6 +244,11 @@ public sealed class MqttConnection : IAsyncDisposable
 
         var body = buffer.Slice(headerLength, header.RemainingLength);
         packet = DecodeBody(header, body);
+        if (packet is MqttConnectPacket connect)
+        {
+            _protocolVersion = connect.ProtocolVersion;
+        }
+
         buffer = buffer.Slice(totalLength);
         return true;
     }
@@ -249,7 +257,7 @@ public sealed class MqttConnection : IAsyncDisposable
     {
         if (body.IsSingleSegment)
         {
-            return MqttPacketDecoder.Decode(header, body.FirstSpan, _options.ProtocolVersion);
+            return MqttPacketDecoder.Decode(header, body.FirstSpan, _protocolVersion);
         }
 
         var length = (int)body.Length;
@@ -257,7 +265,7 @@ public sealed class MqttConnection : IAsyncDisposable
         try
         {
             body.CopyTo(rented);
-            return MqttPacketDecoder.Decode(header, rented.AsSpan(0, length), _options.ProtocolVersion);
+            return MqttPacketDecoder.Decode(header, rented.AsSpan(0, length), _protocolVersion);
         }
         finally
         {

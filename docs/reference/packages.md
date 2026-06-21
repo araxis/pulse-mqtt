@@ -16,7 +16,7 @@ compatible. The analyzer package is a compiler extension and targets `netstandar
 | `Pulse.Mqtt.Storage.LiteDB` | `LiteDbSessionStore` + `LiteDbMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `LiteDB` |
 | `Pulse.Mqtt.Storage.Sqlite` | `SqliteSessionStore` + `SqliteMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `Microsoft.Data.Sqlite` |
 | `Pulse.Mqtt.Transport.WebSocket` | MQTT over `ws`/`wss` | Core |
-| `Pulse.Mqtt.Testing` | `PulseMqttTestBroker`, the in-process broker | Core |
+| `Pulse.Mqtt.Testing` | `PulseMqttTestBroker`, the in-process broker with opt-in retained messages and persistent sessions | Core |
 | `Pulse.Mqtt.Analyzers` | Optional C# diagnostics for common Pulse MQTT usage mistakes | none |
 
 ## Which do I need?

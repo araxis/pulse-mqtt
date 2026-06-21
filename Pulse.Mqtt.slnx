@@ -35,5 +35,6 @@
     <Project Path="tests/Pulse.Mqtt.Serialization.Protobuf.Tests/Pulse.Mqtt.Serialization.Protobuf.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Storage.LiteDB.Tests/Pulse.Mqtt.Storage.LiteDB.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Storage.Sqlite.Tests/Pulse.Mqtt.Storage.Sqlite.Tests.csproj" />
+    <Project Path="tests/Pulse.Mqtt.Testing.Tests/Pulse.Mqtt.Testing.Tests.csproj" />
   </Folder>
 </Solution>
