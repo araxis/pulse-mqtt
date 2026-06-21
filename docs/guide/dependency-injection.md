@@ -112,5 +112,17 @@ builder.Services.AddPulseMqttClient("devices", configure)
 ```
 
 Registers a check named `pulse-mqtt-<name>` that maps the connection state to `Healthy` /
-`Degraded` / `Unhealthy`. The full mapping, liveness-vs-readiness split, and custom checks are
-in [Health checks](./health-checks).
+`Degraded` / `Unhealthy`. Use the overload when readiness should also react to offline backlog,
+dropped queued publishes, or pending subscription operations:
+
+```csharp
+builder.Services.AddPulseMqttClient("devices", configure)
+    .AddHealthCheck(options =>
+    {
+        options.DegradedOfflineQueueDepthThreshold = 100;
+        options.UnhealthyOfflineQueueDepthThreshold = 1_000;
+    });
+```
+
+The full mapping, threshold precedence, nullable queue-counter behavior, and liveness-vs-readiness
+split are in [Health checks](./health-checks).

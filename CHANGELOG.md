@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.14.0 (unreleased)
+
+- Added opt-in health-check policy thresholds for offline queue depth, dropped offline
+  publishes, and pending subscription operations while preserving the existing default health
+  state mapping.
+
 ## 2.13.0
 
 - Added scripted responses to `Pulse.Mqtt.Testing`. `PulseMqttTestBroker` can now customize or

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Pulse.Mqtt;
 using Pulse.Mqtt.Client;
 using Pulse.Mqtt.DependencyInjection;
+using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Resilience;
 using Pulse.Mqtt.Testing;
@@ -17,6 +18,11 @@ namespace Pulse.Mqtt.DependencyInjection.Tests;
 public sealed class AddPulseMqttClientTests
 {
     private static readonly TimeSpan SafetyTimeout = TimeSpan.FromSeconds(10);
+
+    private sealed class ZeroJitter : Random
+    {
+        public override double NextDouble() => 0.0;
+    }
 
     private sealed class LoopbackOnlyFactory : IMqttTransportFactory
     {
@@ -32,6 +38,24 @@ public sealed class AddPulseMqttClientTests
         options.Host = "broker.local";
         options.ClientId = "test-client";
     }
+
+    private static ResilientMqttClientOptions NewClientOptions(IMessageStore? messageStore = null) => new()
+    {
+        Connect = new MqttConnectPacket
+        {
+            ClientId = $"health-{Guid.NewGuid():N}",
+            KeepAliveSeconds = 0,
+        },
+        ReconnectStrategy = new BackoffReconnectStrategy(
+            new BackoffOptions
+            {
+                BaseDelay = TimeSpan.FromMilliseconds(1),
+                MaxDelay = TimeSpan.FromMilliseconds(10),
+            },
+            new DefaultReconnectDecision(),
+            new ZeroJitter()),
+        MessageStore = messageStore,
+    };
 
     [Fact]
     public async Task Named_clients_are_independent_and_cached()
@@ -230,5 +254,316 @@ public sealed class AddPulseMqttClientTests
         await client.DisconnectAsync(timeout.Token);
         var stopped = await check.CheckHealthAsync(context);
         stopped.Data.ContainsKey("broker.protocol.version").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Builder_health_check_overload_registers_configured_thresholds()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        var store = new StaticMessageStore { Count = 2 };
+        var services = new ServiceCollection();
+        services.AddPulseMqttClient("policy", ValidOptions)
+            .UseTransportFactory(_ => broker)
+            .UseMessageStore(_ => store)
+            .AddHealthCheck(options => options.DegradedOfflineQueueDepthThreshold = 2);
+        await using var provider = services.BuildServiceProvider();
+
+        var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("policy");
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        var registration = provider
+            .GetRequiredService<IOptions<HealthCheckServiceOptions>>()
+            .Value
+            .Registrations
+            .ShouldHaveSingleItem();
+        var check = registration.Factory(provider);
+        var entry = await check.CheckHealthAsync(new HealthCheckContext { Registration = registration }, timeout.Token);
+
+        registration.Name.ShouldBe("pulse-mqtt-policy");
+        entry.Status.ShouldBe(HealthStatus.Degraded);
+        entry.Data["health.policy.status"].ShouldBe(HealthStatus.Degraded.ToString());
+        entry.Data["health.policy.reasons"].ShouldBeOfType<string[]>()
+            .ShouldContain("offline.queue.depth 2 >= 2");
+    }
+
+    [Fact]
+    public async Task Connected_client_below_thresholds_stays_healthy()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        var store = new StaticMessageStore { Count = 1, DroppedCount = 1 };
+        await using var client = new ResilientMqttClient(broker, NewClientOptions(store));
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        var check = new PulseMqttHealthCheck(
+            client,
+            new PulseMqttHealthCheckOptions
+            {
+                DegradedOfflineQueueDepthThreshold = 2,
+                UnhealthyOfflineQueueDepthThreshold = 4,
+                DegradedOfflineQueueDroppedCountThreshold = 2,
+                UnhealthyOfflineQueueDroppedCountThreshold = 4,
+            });
+
+        var result = await check.CheckHealthAsync(new HealthCheckContext(), timeout.Token);
+
+        result.Status.ShouldBe(HealthStatus.Healthy);
+        result.Data.ContainsKey("health.policy.status").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Connected_client_crossing_degraded_queue_threshold_returns_degraded()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        var store = new StaticMessageStore { Count = 2 };
+        await using var client = new ResilientMqttClient(broker, NewClientOptions(store));
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        var check = new PulseMqttHealthCheck(
+            client,
+            new PulseMqttHealthCheckOptions { DegradedOfflineQueueDepthThreshold = 2 });
+        var result = await check.CheckHealthAsync(new HealthCheckContext(), timeout.Token);
+
+        result.Status.ShouldBe(HealthStatus.Degraded);
+        result.Data["health.policy.status"].ShouldBe(HealthStatus.Degraded.ToString());
+        result.Data["health.policy.reasons"].ShouldBeOfType<string[]>()
+            .ShouldContain("offline.queue.depth 2 >= 2");
+    }
+
+    [Fact]
+    public async Task Connected_client_crossing_unhealthy_queue_threshold_returns_unhealthy()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        var store = new StaticMessageStore { Count = 5 };
+        await using var client = new ResilientMqttClient(broker, NewClientOptions(store));
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        var check = new PulseMqttHealthCheck(
+            client,
+            new PulseMqttHealthCheckOptions
+            {
+                DegradedOfflineQueueDepthThreshold = 2,
+                UnhealthyOfflineQueueDepthThreshold = 5,
+            });
+        var result = await check.CheckHealthAsync(new HealthCheckContext(), timeout.Token);
+
+        result.Status.ShouldBe(HealthStatus.Unhealthy);
+        result.Data["health.policy.status"].ShouldBe(HealthStatus.Unhealthy.ToString());
+        result.Data["health.policy.reasons"].ShouldBeOfType<string[]>()
+            .ShouldContain("offline.queue.depth 5 >= 5");
+    }
+
+    [Fact]
+    public async Task Dropped_count_thresholds_work_independently_from_queue_depth()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        var store = new StaticMessageStore { Count = 0, DroppedCount = 3 };
+        await using var client = new ResilientMqttClient(broker, NewClientOptions(store));
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        var check = new PulseMqttHealthCheck(
+            client,
+            new PulseMqttHealthCheckOptions { DegradedOfflineQueueDroppedCountThreshold = 3 });
+        var result = await check.CheckHealthAsync(new HealthCheckContext(), timeout.Token);
+
+        result.Status.ShouldBe(HealthStatus.Degraded);
+        result.Data["health.policy.reasons"].ShouldBeOfType<string[]>()
+            .ShouldContain("offline.queue.dropped 3 >= 3");
+    }
+
+    [Fact]
+    public async Task Pending_subscription_threshold_uses_combined_pending_count()
+    {
+        var services = new ServiceCollection();
+        services.AddPulseMqttClient("pending", ValidOptions)
+            .UseTransportFactory(_ => new LoopbackOnlyFactory())
+            .AddHealthCheck();
+        await using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("pending");
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.SubscribeAsync([new MqttTopicFilter("devices/a")], timeout.Token);
+        await client.SubscribeAsync([new MqttTopicFilter("devices/b")], timeout.Token);
+        await client.UnsubscribeAsync(["devices/a"], timeout.Token);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForNotDisconnectedAsync(client, timeout.Token);
+
+        var check = new PulseMqttHealthCheck(
+            client,
+            new PulseMqttHealthCheckOptions { UnhealthyPendingSubscriptionOperationsThreshold = 2 });
+        var result = await check.CheckHealthAsync(new HealthCheckContext(), timeout.Token);
+
+        result.Status.ShouldBe(HealthStatus.Unhealthy);
+        result.Data["pending.subscribe.count"].ShouldBe(1);
+        result.Data["pending.unsubscribe.count"].ShouldBe(1);
+        result.Data["health.policy.reasons"].ShouldBeOfType<string[]>()
+            .ShouldContain("pending.subscription.operations 2 >= 2");
+    }
+
+    [Fact]
+    public async Task Unhealthy_threshold_takes_precedence_when_multiple_thresholds_are_crossed()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        var store = new StaticMessageStore { Count = 2, DroppedCount = 4 };
+        await using var client = new ResilientMqttClient(broker, NewClientOptions(store));
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        var check = new PulseMqttHealthCheck(
+            client,
+            new PulseMqttHealthCheckOptions
+            {
+                DegradedOfflineQueueDepthThreshold = 2,
+                UnhealthyOfflineQueueDroppedCountThreshold = 4,
+            });
+        var result = await check.CheckHealthAsync(new HealthCheckContext(), timeout.Token);
+
+        result.Status.ShouldBe(HealthStatus.Unhealthy);
+        result.Data["health.policy.status"].ShouldBe(HealthStatus.Unhealthy.ToString());
+        result.Data["health.policy.reasons"].ShouldBeOfType<string[]>()
+            .ShouldContain("offline.queue.dropped 4 >= 4");
+    }
+
+    [Fact]
+    public async Task Null_queue_counters_do_not_trigger_threshold_policy()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        await using var client = new ResilientMqttClient(broker, NewClientOptions(new ThrowingCounterStore()));
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        var check = new PulseMqttHealthCheck(
+            client,
+            new PulseMqttHealthCheckOptions
+            {
+                DegradedOfflineQueueDepthThreshold = 1,
+                UnhealthyOfflineQueueDroppedCountThreshold = 1,
+            });
+        var result = await check.CheckHealthAsync(new HealthCheckContext(), timeout.Token);
+
+        result.Status.ShouldBe(HealthStatus.Healthy);
+        result.Data.ContainsKey("offline.queue.depth").ShouldBeFalse();
+        result.Data.ContainsKey("offline.queue.dropped").ShouldBeFalse();
+        result.Data.ContainsKey("health.policy.status").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Policy_thresholds_do_not_improve_or_relabel_existing_unhealthy_states()
+    {
+        var store = new StaticMessageStore { Count = 10 };
+        await using var client = new ResilientMqttClient(new LoopbackOnlyFactory(), NewClientOptions(store));
+        var check = new PulseMqttHealthCheck(
+            client,
+            new PulseMqttHealthCheckOptions { UnhealthyOfflineQueueDepthThreshold = 1 });
+
+        var result = await check.CheckHealthAsync(new HealthCheckContext());
+
+        result.Status.ShouldBe(HealthStatus.Unhealthy);
+        result.Description.ShouldBe("The client is Disconnected.");
+        result.Data.ContainsKey("health.policy.status").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Invalid_threshold_options_throw_clear_exceptions()
+    {
+        await using var client = new ResilientMqttClient(new LoopbackOnlyFactory(), NewClientOptions());
+
+        var outOfRange = Should.Throw<ArgumentOutOfRangeException>(() =>
+            new PulseMqttHealthCheck(
+                client,
+                new PulseMqttHealthCheckOptions { DegradedOfflineQueueDepthThreshold = 0 }));
+        outOfRange.ParamName.ShouldBe(nameof(PulseMqttHealthCheckOptions.DegradedOfflineQueueDepthThreshold));
+
+        var invalidOrder = Should.Throw<ArgumentException>(() =>
+            new PulseMqttHealthCheck(
+                client,
+                new PulseMqttHealthCheckOptions
+                {
+                    DegradedPendingSubscriptionOperationsThreshold = 5,
+                    UnhealthyPendingSubscriptionOperationsThreshold = 4,
+                }));
+        invalidOrder.ParamName.ShouldBe(nameof(PulseMqttHealthCheckOptions.DegradedPendingSubscriptionOperationsThreshold));
+
+        var services = new ServiceCollection();
+        var builder = services.AddPulseMqttClient("invalid-policy", ValidOptions);
+        var builderFailure = Should.Throw<ArgumentOutOfRangeException>(() =>
+            builder.AddHealthCheck(options => options.UnhealthyOfflineQueueDroppedCountThreshold = 0));
+        builderFailure.ParamName.ShouldBe(nameof(PulseMqttHealthCheckOptions.UnhealthyOfflineQueueDroppedCountThreshold));
+    }
+
+    private static async Task WaitForStateAsync(
+        ResilientMqttClient client,
+        ConnectionState state,
+        CancellationToken cancellationToken)
+    {
+        while (client.State != state)
+        {
+            await Task.Delay(5, cancellationToken);
+        }
+    }
+
+    private static async Task WaitForNotDisconnectedAsync(
+        ResilientMqttClient client,
+        CancellationToken cancellationToken)
+    {
+        while (client.State == ConnectionState.Disconnected)
+        {
+            await Task.Delay(5, cancellationToken);
+        }
+    }
+
+    private sealed class StaticMessageStore : IMessageStore
+    {
+        public int Count { get; set; }
+
+        public long DroppedCount { get; set; }
+
+        public ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<MqttPublishPacket?>(null);
+
+        public ValueTask RemoveHeadAsync(CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask ClearAsync(CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
+    }
+
+    private sealed class ThrowingCounterStore : IMessageStore
+    {
+        public int Count => throw new InvalidOperationException("count failed");
+
+        public long DroppedCount => throw new InvalidOperationException("dropped failed");
+
+        public ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<MqttPublishPacket?>(null);
+
+        public ValueTask RemoveHeadAsync(CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask ClearAsync(CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
     }
 }

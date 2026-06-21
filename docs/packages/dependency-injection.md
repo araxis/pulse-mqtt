@@ -43,5 +43,17 @@ The package also exposes per-client swap points:
 .UseSerializer(_ => serializer)
 ```
 
+Health checks can stay state-only or apply opt-in policy thresholds:
+
+```csharp
+.AddHealthCheck(options =>
+{
+    options.DegradedOfflineQueueDepthThreshold = 100;
+    options.UnhealthyOfflineQueueDepthThreshold = 1_000;
+    options.DegradedPendingSubscriptionOperationsThreshold = 10;
+});
+```
+
 See [Dependency injection](/guide/dependency-injection) for options binding, multiple clients,
-host-managed lifecycle, and health checks.
+host-managed lifecycle, and health checks. See [Health checks](/guide/health-checks) for threshold
+precedence and result-data keys.
