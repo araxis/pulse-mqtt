@@ -97,6 +97,33 @@ await foreach (MqttRoutedMessage routed in stream.ReadAllAsync(token))
 }
 ```
 
+## Dataflow source blocks
+
+Add `Pulse.Mqtt.Dataflow` when a route should feed a bounded pipeline:
+
+```csharp
+using Pulse.Mqtt.Dataflow;
+using System.Threading.Tasks.Dataflow;
+
+var template = MqttRouteTemplate.Parse("sensors/{deviceId}/temp");
+await client.SubscribeAsync(template, token);
+
+await using var source = client.ToRouteSourceBlock(
+    template,
+    sourceOptions: new MqttDataflowSourceOptions { BoundedCapacity = 128 },
+    cancellationToken: token);
+
+using var link = source.LinkTo(
+    new ActionBlock<MqttRoutedMessage>(
+        routed => Process(routed.Values["deviceId"], routed.Message),
+        new ExecutionDataflowBlockOptions { BoundedCapacity = 128 }),
+    new DataflowLinkOptions { PropagateCompletion = true });
+```
+
+`ToRouteSourceBlock` is a local routing adapter only. It does not subscribe to the broker; call
+`SubscribeAsync` first, or use an existing fluent route helper when you want subscription and
+local route ownership together. For event-style consumers, use `DataflowBlock.AsObservable(source)`.
+
 ## Acknowledged streams
 
 The default raw stream and route stream acknowledge inbound QoS 1/2 publishes automatically

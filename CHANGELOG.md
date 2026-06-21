@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.10.0 (unreleased)
+
+- Added `Pulse.Mqtt.Dataflow`, an opt-in package that exposes client messages, route streams,
+  acknowledged route streams, and connection state transitions as bounded Dataflow source blocks
+  without changing existing runtime APIs.
+
 ## 2.9.0
 
 - Updated repository workflows to use current action runtimes and made docs workflow maintenance

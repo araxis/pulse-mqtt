@@ -78,6 +78,10 @@ never blocks the client). Subscribe before the transitions you care about; there
 when a broker disconnect, rejected CONNECT, retry failure, or terminal fault has details to
 report.
 
+When state changes feed a Dataflow pipeline, add `Pulse.Mqtt.Dataflow` and use
+`ToStateSourceBlock(...)`. The source is bounded and can also be exposed as an observable through
+`DataflowBlock.AsObservable(source)`.
+
 ## Reading diagnostics
 
 For a synchronous point-in-time view, call `GetDiagnosticsSnapshot()`:

@@ -89,6 +89,7 @@ jobs:
             for id in \
               Pulse.Mqtt.Core \
               Pulse.Mqtt.Client \
+              Pulse.Mqtt.Dataflow \
               Pulse.Mqtt.DependencyInjection \
               Pulse.Mqtt.Serialization.Json \
               Pulse.Mqtt.Serialization.MessagePack \

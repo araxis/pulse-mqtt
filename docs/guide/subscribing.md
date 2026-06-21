@@ -78,6 +78,15 @@ The channel is bounded (`RawMqttClientOptions.InboundMessageCapacity`, default 2
 consumer slows the socket reader rather than growing memory. The channel survives reconnects —
 one continuous stream across sessions.
 
+For pipeline-style consumers, `Pulse.Mqtt.Dataflow` exposes the same raw stream as a bounded
+`ISourceBlock<MqttPublishPacket>`:
+
+```csharp
+await using var source = client.ToMessageSourceBlock(
+    new MqttDataflowSourceOptions { BoundedCapacity = 128 },
+    token);
+```
+
 ::: warning Pick one consumer model
 Use either the raw `Messages` stream or [routing](./routing), not both: the router consumes
 from the same stream. Routing is the right default; the raw stream suits gateway-style code
