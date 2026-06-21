@@ -1,10 +1,1 @@
 #nullable enable
-Pulse.Mqtt.Testing.PulseMqttTestBroker.PulseMqttTestBroker(Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions! options) -> void
-Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions
-Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.MaximumForwardQualityOfService.get -> Pulse.Mqtt.MqttQualityOfService
-Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.MaximumForwardQualityOfService.init -> void
-Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.PersistentSessions.get -> bool
-Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.PersistentSessions.init -> void
-Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.PulseMqttTestBrokerOptions() -> void
-Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.RetainedMessages.get -> bool
-Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.RetainedMessages.init -> void

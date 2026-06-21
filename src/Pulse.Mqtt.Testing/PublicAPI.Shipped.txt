@@ -5,5 +5,14 @@ Pulse.Mqtt.Testing.PulseMqttTestBroker.ConnectAsync(System.Threading.Cancellatio
 Pulse.Mqtt.Testing.PulseMqttTestBroker.DisposeAsync() -> System.Threading.Tasks.ValueTask
 Pulse.Mqtt.Testing.PulseMqttTestBroker.PublishAsync(Pulse.Mqtt.Packets.MqttPublishPacket! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 Pulse.Mqtt.Testing.PulseMqttTestBroker.PulseMqttTestBroker() -> void
+Pulse.Mqtt.Testing.PulseMqttTestBroker.PulseMqttTestBroker(Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions! options) -> void
 Pulse.Mqtt.Testing.PulseMqttTestBroker.ResumeSessions.get -> bool
 Pulse.Mqtt.Testing.PulseMqttTestBroker.ResumeSessions.init -> void
+Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions
+Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.MaximumForwardQualityOfService.get -> Pulse.Mqtt.MqttQualityOfService
+Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.MaximumForwardQualityOfService.init -> void
+Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.PersistentSessions.get -> bool
+Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.PersistentSessions.init -> void
+Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.PulseMqttTestBrokerOptions() -> void
+Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.RetainedMessages.get -> bool
+Pulse.Mqtt.Testing.PulseMqttTestBrokerOptions.RetainedMessages.init -> void

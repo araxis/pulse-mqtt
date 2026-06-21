@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.12.0 (unreleased)
+## 2.12.0
 
 - Improved `Pulse.Mqtt.Testing` protocol realism. `PulseMqttTestBroker` now supports MQTT 3.1.1
   sessions, opt-in retained messages, opt-in persistent sessions, subscription flags, and
