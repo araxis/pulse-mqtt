@@ -218,6 +218,50 @@ The snapshot includes:
 Successful `Connected` transitions clear stale fault details, so `LastError` describes the
 current problem, not an old outage that has already recovered.
 
+Use the snapshot when an operator-facing system needs a current value instead of an event
+stream. Typical uses are periodic logs, dashboard gauges, and fault triage after an alert:
+
+```csharp
+var snapshot = client.GetDiagnosticsSnapshot();
+
+logger.LogInformation(
+    "MQTT client {ClientId} is {State} after {Attempt} attempts; queue depth {QueueDepth}",
+    snapshot.ClientId,
+    snapshot.State,
+    snapshot.Attempt,
+    snapshot.OfflineQueueDepth);
+
+if (snapshot.LastError is { } error)
+{
+    logger.LogWarning(
+        error,
+        "MQTT last failure was {Reason}: {ReasonString}; server reference {ServerReference}",
+        snapshot.LastReason,
+        snapshot.LastReasonString,
+        snapshot.LastServerReference);
+}
+```
+
+For a small metrics bridge, prefer low-cardinality gauges. Queue counters are nullable because
+custom stores can decline or fail counter reads without failing diagnostics collection:
+
+```csharp
+var meter = new Meter("MyApp.Mqtt");
+
+meter.CreateObservableGauge(
+    "app_mqtt_connected",
+    () => client.GetDiagnosticsSnapshot().State == ConnectionState.Connected ? 1 : 0);
+
+meter.CreateObservableGauge(
+    "app_mqtt_offline_queue_depth",
+    () => client.GetDiagnosticsSnapshot().OfflineQueueDepth ?? 0);
+```
+
+For reconnect and fault triage, start with `State`, `Attempt`, and `StateChangedAt`, then look
+at `LastReason`, `LastReasonString`, `LastServerReference`, and `LastError`. A missing
+`LastError` means the current state was not caused by a captured exception; a missing queue
+counter means the store could not report it, not that the queue is empty.
+
 ## State as a stream or event
 
 For in-process reactions — a UI badge, a circuit indicator, paging — you do not need the

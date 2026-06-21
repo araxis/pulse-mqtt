@@ -95,7 +95,9 @@ logger.LogInformation(
 
 The snapshot includes the current state, when it changed, the last reason/error details, offline
 queue counters, and subscription bookkeeping. Queue counters are nullable so a custom store can
-fail diagnostics collection without failing the caller.
+fail diagnostics collection without failing the caller. For structured logging, metrics export,
+and health-check result data, see [Observability](./observability#diagnostics-snapshot) and
+[Health checks](./health-checks#result-data).
 
 ## Waiting for connected
 

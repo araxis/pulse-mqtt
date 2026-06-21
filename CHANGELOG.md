@@ -2,6 +2,11 @@
 
 ## 2.9.0 (unreleased)
 
+- Updated repository workflows to use current action runtimes while preserving the existing CI,
+  docs, broker-matrix, and release behavior.
+- Clarified diagnostics snapshot and health-check documentation with production logging, metrics,
+  readiness/liveness, and nullable queue-counter guidance.
+
 ## 2.8.0
 
 - Added `ResilientMqttClient.GetDiagnosticsSnapshot()` and

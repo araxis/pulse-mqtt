@@ -31,25 +31,33 @@ exactly:
 | `Disconnected`, `Faulted`, `Stopped` | **Unhealthy** | `The client is <state>.`, or `The client is <state> (<reason>).` when a reason is known |
 
 `Degraded` is the deliberate middle ground: the client is doing its job (reconnecting), so a
-transient blip does not flap your readiness probe, but the dashboard still shows it is not fully
-up. `Faulted` is `Unhealthy` because the client has stopped retrying — it needs intervention.
+transient blip does not have to restart the process, but the dashboard still shows it is not fully
+up. `Faulted` is `Unhealthy` because the client has stopped retrying and needs intervention.
 
 ## Result data
 
-The built-in check attaches snapshot data for dashboards and probe logs:
+The built-in check attaches snapshot data for dashboards and probe logs. Optional keys are omitted
+when the snapshot has no value for them:
 
 | Key | Meaning |
 | --- | --- |
 | `client.id`, `state`, `attempt`, `is.running`, `state.changed_at` | Lifecycle position |
 | `subscription.count`, `pending.subscribe.count`, `pending.unsubscribe.count` | Subscription bookkeeping |
-| `reason`, `reason.string`, `server.reference` | Last broker or connect reason details, when available |
+| `reason`, `reason.string`, `server.reference` | Last broker disconnect or connect rejection details, when available |
 | `error.type`, `error.message` | Last exception details, when available |
 | `offline.queue.depth`, `offline.queue.dropped` | Queue counters, when the store can report them |
 
+Treat missing queue keys as *unknown*, not zero. A custom message store can fail counter reads,
+and the health check will still return the connection-state result instead of failing diagnostics
+collection. `reason` is the last `MqttReasonCode` name; `reason.string` and `server.reference`
+come from broker/connect packets when the broker supplied them. `error.message` is useful in
+dashboards, but avoid exposing raw health JSON to untrusted callers if exception messages may
+include deployment details.
+
 ## Separating liveness from readiness
 
-A resilient client that is reconnecting is *alive* but not *ready*. Tag the check and split the
-endpoints so a reconnect doesn't restart your pod:
+A resilient client that is reconnecting is *alive* but not *ready*. Readiness should normally
+require `Healthy`; liveness can accept `Degraded` so reconnects do not restart the process:
 
 ```csharp
 builder.Services
@@ -119,6 +127,11 @@ public sealed class MqttBacklogHealthCheck(IPulseMqttClientFactory clients) : IH
         {
             return Task.FromResult(
                 HealthCheckResult.Degraded($"Offline backlog {snapshot.OfflineQueueDepth}."));
+        }
+
+        if (snapshot.OfflineQueueDepth is null)
+        {
+            return Task.FromResult(HealthCheckResult.Healthy("MQTT connected; backlog unknown."));
         }
 
         return Task.FromResult(HealthCheckResult.Healthy());
