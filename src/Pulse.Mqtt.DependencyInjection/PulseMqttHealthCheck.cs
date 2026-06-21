@@ -8,25 +8,58 @@ namespace Pulse.Mqtt.DependencyInjection;
 /// Reports a client's connection state: connected is healthy, transitional states are degraded,
 /// and faulted/stopped/disconnected are unhealthy.
 /// </summary>
-public sealed class PulseMqttHealthCheck(ResilientMqttClient client) : IHealthCheck
+public sealed class PulseMqttHealthCheck : IHealthCheck
 {
+    private readonly ResilientMqttClient _client;
+    private readonly PulseMqttHealthCheckOptions _options;
+
+    /// <summary>Creates a health check with the default connection-state mapping.</summary>
+    public PulseMqttHealthCheck(ResilientMqttClient client)
+        : this(client, options: null)
+    {
+    }
+
+    /// <summary>Creates a health check with optional policy thresholds.</summary>
+    public PulseMqttHealthCheck(ResilientMqttClient client, PulseMqttHealthCheckOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+
+        _client = client;
+        _options = (options ?? new PulseMqttHealthCheckOptions()).Snapshot();
+    }
+
     /// <inheritdoc />
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
-        var snapshot = client.GetDiagnosticsSnapshot();
+        var snapshot = _client.GetDiagnosticsSnapshot();
+        var data = Data(snapshot);
         var result = snapshot.State switch
         {
-            ConnectionState.Connected => HealthCheckResult.Healthy(
+            ConnectionState.Connected => new HealthCheckResult(
+                HealthStatus.Healthy,
                 $"Connected (attempt {snapshot.Attempt}).",
-                Data(snapshot)),
+                data: data),
             ConnectionState.Connecting or ConnectionState.Reconnecting or ConnectionState.WaitingRetry =>
-                HealthCheckResult.Degraded(
+                new HealthCheckResult(
+                    HealthStatus.Degraded,
                     $"The connection is being established ({snapshot.State}, attempt {snapshot.Attempt}).",
-                    data: Data(snapshot)),
-            _ => HealthCheckResult.Unhealthy(
+                    data: data),
+            _ => new HealthCheckResult(
+                HealthStatus.Unhealthy,
                 UnhealthyDescription(snapshot),
-                data: Data(snapshot)),
+                data: data),
         };
+
+        var policy = EvaluatePolicy(snapshot);
+        if (policy is not null && IsWorse(policy.Value.Status, result.Status))
+        {
+            data["health.policy.status"] = policy.Value.Status.ToString();
+            data["health.policy.reasons"] = policy.Value.Reasons;
+            result = new HealthCheckResult(
+                policy.Value.Status,
+                PolicyDescription(policy.Value),
+                data: data);
+        }
 
         return Task.FromResult(result);
     }
@@ -83,6 +116,91 @@ public sealed class PulseMqttHealthCheck(ResilientMqttClient client) : IHealthCh
 
         return data;
     }
+
+    private PolicyResult? EvaluatePolicy(MqttClientDiagnosticsSnapshot snapshot)
+    {
+        List<string> unhealthyReasons = [];
+        List<string> degradedReasons = [];
+
+        if (snapshot.OfflineQueueDepth is { } depth)
+        {
+            AddThresholdReason(
+                unhealthyReasons,
+                depth,
+                _options.UnhealthyOfflineQueueDepthThreshold,
+                "offline.queue.depth");
+            AddThresholdReason(
+                degradedReasons,
+                depth,
+                _options.DegradedOfflineQueueDepthThreshold,
+                "offline.queue.depth");
+        }
+
+        if (snapshot.OfflineQueueDroppedCount is { } dropped)
+        {
+            AddThresholdReason(
+                unhealthyReasons,
+                dropped,
+                _options.UnhealthyOfflineQueueDroppedCountThreshold,
+                "offline.queue.dropped");
+            AddThresholdReason(
+                degradedReasons,
+                dropped,
+                _options.DegradedOfflineQueueDroppedCountThreshold,
+                "offline.queue.dropped");
+        }
+
+        var pendingOperations = snapshot.PendingSubscribeCount + snapshot.PendingUnsubscribeCount;
+        AddThresholdReason(
+            unhealthyReasons,
+            pendingOperations,
+            _options.UnhealthyPendingSubscriptionOperationsThreshold,
+            "pending.subscription.operations");
+        AddThresholdReason(
+            degradedReasons,
+            pendingOperations,
+            _options.DegradedPendingSubscriptionOperationsThreshold,
+            "pending.subscription.operations");
+
+        if (unhealthyReasons.Count > 0)
+        {
+            return new PolicyResult(HealthStatus.Unhealthy, [.. unhealthyReasons]);
+        }
+
+        return degradedReasons.Count > 0
+            ? new PolicyResult(HealthStatus.Degraded, [.. degradedReasons])
+            : null;
+    }
+
+    private static void AddThresholdReason(List<string> reasons, int value, int? threshold, string key)
+    {
+        if (threshold is { } setThreshold && value >= setThreshold)
+        {
+            reasons.Add($"{key} {value} >= {setThreshold}");
+        }
+    }
+
+    private static void AddThresholdReason(List<string> reasons, long value, long? threshold, string key)
+    {
+        if (threshold is { } setThreshold && value >= setThreshold)
+        {
+            reasons.Add($"{key} {value} >= {setThreshold}");
+        }
+    }
+
+    private static bool IsWorse(HealthStatus candidate, HealthStatus current) =>
+        Severity(candidate) > Severity(current);
+
+    private static int Severity(HealthStatus status) =>
+        status switch
+        {
+            HealthStatus.Healthy => 0,
+            HealthStatus.Degraded => 1,
+            _ => 2,
+        };
+
+    private static string PolicyDescription(PolicyResult policy) =>
+        $"Health policy marked the client {policy.Status.ToString().ToLowerInvariant()}: {string.Join("; ", policy.Reasons)}.";
 
     private static void AddBrokerCapabilities(
         Dictionary<string, object> data,
@@ -179,4 +297,6 @@ public sealed class PulseMqttHealthCheck(ResilientMqttClient client) : IHealthCh
 
         return $"The client is {snapshot.State}.";
     }
+
+    private readonly record struct PolicyResult(HealthStatus Status, string[] Reasons);
 }

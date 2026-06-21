@@ -72,12 +72,24 @@ public sealed class PulseMqttBuilder
         AddKeyed(factory);
 
     /// <summary>Registers a health check named <c>pulse-mqtt-&lt;name&gt;</c> for this client.</summary>
-    public PulseMqttBuilder AddHealthCheck()
+    public PulseMqttBuilder AddHealthCheck() =>
+        AddHealthCheck(_ => { });
+
+    /// <summary>Registers a health check named <c>pulse-mqtt-&lt;name&gt;</c> for this client with optional policy thresholds.</summary>
+    public PulseMqttBuilder AddHealthCheck(Action<PulseMqttHealthCheckOptions> configure)
     {
+        ArgumentNullException.ThrowIfNull(configure);
+
         var clientName = Name;
+        var options = new PulseMqttHealthCheckOptions();
+        configure(options);
+        var snapshot = options.Snapshot();
+
         Services.AddHealthChecks().Add(new HealthCheckRegistration(
             $"pulse-mqtt-{clientName}",
-            provider => new PulseMqttHealthCheck(provider.GetRequiredKeyedService<ResilientMqttClient>(clientName)),
+            provider => new PulseMqttHealthCheck(
+                provider.GetRequiredKeyedService<ResilientMqttClient>(clientName),
+                snapshot),
             failureStatus: null,
             tags: null));
         return this;

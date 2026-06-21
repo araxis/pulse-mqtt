@@ -12,6 +12,22 @@ builder.Services
     .AddHealthCheck();
 ```
 
+Add thresholds when readiness should react to backlog or subscription-operation pressure:
+
+```csharp
+builder.Services
+    .AddPulseMqttClient("devices", configure)
+    .AddHealthCheck(options =>
+    {
+        options.DegradedOfflineQueueDepthThreshold = 100;
+        options.UnhealthyOfflineQueueDepthThreshold = 1_000;
+        options.DegradedOfflineQueueDroppedCountThreshold = 1;
+        options.UnhealthyOfflineQueueDroppedCountThreshold = 50;
+        options.DegradedPendingSubscriptionOperationsThreshold = 10;
+        options.UnhealthyPendingSubscriptionOperationsThreshold = 100;
+    });
+```
+
 That registers a check named **`pulse-mqtt-<name>`** — for the client above,
 `pulse-mqtt-devices`. Register the ASP.NET Core endpoint as usual:
 
@@ -22,7 +38,7 @@ app.MapHealthChecks("/health");
 ## The state mapping
 
 The check reads `ResilientMqttClient.GetDiagnosticsSnapshot()` and maps the snapshot state
-exactly:
+exactly when no thresholds are configured:
 
 | Connection state | Health status | Description |
 | --- | --- | --- |
@@ -33,6 +49,29 @@ exactly:
 `Degraded` is the deliberate middle ground: the client is doing its job (reconnecting), so a
 transient blip does not have to restart the process, but the dashboard still shows it is not fully
 up. `Faulted` is `Unhealthy` because the client has stopped retrying and needs intervention.
+
+## Threshold policy
+
+`PulseMqttHealthCheckOptions` can only worsen the state-based result:
+
+- An unhealthy threshold has priority over degraded thresholds.
+- A degraded threshold can turn `Healthy` into `Degraded`.
+- An unhealthy threshold can turn `Healthy` or `Degraded` into `Unhealthy`.
+- Existing `Unhealthy` states remain `Unhealthy`.
+
+Threshold comparisons use `value >= threshold`. Values must be positive when set, and a degraded
+threshold must be less than or equal to its unhealthy threshold for the same metric.
+
+The available metrics are:
+
+| Option | Snapshot value |
+| --- | --- |
+| `DegradedOfflineQueueDepthThreshold`, `UnhealthyOfflineQueueDepthThreshold` | `OfflineQueueDepth` |
+| `DegradedOfflineQueueDroppedCountThreshold`, `UnhealthyOfflineQueueDroppedCountThreshold` | `OfflineQueueDroppedCount` |
+| `DegradedPendingSubscriptionOperationsThreshold`, `UnhealthyPendingSubscriptionOperationsThreshold` | `PendingSubscribeCount + PendingUnsubscribeCount` |
+
+Offline queue counters are nullable because custom stores can fail counter reads. When a counter is
+`null`, its thresholds are ignored and diagnostics collection continues.
 
 ## Result data
 
@@ -53,6 +92,7 @@ when the snapshot has no value for them:
 | `broker.topic.alias.maximum`, `broker.topic.alias.maximum.effective` | Raw and effective topic-alias maximum |
 | `broker.maximum.packet.size`, `broker.server.keep_alive`, `broker.keep_alive.effective` | Packet-size and keep-alive limits, when available |
 | `broker.assigned.client.id`, `broker.response.information`, `broker.server.reference`, `broker.authentication.method` | Optional broker-supplied connection metadata |
+| `health.policy.status`, `health.policy.reasons` | Present only when configured thresholds worsened the result |
 
 Treat missing queue keys as *unknown*, not zero. A custom message store can fail counter reads,
 and the health check will still return the connection-state result instead of failing diagnostics
@@ -116,42 +156,16 @@ HealthCheckResult result = await check.CheckHealthAsync(
     new HealthCheckContext { Registration = registration }, ct);
 ```
 
-## A custom health check
-
-If you want a different definition of healthy — say, also requiring the offline queue to be
-below a threshold — write your own over the same snapshot:
+Pass `PulseMqttHealthCheckOptions` when the manually constructed check should apply thresholds:
 
 ```csharp
-public sealed class MqttBacklogHealthCheck(IPulseMqttClientFactory clients) : IHealthCheck
-{
-    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct)
+var check = new PulseMqttHealthCheck(
+    client,
+    new PulseMqttHealthCheckOptions
     {
-        var client = clients.GetClient("devices");
-        var snapshot = client.GetDiagnosticsSnapshot();
-
-        if (snapshot.State != ConnectionState.Connected)
-        {
-            return Task.FromResult(HealthCheckResult.Unhealthy($"MQTT is {snapshot.State}."));
-        }
-
-        if (snapshot.OfflineQueueDepth is > 500)
-        {
-            return Task.FromResult(
-                HealthCheckResult.Degraded($"Offline backlog {snapshot.OfflineQueueDepth}."));
-        }
-
-        if (snapshot.OfflineQueueDepth is null)
-        {
-            return Task.FromResult(HealthCheckResult.Healthy("MQTT connected; backlog unknown."));
-        }
-
-        return Task.FromResult(HealthCheckResult.Healthy());
-    }
-}
-```
-
-```csharp
-builder.Services.AddHealthChecks().AddCheck<MqttBacklogHealthCheck>("mqtt-backlog");
+        DegradedOfflineQueueDepthThreshold = 500,
+        UnhealthyOfflineQueueDepthThreshold = 5_000,
+    });
 ```
 
 The diagnostics snapshot and state stream behind the built-in check are also available directly
