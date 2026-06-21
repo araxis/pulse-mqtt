@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.0 (unreleased)
+
+- No changes yet.
+
 ## 2.4.0
 
 - Added acknowledged route streams. `OpenAcknowledgedRouteStream(...)` lets a route consumer
