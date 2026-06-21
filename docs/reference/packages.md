@@ -1,7 +1,7 @@
 # Packages
 
-All packages target `net8.0` and `net10.0`, carry XML documentation, and are Native AOT
-compatible. MIT licensed.
+Runtime packages target `net8.0` and `net10.0`, carry XML documentation, and are Native AOT
+compatible. The analyzer package is a compiler extension and targets `netstandard2.0`. MIT licensed.
 
 | Package | What it is | Depends on |
 | --- | --- | --- |
@@ -15,6 +15,7 @@ compatible. MIT licensed.
 | `Pulse.Mqtt.Storage.Sqlite` | `SqliteSessionStore` + `SqliteMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `Microsoft.Data.Sqlite` |
 | `Pulse.Mqtt.Transport.WebSocket` | MQTT over `ws`/`wss` | Core |
 | `Pulse.Mqtt.Testing` | `PulseMqttTestBroker`, the in-process broker | Core |
+| `Pulse.Mqtt.Analyzers` | Optional C# diagnostics for common Pulse MQTT usage mistakes | none |
 
 ## Which do I need?
 
@@ -23,3 +24,4 @@ compatible. MIT licensed.
   layers).
 - **Tests**: add `Testing`.
 - **Polly policies or WebSocket brokers**: add the matching add-on.
+- **Compile-time guidance**: add `Analyzers` with `PrivateAssets="all"`.

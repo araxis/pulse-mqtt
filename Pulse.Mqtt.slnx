@@ -10,6 +10,7 @@
     <Project Path="samples/Pulse.Mqtt.Sample/Pulse.Mqtt.Sample.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Pulse.Mqtt.Analyzers/Pulse.Mqtt.Analyzers.csproj" />
     <Project Path="src/Pulse.Mqtt.Client/Pulse.Mqtt.Client.csproj" />
     <Project Path="src/Pulse.Mqtt.Core/Pulse.Mqtt.Core.csproj" />
     <Project Path="src/Pulse.Mqtt.DependencyInjection/Pulse.Mqtt.DependencyInjection.csproj" />
@@ -22,6 +23,7 @@
     <Project Path="src/Pulse.Mqtt.Transport.WebSocket/Pulse.Mqtt.Transport.WebSocket.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Pulse.Mqtt.Analyzers.Tests/Pulse.Mqtt.Analyzers.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Client.Tests/Pulse.Mqtt.Client.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Core.Tests/Pulse.Mqtt.Core.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.DependencyInjection.Tests/Pulse.Mqtt.DependencyInjection.Tests.csproj" />

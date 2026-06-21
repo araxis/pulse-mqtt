@@ -96,7 +96,8 @@ jobs:
               Pulse.Mqtt.Storage.LiteDB \
               Pulse.Mqtt.Storage.Sqlite \
               Pulse.Mqtt.Transport.WebSocket \
-              Pulse.Mqtt.Testing; do
+              Pulse.Mqtt.Testing \
+              Pulse.Mqtt.Analyzers; do
               echo "- [\`$id\`](https://www.nuget.org/packages/$id/$VERSION)"
             done
           } >> release-notes.md

@@ -47,6 +47,10 @@
     <!-- Public API surface guard -->
     <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4" />
 
+    <!-- Analyzer package -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.3.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
+
     <!-- Integration tests -->
     <PackageVersion Include="Testcontainers" Version="4.12.0" />
 

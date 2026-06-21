@@ -50,6 +50,7 @@ export default defineConfig({
             { text: 'Health checks', link: '/guide/health-checks' },
             { text: 'Observability', link: '/guide/observability' },
             { text: 'Testing', link: '/guide/testing' },
+            { text: 'Analyzers', link: '/guide/analyzers' },
           ],
         },
         {

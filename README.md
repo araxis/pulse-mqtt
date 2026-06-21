@@ -32,6 +32,7 @@ one line, not a fork.
 | `Pulse.Mqtt.Storage.Sqlite` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Storage.Sqlite?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Storage.Sqlite) | Durable SQLite session and offline-message stores. |
 | `Pulse.Mqtt.Transport.WebSocket` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Transport.WebSocket?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Transport.WebSocket) | MQTT over WebSocket (`ws`/`wss`). |
 | `Pulse.Mqtt.Testing` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Testing?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Testing) | `PulseMqttTestBroker` — an in-process broker for millisecond tests with no Docker. |
+| `Pulse.Mqtt.Analyzers` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Analyzers?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Analyzers) | Optional C# diagnostics for common Pulse MQTT usage mistakes. |
 
 ## Quick start
 
@@ -187,8 +188,8 @@ the whole stack is testable with a fake clock.
 
 ## Scope notes
 
-MQTT over QUIC, a Protobuf serializer, broker-side feature probes, and an analyzer package for
-common misuse are tracked as post-1.0 horizon items.
+MQTT over QUIC, a Protobuf serializer, broker-side feature probes, and more protocol-specific
+tooling are tracked as post-1.0 horizon items.
 
 ## Documentation
 
@@ -198,7 +199,7 @@ The full documentation is a VitePress site under [`docs/`](docs) — run it loca
 **Guides**
 - [Introduction](docs/guide/introduction.md) · [Getting started](docs/guide/getting-started.md) · [Connecting](docs/guide/connecting.md)
 - [Publishing](docs/guide/publishing.md) · [Subscribing](docs/guide/subscribing.md) · [Routing](docs/guide/routing.md) · [Typed messaging](docs/guide/typed-messaging.md) · [Request and response](docs/guide/request-response.md)
-- [Resilience](docs/guide/resilience.md) · [Lifecycle and state](docs/guide/lifecycle.md) · [Dependency injection](docs/guide/dependency-injection.md) · [Observability](docs/guide/observability.md) · [Testing](docs/guide/testing.md)
+- [Resilience](docs/guide/resilience.md) · [Lifecycle and state](docs/guide/lifecycle.md) · [Dependency injection](docs/guide/dependency-injection.md) · [Observability](docs/guide/observability.md) · [Testing](docs/guide/testing.md) · [Analyzers](docs/guide/analyzers.md)
 - [Extending the client](docs/guide/extending.md) · [The raw client](docs/guide/raw-client.md) · [Native AOT](docs/guide/native-aot.md) · [Performance](docs/guide/performance.md) · [Releasing](docs/guide/releasing.md)
 
 **Reference**

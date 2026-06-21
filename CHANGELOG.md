@@ -2,6 +2,11 @@
 
 ## 2.6.0 (unreleased)
 
+- Added `Pulse.Mqtt.Analyzers`, an opt-in C# analyzer package with warning-only diagnostics for
+  common client mistakes: unobserved Pulse MQTT async operations (`PMQ0001`), omitted available
+  cancellation tokens (`PMQ0002`), and synchronous disposal patterns for async-owned MQTT
+  resources (`PMQ0003`).
+
 ## 2.5.0
 
 - Added MQTT-named resilient lifecycle APIs: `ConnectAsync` / `DisconnectAsync` on

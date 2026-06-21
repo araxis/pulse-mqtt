@@ -9,7 +9,7 @@ dotnet add package Pulse.Mqtt.Serialization.Json
 ```
 
 `Pulse.Mqtt.Core` comes in transitively. See [Packages](/reference/packages) for the add-ons:
-Polly integration, WebSocket transport, and the in-process test broker.
+Polly integration, WebSocket transport, the in-process test broker, and optional analyzers.
 
 ## Register a client
 
