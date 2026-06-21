@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.13.0 (unreleased)
+## 2.13.0
 
 - Added scripted responses to `Pulse.Mqtt.Testing`. `PulseMqttTestBroker` can now customize or
   reject CONNACK, deny individual SUBSCRIBE filters, fail or withhold QoS 1/2 publish
