@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.13.0 (unreleased)
+
 ## 2.12.0
 
 - Improved `Pulse.Mqtt.Testing` protocol realism. `PulseMqttTestBroker` now supports MQTT 3.1.1
