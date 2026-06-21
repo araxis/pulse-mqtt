@@ -60,6 +60,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     private string? _lastReasonString;
     private string? _lastServerReference;
     private Exception? _lastError;
+    private MqttBrokerCapabilitiesSnapshot? _brokerCapabilities;
     private volatile bool _disposed;
 
     /// <summary>Creates a resilient client that connects through <paramref name="transportFactory"/>.</summary>
@@ -173,7 +174,19 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 offlineQueueDroppedCount,
                 subscriptionCount,
                 pendingSubscribeCount,
-                pendingUnsubscribeCount);
+                pendingUnsubscribeCount)
+            {
+                BrokerCapabilities = State == ConnectionState.Connected ? _brokerCapabilities : null,
+            };
+        }
+    }
+
+    /// <summary>Returns the broker capabilities negotiated for the current connection, if connected.</summary>
+    public MqttBrokerCapabilitiesSnapshot? GetBrokerCapabilitiesSnapshot()
+    {
+        lock (_stateGate)
+        {
+            return State == ConnectionState.Connected ? _brokerCapabilities : null;
         }
     }
 
@@ -1392,7 +1405,9 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 }
 
                 _raw = raw;
-                Transition(ConnectionState.Connected);
+                Transition(
+                    ConnectionState.Connected,
+                    brokerCapabilities: MqttBrokerCapabilitiesSnapshot.From(connAck!, _options.Connect));
 
                 try
                 {
@@ -1535,7 +1550,8 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         MqttReasonCode? reason = null,
         string? reasonString = null,
         string? serverReference = null,
-        Exception? error = null)
+        Exception? error = null,
+        MqttBrokerCapabilitiesSnapshot? brokerCapabilities = null)
     {
         ConnectionStateChanged changed;
         Channel<ConnectionStateChanged>[] watchers;
@@ -1547,6 +1563,11 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 reasonString = null;
                 serverReference = null;
                 error = null;
+                _brokerCapabilities = brokerCapabilities;
+            }
+            else
+            {
+                _brokerCapabilities = null;
             }
 
             changed = new ConnectionStateChanged(State, next, _attempt, reason)
