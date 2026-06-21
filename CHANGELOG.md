@@ -2,8 +2,8 @@
 
 ## 2.9.0 (unreleased)
 
-- Updated repository workflows to use current action runtimes while preserving the existing CI,
-  docs, broker-matrix, and release behavior.
+- Updated repository workflows to use current action runtimes and made docs workflow maintenance
+  self-verifying while preserving the existing CI, docs, broker-matrix, and release behavior.
 - Clarified diagnostics snapshot and health-check documentation with production logging, metrics,
   readiness/liveness, and nullable queue-counter guidance.
 
