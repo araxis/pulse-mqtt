@@ -529,10 +529,17 @@ Pulse.Mqtt.Resilience.ConnectionStateChanged.ConnectionStateChanged() -> void
 Pulse.Mqtt.Resilience.ConnectionStateChanged.ConnectionStateChanged(Pulse.Mqtt.Resilience.ConnectionState Previous, Pulse.Mqtt.Resilience.ConnectionState Current, int Attempt, Pulse.Mqtt.Protocol.MqttReasonCode? Reason = null) -> void
 Pulse.Mqtt.Resilience.ConnectionStateChanged.Current.get -> Pulse.Mqtt.Resilience.ConnectionState
 Pulse.Mqtt.Resilience.ConnectionStateChanged.Current.init -> void
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Deconstruct(out Pulse.Mqtt.Resilience.ConnectionState Previous, out Pulse.Mqtt.Resilience.ConnectionState Current, out int Attempt, out Pulse.Mqtt.Protocol.MqttReasonCode? Reason) -> void
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Error.get -> System.Exception?
+Pulse.Mqtt.Resilience.ConnectionStateChanged.Error.init -> void
 Pulse.Mqtt.Resilience.ConnectionStateChanged.Previous.get -> Pulse.Mqtt.Resilience.ConnectionState
 Pulse.Mqtt.Resilience.ConnectionStateChanged.Previous.init -> void
 Pulse.Mqtt.Resilience.ConnectionStateChanged.Reason.get -> Pulse.Mqtt.Protocol.MqttReasonCode?
 Pulse.Mqtt.Resilience.ConnectionStateChanged.Reason.init -> void
+Pulse.Mqtt.Resilience.ConnectionStateChanged.ReasonString.get -> string?
+Pulse.Mqtt.Resilience.ConnectionStateChanged.ReasonString.init -> void
+Pulse.Mqtt.Resilience.ConnectionStateChanged.ServerReference.get -> string?
+Pulse.Mqtt.Resilience.ConnectionStateChanged.ServerReference.init -> void
 Pulse.Mqtt.Resilience.ConnectOnceAsync
 Pulse.Mqtt.Resilience.DefaultConnectionLifecycle
 Pulse.Mqtt.Resilience.DefaultConnectionLifecycle.DefaultConnectionLifecycle(Pulse.Mqtt.Resilience.ISessionStore! sessionStore) -> void
@@ -598,7 +605,10 @@ Pulse.Mqtt.Resilience.ISubscriptionRegistrar
 Pulse.Mqtt.Resilience.ISubscriptionRegistrar.SubscribeAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!>
 Pulse.Mqtt.Resilience.MqttConnectRejectedException
 Pulse.Mqtt.Resilience.MqttConnectRejectedException.MqttConnectRejectedException(Pulse.Mqtt.Protocol.MqttReasonCode reasonCode) -> void
+Pulse.Mqtt.Resilience.MqttConnectRejectedException.MqttConnectRejectedException(Pulse.Mqtt.Protocol.MqttReasonCode reasonCode, string? reasonString, string? serverReference) -> void
 Pulse.Mqtt.Resilience.MqttConnectRejectedException.ReasonCode.get -> Pulse.Mqtt.Protocol.MqttReasonCode
+Pulse.Mqtt.Resilience.MqttConnectRejectedException.ReasonString.get -> string?
+Pulse.Mqtt.Resilience.MqttConnectRejectedException.ServerReference.get -> string?
 Pulse.Mqtt.Resilience.MqttInFlightPublish
 Pulse.Mqtt.Resilience.MqttInFlightPublish.MqttInFlightPublish(Pulse.Mqtt.Packets.MqttPublishPacket! Packet, Pulse.Mqtt.Resilience.MqttInFlightStage Stage) -> void
 Pulse.Mqtt.Resilience.MqttInFlightPublish.Packet.get -> Pulse.Mqtt.Packets.MqttPublishPacket!

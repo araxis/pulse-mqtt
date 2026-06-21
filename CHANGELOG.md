@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.8.0 (unreleased)
+## 2.8.0
 
 - Added `ResilientMqttClient.GetDiagnosticsSnapshot()` and
   `MqttClientDiagnosticsSnapshot` for synchronous production inspection of state, attempts,

@@ -3,6 +3,36 @@ const Pulse.Mqtt.Client.PulseMqttDiagnostics.SourceName = "Pulse.Mqtt" -> string
 Pulse.Mqtt.Client.BirthFailurePolicy
 Pulse.Mqtt.Client.BirthFailurePolicy.FailConnection = 0 -> Pulse.Mqtt.Client.BirthFailurePolicy
 Pulse.Mqtt.Client.BirthFailurePolicy.LogAndContinue = 1 -> Pulse.Mqtt.Client.BirthFailurePolicy
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.Attempt.get -> int
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.Attempt.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.ClientId.get -> string!
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.ClientId.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.IsRunning.get -> bool
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.IsRunning.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.LastError.get -> System.Exception?
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.LastError.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.LastReason.get -> Pulse.Mqtt.Protocol.MqttReasonCode?
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.LastReason.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.LastReasonString.get -> string?
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.LastReasonString.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.LastServerReference.get -> string?
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.LastServerReference.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.MqttClientDiagnosticsSnapshot(string! ClientId, Pulse.Mqtt.Resilience.ConnectionState State, int Attempt, bool IsRunning, System.DateTimeOffset StateChangedAt, Pulse.Mqtt.Protocol.MqttReasonCode? LastReason, string? LastReasonString, string? LastServerReference, System.Exception? LastError, int? OfflineQueueDepth, long? OfflineQueueDroppedCount, int SubscriptionCount, int PendingSubscribeCount, int PendingUnsubscribeCount) -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.OfflineQueueDepth.get -> int?
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.OfflineQueueDepth.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.OfflineQueueDroppedCount.get -> long?
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.OfflineQueueDroppedCount.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.PendingSubscribeCount.get -> int
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.PendingSubscribeCount.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.PendingUnsubscribeCount.get -> int
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.PendingUnsubscribeCount.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.State.get -> Pulse.Mqtt.Resilience.ConnectionState
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.State.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.StateChangedAt.get -> System.DateTimeOffset
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.StateChangedAt.init -> void
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.SubscriptionCount.get -> int
+Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot.SubscriptionCount.init -> void
 Pulse.Mqtt.Client.MqttPublishBuilder
 Pulse.Mqtt.Client.MqttPublishBuilder.AtLeastOnce() -> Pulse.Mqtt.Client.MqttPublishBuilder!
 Pulse.Mqtt.Client.MqttPublishBuilder.AtMostOnce() -> Pulse.Mqtt.Client.MqttPublishBuilder!
@@ -128,6 +158,7 @@ Pulse.Mqtt.Client.PulseMqttClientBuilder.WithWill<T>(string! topic, T value, Pul
 Pulse.Mqtt.Client.PulseMqttDiagnostics
 Pulse.Mqtt.Client.ResilientMqttClient
 Pulse.Mqtt.Client.ResilientMqttClient.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Client.ResilientMqttClient.GetDiagnosticsSnapshot() -> Pulse.Mqtt.Client.MqttClientDiagnosticsSnapshot!
 Pulse.Mqtt.Client.ResilientMqttClient.Messages.get -> System.Threading.Channels.ChannelReader<Pulse.Mqtt.Packets.MqttPublishPacket!>!
 Pulse.Mqtt.Client.ResilientMqttClient.OpenRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template) -> Pulse.Mqtt.Client.MqttRouteStream!
 Pulse.Mqtt.Client.ResilientMqttClient.OpenRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttRouteStream!
