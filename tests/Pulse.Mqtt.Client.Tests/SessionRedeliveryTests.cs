@@ -18,7 +18,7 @@ public sealed class SessionRedeliveryTests
         await using var client = NewClient(factory);
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -55,7 +55,7 @@ public sealed class SessionRedeliveryTests
         await using var client = NewClient(factory);
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -94,7 +94,7 @@ public sealed class SessionRedeliveryTests
         await using var client = NewClient(factory);
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -135,7 +135,7 @@ public sealed class SessionRedeliveryTests
         await using var client = NewClient(factory);
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -172,7 +172,7 @@ public sealed class SessionRedeliveryTests
         await using var client = NewClient(factory);
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -214,7 +214,7 @@ public sealed class SessionRedeliveryTests
         await using var client = NewClient(factory);
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -277,7 +277,7 @@ public sealed class SessionRedeliveryTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -304,7 +304,7 @@ public sealed class SessionRedeliveryTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -342,7 +342,7 @@ public sealed class SessionRedeliveryTests
         await using var client = NewClient(factory);
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);

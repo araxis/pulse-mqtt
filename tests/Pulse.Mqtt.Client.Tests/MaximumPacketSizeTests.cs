@@ -18,7 +18,7 @@ public sealed class MaximumPacketSizeTests
         await using var client = NewClient(factory);
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token, maximumPacketSize: 32);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -35,7 +35,7 @@ public sealed class MaximumPacketSizeTests
         await using var client = NewClient(factory);
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);

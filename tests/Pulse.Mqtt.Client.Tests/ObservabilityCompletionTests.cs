@@ -123,7 +123,7 @@ public sealed class ObservabilityCompletionTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
         await WaitForConnectedAsync(client, timeout.Token);
@@ -161,7 +161,7 @@ public sealed class ObservabilityCompletionTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
         await WaitForConnectedAsync(client, timeout.Token);
@@ -189,7 +189,7 @@ public sealed class ObservabilityCompletionTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
         await WaitForConnectedAsync(client, timeout.Token);
@@ -219,7 +219,7 @@ public sealed class ObservabilityCompletionTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
         await WaitForConnectedAsync(client, timeout.Token);

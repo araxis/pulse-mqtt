@@ -65,14 +65,14 @@ static async Task ConnectLatencyPassAsync()
             {
                 Connect = new MqttConnectPacket { ClientId = $"pulse-conn-{i}", KeepAliveSeconds = 30 },
             });
-        await client.StartAsync(CancellationToken.None);
+        await client.ConnectAsync(CancellationToken.None);
         while (client.State != ConnectionState.Connected)
         {
             await Task.Yield();
         }
 
         pulse.Add(sw.Elapsed.TotalMilliseconds);
-        await client.StopAsync(CancellationToken.None);
+        await client.DisconnectAsync(CancellationToken.None);
     }
 
     var mqttNet = new List<double>();
@@ -111,7 +111,7 @@ static async Task ThroughputPassAsync()
             {
                 Connect = new MqttConnectPacket { ClientId = "pulse-tp", KeepAliveSeconds = 30 },
             });
-        await client.StartAsync(CancellationToken.None);
+        await client.ConnectAsync(CancellationToken.None);
         while (client.State != ConnectionState.Connected)
         {
             await Task.Yield();

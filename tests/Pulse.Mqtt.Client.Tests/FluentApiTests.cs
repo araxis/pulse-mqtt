@@ -26,7 +26,7 @@ public sealed class FluentApiTests
             .WithSerializer(new JsonMqttSerializer(TestJsonContext.Default))
             .WithBackoff(TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(100))
             .WithOfflineQueue(capacity: 16, OverflowPolicy.DropOldest)
-            .BuildAndStartAsync(timeout.Token);
+            .BuildAndConnectAsync(timeout.Token);
 
         await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
         client.State.ShouldBe(ConnectionState.Connected);
@@ -158,7 +158,7 @@ public sealed class FluentApiTests
                 },
             });
 
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await transport.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
         await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
@@ -243,7 +243,7 @@ public sealed class FluentApiTests
             .WithClientId("fluent")
             .WithoutKeepAlive()
             .WithSerializer(new JsonMqttSerializer(TestJsonContext.Default))
-            .BuildAndStartAsync(timeout.Token);
+            .BuildAndConnectAsync(timeout.Token);
 
         await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
         return (client, broker, timeout.Token);

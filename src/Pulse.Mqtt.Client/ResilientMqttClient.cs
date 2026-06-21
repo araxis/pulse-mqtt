@@ -136,9 +136,12 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// </summary>
     public MqttRouter Router => _router.Value;
 
-    /// <summary>Starts the supervisor. Connection happens in the background; watch <see cref="State"/>.</summary>
+    /// <summary>
+    /// Connects this resilient client. The first connection attempt starts immediately, while
+    /// reconnects continue in the background; watch <see cref="State"/> for progress.
+    /// </summary>
     /// <exception cref="InvalidOperationException">The client is already running.</exception>
-    public async Task StartAsync(CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         lock (_stateGate)
@@ -175,6 +178,13 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         // on the calling task instead of waiting for a thread-pool slot.
         _supervisor = SuperviseAsync(lifetime.Token);
     }
+
+    /// <summary>
+    /// Starts the supervisor. Prefer <see cref="ConnectAsync"/> for application code; this alias
+    /// remains for source compatibility with earlier releases.
+    /// </summary>
+    [Obsolete("Use ConnectAsync. StartAsync is retained only as a compatibility alias.")]
+    public Task StartAsync(CancellationToken cancellationToken = default) => ConnectAsync(cancellationToken);
 
     /// <summary>
     /// Publishes through the live connection when available; otherwise queues (QoS &gt; 0, or QoS 0
@@ -1106,8 +1116,8 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         (_raw ?? throw new InvalidOperationException("The client is not connected."))
             .ReAuthenticateAsync(cancellationToken);
 
-    /// <summary>Stops the supervisor and closes any live connection.</summary>
-    public async Task StopAsync(CancellationToken cancellationToken = default)
+    /// <summary>Disconnects this resilient client and stops reconnecting.</summary>
+    public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
         if (_lifetime is { } lifetime)
         {
@@ -1125,6 +1135,13 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Stops the supervisor and closes any live connection. Prefer <see cref="DisconnectAsync"/>
+    /// for application code; this alias remains for source compatibility with earlier releases.
+    /// </summary>
+    [Obsolete("Use DisconnectAsync. StopAsync is retained only as a compatibility alias.")]
+    public Task StopAsync(CancellationToken cancellationToken = default) => DisconnectAsync(cancellationToken);
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
@@ -1136,7 +1153,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         _disposed = true;
         GC.SuppressFinalize(this);
         PulseMqttDiagnostics.UnregisterOfflineQueue(_offlineProbe);
-        await StopAsync(CancellationToken.None).ConfigureAwait(false);
+        await DisconnectAsync(CancellationToken.None).ConfigureAwait(false);
         _messages.Writer.TryComplete();
         if (_router.IsValueCreated)
         {

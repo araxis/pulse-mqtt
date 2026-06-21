@@ -16,7 +16,7 @@ Bindable from configuration; one instance per client name.
 | `CleanStart` | `true` | Start a clean session |
 | `Username` / `Password` | `null` | Broker credentials |
 | `ProtocolVersion` | `V500` | `V500` or `V311` |
-| `StartWithHost` | `true` | `false` hands start/stop to the application |
+| `ConnectWithHost` | `true` | `false` hands connect/disconnect to the application |
 
 ## ResilientMqttClientOptions
 

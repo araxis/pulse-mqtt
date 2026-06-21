@@ -15,7 +15,7 @@ await using var client = new ResilientMqttClient(broker, new ResilientMqttClient
 {
     Connect = new MqttConnectPacket { ClientId = "sut" },
 });
-await client.StartAsync(ct);
+await client.ConnectAsync(ct);
 ```
 
 With dependency injection:

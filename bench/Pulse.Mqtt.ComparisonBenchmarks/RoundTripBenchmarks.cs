@@ -48,7 +48,7 @@ public class RoundTripBenchmarks
                         KeepAliveSeconds = 60,
                     },
                 });
-            await pulse.StartAsync(CancellationToken.None);
+            await pulse.ConnectAsync(CancellationToken.None);
             while (pulse.State != ConnectionState.Connected)
             {
                 await Task.Yield();

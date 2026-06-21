@@ -37,13 +37,24 @@ public sealed class PulseMqttClientOptions
     public MqttProtocolVersion ProtocolVersion { get; set; } = MqttProtocolVersion.V500;
 
     /// <summary>
-    /// Whether the host starts the client on startup. Defaults to <see langword="true"/>. Set
+    /// Whether the host connects the client on startup. Defaults to <see langword="true"/>. Set
     /// <see langword="false"/> to control the lifecycle yourself through
-    /// <see cref="Client.ResilientMqttClient.StartAsync"/> and
-    /// <see cref="Client.ResilientMqttClient.StopAsync"/> — start, stop, and restart at any
-    /// time. Host shutdown still stops a running client either way.
+    /// <see cref="Client.ResilientMqttClient.ConnectAsync"/> and
+    /// <see cref="Client.ResilientMqttClient.DisconnectAsync"/>. Host shutdown still disconnects
+    /// a running client either way.
     /// </summary>
-    public bool StartWithHost { get; set; } = true;
+    public bool ConnectWithHost { get; set; } = true;
+
+    /// <summary>
+    /// Whether the host starts the client on startup. Prefer <see cref="ConnectWithHost"/>; this
+    /// alias remains for source and configuration compatibility with earlier releases.
+    /// </summary>
+    [Obsolete("Use ConnectWithHost. StartWithHost is retained only as a compatibility alias.")]
+    public bool StartWithHost
+    {
+        get => ConnectWithHost;
+        set => ConnectWithHost = value;
+    }
 
     /// <summary>
     /// The last-will message the broker publishes when the connection dies ungracefully —

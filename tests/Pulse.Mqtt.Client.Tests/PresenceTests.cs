@@ -22,7 +22,7 @@ public sealed class PresenceTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
 
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         var connect1 = (await broker1.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
@@ -54,7 +54,7 @@ public sealed class PresenceTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
 
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         (await broker1.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttConnectPacket>()
@@ -86,7 +86,7 @@ public sealed class PresenceTests
             new MqttPublishPacket { Topic = "queued/1", Payload = new byte[] { 1 }, QualityOfService = MqttQualityOfService.AtLeastOnce },
             timeout.Token)).Disposition.ShouldBe(PublishDisposition.Queued);
 
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
 
@@ -130,7 +130,7 @@ public sealed class PresenceTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
 
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
@@ -160,7 +160,7 @@ public sealed class PresenceTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
 
         // Each connection-up fails at the birth and the cycle retries with a new connection.
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
@@ -189,7 +189,7 @@ public sealed class PresenceTests
         });
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
 
         // The broker's tiny maximum packet size makes the birth publish fail client-side;
         // with LogAndContinue the connection still comes up.

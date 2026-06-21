@@ -35,8 +35,9 @@ var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("d
 ```
 
 ::: tip Manual control
-Prefer to start and stop the client yourself? Set `options.StartWithHost = false` and call
-`StartAsync`/`StopAsync` whenever you want — see [Lifecycle and state](./lifecycle).
+Prefer to connect and disconnect the client yourself? Set `options.ConnectWithHost = false`
+and call `ConnectAsync`/`DisconnectAsync` whenever you want — see
+[Lifecycle and state](./lifecycle).
 :::
 
 No host? Construct directly:
@@ -48,7 +49,7 @@ await using var client = new ResilientMqttClient(factory, new ResilientMqttClien
     Connect = new MqttConnectPacket { ClientId = "my-service" },
     Serializer = new JsonMqttSerializer(AppJsonContext.Default),
 });
-await client.StartAsync(ct);
+await client.ConnectAsync(ct);
 ```
 
 ## Publish

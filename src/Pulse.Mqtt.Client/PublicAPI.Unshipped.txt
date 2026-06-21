@@ -1,4 +1,5 @@
 #nullable enable
+Pulse.Mqtt.Client.PulseMqttClientBuilder.BuildAndConnectAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.ResilientMqttClient!>!
 Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage
 Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage.AcknowledgeAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage.CanReject.get -> bool
@@ -21,6 +22,8 @@ Pulse.Mqtt.Client.ResilientMqttClient.OpenAcknowledgedRouteStream(Pulse.Mqtt.Rou
 Pulse.Mqtt.Client.ResilientMqttClient.OpenAcknowledgedRouteStream(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
 Pulse.Mqtt.Client.ResilientMqttClient.OpenAcknowledgedRouteStream(string! template) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
 Pulse.Mqtt.Client.ResilientMqttClient.OpenAcknowledgedRouteStream(string! template, Pulse.Mqtt.Client.MqttRouteOptions? options) -> Pulse.Mqtt.Client.MqttAcknowledgedRouteStream!
+Pulse.Mqtt.Client.ResilientMqttClient.ConnectAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Pulse.Mqtt.Client.ResilientMqttClient.DisconnectAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 static Pulse.Mqtt.Client.ResilientMqttClientFluentExtensions.SubscribeAsync(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Routing.MqttRouteTemplate! template) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!>!
 static Pulse.Mqtt.Client.ResilientMqttClientFluentExtensions.SubscribeAsync(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.MqttQualityOfService maximumQualityOfService) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!>!
 static Pulse.Mqtt.Client.ResilientMqttClientFluentExtensions.SubscribeAsync(this Pulse.Mqtt.Client.ResilientMqttClient! client, Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.MqttQualityOfService maximumQualityOfService, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Protocol.MqttReasonCode>!>!

@@ -19,7 +19,7 @@ await using var client = await new PulseMqttClientBuilder()
     .WithSerializer(new JsonMqttSerializer(AppJsonContext.Default))
     .WithBackoff(TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(30))
     .WithOfflineQueue(capacity: 2048, OverflowPolicy.DropOldest)
-    .BuildAndStartAsync(ct);
+    .BuildAndConnectAsync(ct);
 ```
 
 Everything configurable on [`ResilientMqttClientOptions`](/reference/options#resilientmqttclientoptions)
@@ -29,8 +29,8 @@ in-process test broker, `WithLogger`, `WithTimeProvider` for fake-clock tests,
 `WithRawOptions` for handshake timeouts, and `WithConnect` as the full-CONNECT escape hatch
 (wills, session expiry, enhanced auth).
 
-`Build()` returns the client unstarted; `BuildAndStartAsync(ct)` starts it (connection proceeds
-in the background, as always). Validation is explicit: no transport or no identity fails with
+`Build()` returns the client disconnected; `BuildAndConnectAsync(ct)` connects it (reconnects
+continue in the background, as always). Validation is explicit: no transport or no identity fails with
 a message naming the missing call, and mixing `WithConnect` with the individual identity
 methods is rejected rather than silently merged.
 

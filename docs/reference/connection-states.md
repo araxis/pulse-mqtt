@@ -5,13 +5,13 @@ The `ConnectionState` enum, as reported by `ResilientMqttClient.State` and strea
 
 | State | Meaning | Leaves via |
 | --- | --- | --- |
-| `Disconnected` | Initial state, before the first start | `StartAsync` |
+| `Disconnected` | Initial state, before the first connect | `ConnectAsync` |
 | `Connecting` | First connection attempt in progress | success → `Connected`; failure → `WaitingRetry`; terminal → `Faulted` |
-| `Connected` | A session is live | drop → `Reconnecting`; `StopAsync` → `Stopped` |
+| `Connected` | A session is live | drop → `Reconnecting`; `DisconnectAsync` → `Stopped` |
 | `Reconnecting` | The connection was lost; restoring | success → `Connected`; failure → `WaitingRetry` |
 | `WaitingRetry` | Backing off between attempts | timer → `Connecting`/`Reconnecting` |
-| `Faulted` | Terminal failure; **sticky** | explicit `StartAsync` |
-| `Stopped` | Stopped at the caller's request | `StartAsync` |
+| `Faulted` | Terminal failure; **sticky** | explicit `ConnectAsync` |
+| `Stopped` | Stopped at the caller's request | `ConnectAsync` |
 
 Notes:
 

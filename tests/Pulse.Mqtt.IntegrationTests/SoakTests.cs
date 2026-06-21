@@ -80,7 +80,7 @@ public sealed class SoakTests
             },
             Backoff = new BackoffOptions { BaseDelay = TimeSpan.FromMilliseconds(50), MaxDelay = TimeSpan.FromSeconds(1) },
         });
-        await publisher.StartAsync(lifetime.Token);
+        await publisher.ConnectAsync(lifetime.Token);
         await WaitConnectedAsync(publisher, lifetime.Token);
 
         // Warm up, then snapshot the heap once allocations have settled.
@@ -179,7 +179,7 @@ public sealed class SoakTests
             $"RESULT=PASS elapsed={DateTimeOffset.UtcNow - started:hh\\:mm\\:ss} published={published} contiguous={tracker.Contiguous} " +
             $"kills={Volatile.Read(ref killCount)} growthMB={growth / (1024 * 1024)} maxHeapMB={maxHeap / (1024 * 1024)}");
 
-        await publisher.StopAsync(lifetime.Token);
+        await publisher.DisconnectAsync(lifetime.Token);
         await subscriber.DisconnectAsync(lifetime.Token);
     }
 

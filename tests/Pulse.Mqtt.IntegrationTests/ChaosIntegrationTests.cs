@@ -69,7 +69,7 @@ public sealed class ChaosIntegrationTests
             },
             Backoff = new BackoffOptions { BaseDelay = TimeSpan.FromMilliseconds(50), MaxDelay = TimeSpan.FromMilliseconds(500) },
         });
-        await publisher.StartAsync(timeout.Token);
+        await publisher.ConnectAsync(timeout.Token);
         await WaitConnectedAsync(publisher, timeout.Token);
 
         // Kill the connection at random while publishing is in flight.
@@ -121,7 +121,7 @@ public sealed class ChaosIntegrationTests
         missing.ShouldBeEmpty($"publisher state={publisher.State}, received={received.Count}/{MessageCount}");
         publisher.State.ShouldBe(ConnectionState.Connected);
 
-        await publisher.StopAsync(timeout.Token);
+        await publisher.DisconnectAsync(timeout.Token);
         await subscriber.DisconnectAsync(timeout.Token);
     }
 

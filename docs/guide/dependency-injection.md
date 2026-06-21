@@ -19,7 +19,7 @@ builder.Services
 ```
 
 Each name registers one singleton `ResilientMqttClient` (created lazily, validated on first
-resolve with clear messages), one hosted lifecycle, and a keyed-service entry.
+resolve with clear messages), an optional hosted lifecycle adapter, and a keyed-service entry.
 
 ## Resolving clients
 
@@ -52,14 +52,14 @@ builder.Services.AddPulseMqttClient("devices",
       "Password": "secret",
       "KeepAliveSeconds": 30,
       "CleanStart": true,
-      "StartWithHost": true
+      "ConnectWithHost": true
     }
   }
 }
 ```
 
 The full set: `Host`, `Port`, `UseTls`, `ClientId`, `KeepAliveSeconds`, `CleanStart`,
-`Username`, `Password`, `ProtocolVersion`, `StartWithHost`. Swappable behaviors are configured
+`Username`, `Password`, `ProtocolVersion`, `ConnectWithHost`. Swappable behaviors are configured
 on the builder, not in options — code, not strings.
 
 ## Swapping behaviors per client
@@ -94,9 +94,9 @@ Independent connections, independent settings, independent lifecycles.
 
 ## Lifecycle
 
-The hosted service starts each client with the host and stops it on shutdown. Set
-`StartWithHost = false` to [drive it manually](./lifecycle#host-managed-or-manual) — host
-shutdown still stops a running client.
+The hosted service connects each client with the host and disconnects it on shutdown. Set
+`ConnectWithHost = false` to [drive it manually](./lifecycle#host-managed-or-manual) — host
+shutdown still disconnects a running client.
 
 ## Logging
 

@@ -40,7 +40,7 @@ public sealed class PollyParityTests
         await using var client = new ResilientMqttClient(factory, NewOptions());
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
 
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
@@ -60,7 +60,7 @@ public sealed class PollyParityTests
         await using var client = new ResilientMqttClient(factory, NewOptions());
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
 
         var broker = await factory.NextBrokerAsync(timeout.Token);
         (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();

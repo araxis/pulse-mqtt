@@ -103,7 +103,7 @@ public interface IReconnectDecision
 ```
 
 **Default:** authentication/identity rejections are terminal; network errors retry. Returning
-`false` faults the client **sticky** — recovery is an explicit `StartAsync`.
+`false` faults the client **sticky** — recovery is an explicit `ConnectAsync`.
 
 **Token-aware:** treat `NotAuthorized` as transient while a token can refresh out of band:
 

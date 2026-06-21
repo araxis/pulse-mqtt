@@ -34,7 +34,7 @@ public sealed class ResilientMqttClientTests
         client.StateChanged += changed => { lock (states) { states.Add(changed.Current); } };
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
 
@@ -53,7 +53,7 @@ public sealed class ResilientMqttClientTests
         await using var client = new ResilientMqttClient(factory, NewOptions());
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var wait = client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
 
         var broker = await factory.NextBrokerAsync(timeout.Token);
@@ -70,7 +70,7 @@ public sealed class ResilientMqttClientTests
         await using var client = new ResilientMqttClient(factory, NewOptions());
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -85,7 +85,7 @@ public sealed class ResilientMqttClientTests
         await using var client = new ResilientMqttClient(factory, NewOptions());
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var wait = client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
 
         var broker = await factory.NextBrokerAsync(timeout.Token);
@@ -115,7 +115,7 @@ public sealed class ResilientMqttClientTests
         await using var client = new ResilientMqttClient(factory, NewOptions());
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
 
         // Session 1: connect and subscribe.
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
@@ -168,7 +168,7 @@ public sealed class ResilientMqttClientTests
         await using var client = new ResilientMqttClient(factory, NewOptions());
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
 
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         (await broker1.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
@@ -180,7 +180,7 @@ public sealed class ResilientMqttClientTests
         await Task.Delay(150, timeout.Token);
         factory.ConnectionsHandedOut.ShouldBe(connectionsAfterFault); // sticky: no auto-retry out of Faulted
 
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker2 = await factory.NextBrokerAsync(timeout.Token);
         await broker2.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
@@ -212,12 +212,12 @@ public sealed class ResilientMqttClientTests
         await using var client = new ResilientMqttClient(factory, NewOptions());
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
 
-        await client.StopAsync(timeout.Token);
+        await client.DisconnectAsync(timeout.Token);
 
         client.State.ShouldBe(ConnectionState.Stopped);
     }
@@ -229,7 +229,7 @@ public sealed class ResilientMqttClientTests
         await using var client = new ResilientMqttClient(factory, NewOptions());
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
 
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);

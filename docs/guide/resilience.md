@@ -7,7 +7,7 @@ connections.
 ## The reconnect cycle
 
 ```
-StartAsync
+ConnectAsync
    │
    ▼
 Connecting ──connect──▶ Connected ──connection lost──▶ Reconnecting
@@ -15,7 +15,7 @@ Connecting ──connect──▶ Connected ──connection lost──▶ Recon
    │  └──── WaitingRetry ◀──┴──────────────────────────────┘
    │            (backoff between attempts)
    ▼
-Faulted (terminal failure — sticky)        Stopped (StopAsync)
+Faulted (terminal failure — sticky)        Stopped (DisconnectAsync)
 ```
 
 On every successful (re)connection, **strict order**:
@@ -88,7 +88,7 @@ Recovery is explicit:
 if (client.State == ConnectionState.Faulted)
 {
     await RotateCredentialsAsync();
-    await client.StartAsync(token);   // restart after the cause is fixed
+    await client.ConnectAsync(token);   // restart after the cause is fixed
 }
 ```
 

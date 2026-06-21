@@ -109,7 +109,7 @@ public sealed class AddPulseMqttClientTests
         services.AddPulseMqttClient("manual", options =>
         {
             ValidOptions(options);
-            options.StartWithHost = false;
+            options.ConnectWithHost = false;
         }).UseTransportFactory(_ => new LoopbackOnlyFactory());
         await using var provider = services.BuildServiceProvider();
 
@@ -121,16 +121,16 @@ public sealed class AddPulseMqttClientTests
         client.State.ShouldBe(ConnectionState.Disconnected); // the host did not start it
 
         // The application starts, stops, and restarts the client whenever it wants.
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         while (client.State == ConnectionState.Disconnected)
         {
             await Task.Delay(5, timeout.Token);
         }
 
-        await client.StopAsync(timeout.Token);
+        await client.DisconnectAsync(timeout.Token);
         client.State.ShouldBe(ConnectionState.Stopped);
 
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         while (client.State == ConnectionState.Stopped)
         {
             await Task.Delay(5, timeout.Token);
@@ -161,7 +161,7 @@ public sealed class AddPulseMqttClientTests
         (await check.CheckHealthAsync(context)).Status.ShouldBe(HealthStatus.Unhealthy); // Disconnected
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         while (client.State == ConnectionState.Disconnected)
         {
             await Task.Delay(5, timeout.Token);
@@ -169,7 +169,7 @@ public sealed class AddPulseMqttClientTests
 
         (await check.CheckHealthAsync(context)).Status.ShouldBe(HealthStatus.Degraded); // connecting/retrying
 
-        await client.StopAsync(timeout.Token);
+        await client.DisconnectAsync(timeout.Token);
         (await check.CheckHealthAsync(context)).Status.ShouldBe(HealthStatus.Unhealthy); // Stopped
     }
 }

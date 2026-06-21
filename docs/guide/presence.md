@@ -18,7 +18,7 @@ await using var client = await new PulseMqttClientBuilder()
     .WithClientId("device-7")
     .WithBirth("status/device-7", "online", MqttQualityOfService.AtLeastOnce, retain: true)
     .WithWill("status/device-7", "offline", MqttQualityOfService.AtLeastOnce, retain: true)
-    .BuildAndStartAsync(ct);
+    .BuildAndConnectAsync(ct);
 ```
 
 Any subscriber of `status/device-7` now sees `online` whenever the device connects (including
@@ -28,7 +28,7 @@ because both messages are retained — the current state immediately upon subscr
 ## The last will
 
 The will rides the CONNECT packet; the broker holds it and publishes it only on an ungraceful
-end (a clean `StopAsync`/DISCONNECT withdraws it). Configure it three ways:
+end (a clean `DisconnectAsync`/DISCONNECT withdraws it). Configure it three ways:
 
 ```csharp
 // Fluent: text, bytes, or typed payloads, plus the full v5 message form.

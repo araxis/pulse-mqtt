@@ -51,7 +51,7 @@ public sealed class SessionRedeliveryIntegrationTests
                 SessionExpiryInterval = 300,
             },
         });
-        await publisher.StartAsync(timeout.Token);
+        await publisher.ConnectAsync(timeout.Token);
         await WaitForConnectedAsync(publisher, timeout.Token);
 
         // Publish QoS 2 and cut the socket the instant the message is on the wire, so the
@@ -72,7 +72,7 @@ public sealed class SessionRedeliveryIntegrationTests
         received.Topic.ShouldBe(topic);
         Encoding.UTF8.GetString(received.Payload.Span).ShouldBe("exactly-once");
 
-        await publisher.StopAsync(timeout.Token);
+        await publisher.DisconnectAsync(timeout.Token);
         await subscriber.DisconnectAsync(timeout.Token);
     }
 

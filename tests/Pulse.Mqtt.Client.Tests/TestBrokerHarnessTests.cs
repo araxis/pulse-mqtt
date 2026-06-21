@@ -25,7 +25,7 @@ public sealed class TestBrokerHarnessTests
         await using var client = new ResilientMqttClient(broker, NewOptions("c1"));
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
     }
 
@@ -36,7 +36,7 @@ public sealed class TestBrokerHarnessTests
         await using var client = new ResilientMqttClient(broker, NewOptions("c1"));
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
 
         var template = MqttRouteTemplate.Parse("sensors/{id}");
@@ -70,8 +70,8 @@ public sealed class TestBrokerHarnessTests
         await using var publisher = new ResilientMqttClient(broker, NewOptions("pub"));
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await subscriber.StartAsync(timeout.Token);
-        await publisher.StartAsync(timeout.Token);
+        await subscriber.ConnectAsync(timeout.Token);
+        await publisher.ConnectAsync(timeout.Token);
         await WaitForStateAsync(subscriber, ConnectionState.Connected, timeout.Token);
         await WaitForStateAsync(publisher, ConnectionState.Connected, timeout.Token);
 
@@ -100,7 +100,7 @@ public sealed class TestBrokerHarnessTests
         await using var client = new ResilientMqttClient(broker, NewOptions("c1"));
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
 
         var template = MqttRouteTemplate.Parse("alerts/#");
@@ -119,7 +119,7 @@ public sealed class TestBrokerHarnessTests
         await using var client = new ResilientMqttClient(broker, NewOptions("c1"));
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
 
         await client.PublishAsync(new MqttPublishPacket { Topic = "audit/x", Payload = "p"u8.ToArray() }, timeout.Token);
@@ -136,7 +136,7 @@ public sealed class TestBrokerHarnessTests
         await using var client = new ResilientMqttClient(broker, NewOptions("c1"));
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
 
         var outcome = await client.PublishAsync(

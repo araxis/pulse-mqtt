@@ -53,8 +53,9 @@ var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("d
 ```
 
 No host? `new ResilientMqttClient(new TcpTransportFactory(new TcpTransportOptions { Host = "..." }), options)`
-then `await client.StartAsync(ct)`. There is **no `ConnectAsync` to await and no disconnect handler to
-write** — watch [`State`](./lifecycle) if you want to observe the connection.
+then `await client.ConnectAsync(ct)`. There is **no reconnect loop or disconnect handler to
+write** — watch [`State`](./lifecycle), or call `WaitUntilConnectedAsync(...)`, if you want
+readiness.
 
 ## Publishing
 

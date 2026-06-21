@@ -54,7 +54,7 @@ public sealed class PresenceIntegrationTests
                 Retain = true,
             },
         });
-        await device.StartAsync(timeout.Token);
+        await device.ConnectAsync(timeout.Token);
 
         // 1. Connect → birth → "online".
         (await NextStatusAsync(observer, timeout.Token)).ShouldBe("online");
@@ -66,7 +66,7 @@ public sealed class PresenceIntegrationTests
         // 3. The automatic reconnect publishes the birth again → "online".
         (await NextStatusAsync(observer, timeout.Token)).ShouldBe("online");
 
-        await device.StopAsync(timeout.Token);
+        await device.DisconnectAsync(timeout.Token);
     }
 
     private static async Task<string> NextStatusAsync(RawMqttClient observer, CancellationToken cancellationToken)

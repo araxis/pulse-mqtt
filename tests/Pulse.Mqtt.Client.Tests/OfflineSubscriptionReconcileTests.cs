@@ -32,7 +32,7 @@ public sealed class OfflineSubscriptionReconcileTests
             Connect = new MqttConnectPacket { ClientId = "offsub", KeepAliveSeconds = 0, CleanStart = false },
             Backoff = new BackoffOptions { BaseDelay = TimeSpan.FromMilliseconds(5), MaxDelay = TimeSpan.FromMilliseconds(50) },
         });
-        await subscriber.StartAsync(timeout.Token);
+        await subscriber.ConnectAsync(timeout.Token);
         await WaitForStateAsync(subscriber, s => s == ConnectionState.Connected, timeout.Token);
 
         // Hold the client offline: block the next connect, then drop the live one.

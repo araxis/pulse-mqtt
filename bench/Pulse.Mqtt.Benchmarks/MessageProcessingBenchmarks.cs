@@ -27,7 +27,7 @@ public class MessageProcessingBenchmarks
         {
             Connect = new MqttConnectPacket { ClientId = "bench", KeepAliveSeconds = 0 },
         });
-        await _client.StartAsync(CancellationToken.None);
+        await _client.ConnectAsync(CancellationToken.None);
         while (_client.State != ConnectionState.Connected)
         {
             await Task.Yield();

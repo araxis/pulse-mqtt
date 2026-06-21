@@ -2,7 +2,10 @@
 
 ## 2.5.0 (unreleased)
 
-- No changes yet.
+- Added MQTT-named resilient lifecycle APIs: `ConnectAsync` / `DisconnectAsync` on
+  `ResilientMqttClient`, `BuildAndConnectAsync(...)` on the fluent builder, and
+  `ConnectWithHost` for DI configuration. The older start/stop names remain as compatibility
+  aliases.
 
 ## 2.4.0
 

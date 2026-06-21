@@ -17,7 +17,7 @@ await using var client = new ResilientMqttClient(broker, new ResilientMqttClient
 });
 
 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-await client.StartAsync(timeout.Token);
+await client.ConnectAsync(timeout.Token);
 while (client.State != ConnectionState.Connected)
 {
     await Task.Delay(10, timeout.Token);
@@ -35,7 +35,7 @@ using var route = client.RegisterRoute<SmokeReading>(template, (value, _, _) =>
 var outcome = await client.PublishAsync("smoke/1", new SmokeReading("aot", 1.0), MqttQualityOfService.AtLeastOnce, cancellationToken: timeout.Token);
 var reading = await received.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-await client.StopAsync(timeout.Token);
+await client.DisconnectAsync(timeout.Token);
 Console.WriteLine($"Smoke passed: disposition={outcome.Disposition}, value={reading.Value}, state={client.State}");
 
 internal sealed record SmokeReading(string Source, double Value);

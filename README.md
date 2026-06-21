@@ -46,7 +46,7 @@ services.AddPulseMqttClient("telemetry", options =>
     options.ClientId = "service-1";
 });
 // The client connects with the host, reconnects on drops, re-subscribes, and reports health.
-// Prefer manual control? options.StartWithHost = false, then StartAsync/StopAsync at will.
+// Prefer manual control? options.ConnectWithHost = false, then ConnectAsync/DisconnectAsync at will.
 
 var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("telemetry");
 ```
@@ -59,7 +59,7 @@ await using var client = new ResilientMqttClient(factory, new ResilientMqttClien
 {
     Connect = new MqttConnectPacket { ClientId = "service-1" },
 });
-await client.StartAsync(ct); // connects in the background
+await client.ConnectAsync(ct); // connects in the background
 await client.WaitUntilConnectedAsync(TimeSpan.FromSeconds(10), ct); // when readiness matters
 ```
 
@@ -111,7 +111,7 @@ await using var client = await new PulseMqttClientBuilder()
     .WithTcp("broker.example.com", 8883, useTls: true)
     .WithClientId("service-1")
     .WithSerializer(new JsonMqttSerializer(AppJsonContext.Default))
-    .BuildAndStartAsync(ct);
+    .BuildAndConnectAsync(ct);
 
 await client.Publish("telemetry/1").AtLeastOnce().WithRetain()
     .WithPayload(new Reading("dev-1", 21.5)).SendAsync(ct);
@@ -143,7 +143,7 @@ await using var client = new ResilientMqttClient(broker, options);
 | Transport | `IMqttTransportFactory` | TCP / TLS | WebSocket, or the in-memory test broker |
 
 Terminal failures (for example a broker answering `NotAuthorized`) fault the client **sticky** —
-it stops instead of retrying forever, and an explicit `StartAsync` recovers after the cause is
+it stops instead of retrying forever, and an explicit `ConnectAsync` recovers after the cause is
 fixed.
 
 ## Sample

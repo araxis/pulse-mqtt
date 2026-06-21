@@ -234,7 +234,7 @@ public sealed class RequestStreamTests
         }, time);
 
         var timeout = new CancellationTokenSource(SafetyTimeout);
-        await client.StartAsync(timeout.Token);
+        await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
         while (client.State != ConnectionState.Connected)

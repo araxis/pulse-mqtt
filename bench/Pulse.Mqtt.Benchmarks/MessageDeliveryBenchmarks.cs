@@ -116,7 +116,7 @@ public class MessageDeliveryBenchmarks
         {
             Connect = new MqttConnectPacket { ClientId = clientId, KeepAliveSeconds = 0 },
         });
-        await client.StartAsync(CancellationToken.None);
+        await client.ConnectAsync(CancellationToken.None);
         while (client.State != ConnectionState.Connected)
         {
             await Task.Yield();

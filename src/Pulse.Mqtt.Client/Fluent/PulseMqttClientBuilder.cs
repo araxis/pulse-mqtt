@@ -21,7 +21,7 @@ namespace Pulse.Mqtt.Client;
 ///     .WithCredentials("device-42", "secret")
 ///     .WithKeepAlive(TimeSpan.FromSeconds(30))
 ///     .WithSerializer(new JsonMqttSerializer(AppJsonContext.Default))
-///     .BuildAndStartAsync(ct);
+///     .BuildAndConnectAsync(ct);
 /// </code>
 /// </example>
 public sealed class PulseMqttClientBuilder
@@ -372,7 +372,7 @@ public sealed class PulseMqttClientBuilder
         return this;
     }
 
-    /// <summary>Creates the client. Call <see cref="ResilientMqttClient.StartAsync"/> to connect.</summary>
+    /// <summary>Creates the client. Call <see cref="ResilientMqttClient.ConnectAsync"/> to connect.</summary>
     /// <exception cref="InvalidOperationException">The configuration is incomplete or contradictory.</exception>
     public ResilientMqttClient Build()
     {
@@ -409,13 +409,13 @@ public sealed class PulseMqttClientBuilder
         return new ResilientMqttClient(_transportFactory, options, _timeProvider);
     }
 
-    /// <summary>Creates the client and starts it — connection proceeds in the background.</summary>
-    public async Task<ResilientMqttClient> BuildAndStartAsync(CancellationToken cancellationToken = default)
+    /// <summary>Creates the client and connects it — reconnects proceed in the background.</summary>
+    public async Task<ResilientMqttClient> BuildAndConnectAsync(CancellationToken cancellationToken = default)
     {
         var client = Build();
         try
         {
-            await client.StartAsync(cancellationToken).ConfigureAwait(false);
+            await client.ConnectAsync(cancellationToken).ConfigureAwait(false);
             return client;
         }
         catch
@@ -424,6 +424,14 @@ public sealed class PulseMqttClientBuilder
             throw;
         }
     }
+
+    /// <summary>
+    /// Creates the client and starts it. Prefer <see cref="BuildAndConnectAsync"/> for
+    /// application code; this alias remains for source compatibility with earlier releases.
+    /// </summary>
+    [Obsolete("Use BuildAndConnectAsync. BuildAndStartAsync is retained only as a compatibility alias.")]
+    public Task<ResilientMqttClient> BuildAndStartAsync(CancellationToken cancellationToken = default) =>
+        BuildAndConnectAsync(cancellationToken);
 
     private MqttConnectPacket BuildConnect()
     {

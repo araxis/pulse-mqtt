@@ -16,9 +16,10 @@ namespace Pulse.Mqtt.DependencyInjection;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers a named, host-managed <see cref="ResilientMqttClient"/>. Resolve it via
-    /// <see cref="IPulseMqttClientFactory"/> or as a keyed service; it starts and stops with the
-    /// host. Call once per name; swap behaviors through the returned builder.
+    /// Registers a named <see cref="ResilientMqttClient"/>. Resolve it via
+    /// <see cref="IPulseMqttClientFactory"/> or as a keyed service; the optional hosted-service
+    /// adapter connects and disconnects it with the host. Call once per name; swap behaviors
+    /// through the returned builder.
     /// </summary>
     public static PulseMqttBuilder AddPulseMqttClient(
         this IServiceCollection services,
@@ -94,7 +95,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IHostedService>(provider =>
             new PulseMqttHostedService(
                 provider.GetRequiredKeyedService<ResilientMqttClient>(name),
-                provider.GetRequiredService<IOptionsMonitor<PulseMqttClientOptions>>().Get(name).StartWithHost));
+                provider.GetRequiredService<IOptionsMonitor<PulseMqttClientOptions>>().Get(name).ConnectWithHost));
 
         return new PulseMqttBuilder(services, name);
     }
