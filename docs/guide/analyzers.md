@@ -10,10 +10,11 @@ guidance.
 dotnet add package Pulse.Mqtt.Analyzers
 ```
 
-For project files, keep the analyzer private to the consuming project:
+For project files, keep the analyzer private to the consuming project. If the project does not
+use central package management, keep the version that `dotnet add package` inserted:
 
 ```xml
-<PackageReference Include="Pulse.Mqtt.Analyzers" Version="2.6.0" PrivateAssets="all" />
+<PackageReference Include="Pulse.Mqtt.Analyzers" PrivateAssets="all" />
 ```
 
 ## Diagnostics

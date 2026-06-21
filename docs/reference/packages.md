@@ -2,6 +2,7 @@
 
 Runtime packages target `net8.0` and `net10.0`, carry XML documentation, and are Native AOT
 compatible. The analyzer package is a compiler extension and targets `netstandard2.0`. MIT licensed.
+For install commands and setup examples, see [Package add-ons](/guide/package-add-ons).
 
 | Package | What it is | Depends on |
 | --- | --- | --- |

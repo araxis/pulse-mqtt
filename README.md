@@ -202,7 +202,7 @@ The full documentation is a VitePress site under [`docs/`](docs) — run it loca
 `cd docs && npm install && npm run docs:dev`, or read the pages directly:
 
 **Guides**
-- [Introduction](docs/guide/introduction.md) · [Getting started](docs/guide/getting-started.md) · [Connecting](docs/guide/connecting.md)
+- [Introduction](docs/guide/introduction.md) · [Getting started](docs/guide/getting-started.md) · [Package add-ons](docs/guide/package-add-ons.md) · [Connecting](docs/guide/connecting.md)
 - [Publishing](docs/guide/publishing.md) · [Subscribing](docs/guide/subscribing.md) · [Routing](docs/guide/routing.md) · [Typed messaging](docs/guide/typed-messaging.md) · [Request and response](docs/guide/request-response.md)
 - [Resilience](docs/guide/resilience.md) · [Lifecycle and state](docs/guide/lifecycle.md) · [Dependency injection](docs/guide/dependency-injection.md) · [Observability](docs/guide/observability.md) · [Testing](docs/guide/testing.md) · [Analyzers](docs/guide/analyzers.md)
 - [Extending the client](docs/guide/extending.md) · [The raw client](docs/guide/raw-client.md) · [Native AOT](docs/guide/native-aot.md) · [Performance](docs/guide/performance.md) · [Releasing](docs/guide/releasing.md)

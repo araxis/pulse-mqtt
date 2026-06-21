@@ -65,6 +65,8 @@ These hold everywhere in the codebase:
 ## Where to go next
 
 - [Getting started](./getting-started) — install, connect, publish, subscribe in five minutes.
+- [Package add-ons](./package-add-ons) — choose storage, pipeline, serializer, transport, testing,
+  and analyzer packages.
 - [Resilience](./resilience) — what happens when the network misbehaves.
 - [Routing](./routing) and [typed messaging](./typed-messaging) — from topics to handlers to objects.
 - [Performance](./performance) — the numbers and how they were measured.

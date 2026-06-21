@@ -5,6 +5,8 @@
 - Improved `Pulse.Mqtt.Testing` protocol realism. `PulseMqttTestBroker` now supports MQTT 3.1.1
   sessions, opt-in retained messages, opt-in persistent sessions, subscription flags, and
   optional QoS 2 forwarding while keeping the default lightweight behavior backward compatible.
+- Added a package add-ons guide with install commands and setup examples for storage, pipeline,
+  serializer, transport, testing, analyzer, and hosting packages.
 
 ## 2.11.0
 
