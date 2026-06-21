@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.7.0 (unreleased)
+## 2.7.0
 
 - Added `Pulse.Mqtt.Serialization.Protobuf`, an opt-in Protocol Buffers serializer package
   for generated messages. It uses explicit parser registration for deserialization, stamps
