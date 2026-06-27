@@ -272,7 +272,8 @@ client leaves `Connected`, so consumers never see stale CONNACK details from an 
 ```csharp
 var capabilities = client.GetBrokerCapabilitiesSnapshot();
 
-if (capabilities?.TopicAliases == MqttBrokerFeatureSupport.Supported)
+if (client.CanUseProtocolFeature(MqttProtocolFeature.TopicAliases) &&
+    capabilities is not null)
 {
     logger.LogInformation(
         "Broker topic alias maximum is {Maximum}.",
@@ -297,6 +298,11 @@ Feature support uses `MqttBrokerFeatureSupport`:
 For MQTT 5, omitted CONNACK availability flags use the MQTT defaults. For MQTT 3.1.1, features
 that are not negotiated are reported as `Unknown`, while MQTT 5-only features such as topic
 aliases and subscription identifiers are `NotSupported`.
+
+Use `client.GetProtocolFeatureSupport(feature)` when the code needs the tri-state result, or
+`client.CanUseProtocolFeature(feature)` for a simple branch. `client.EnsureProtocolFeature(feature,
+operation)` is the strict guard for code paths that should fail immediately when a feature is not
+available.
 
 ## State as a stream or event
 

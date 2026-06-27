@@ -115,8 +115,8 @@ public sealed record MqttCapabilitiesResponse(
             capabilities.WildcardSubscriptions.ToString(),
             capabilities.EffectiveMaximumQoS.ToString(),
             capabilities.EffectiveReceiveMaximum,
-            CanUseMqtt5RequestResponse: capabilities.ProtocolVersion == MqttProtocolVersion.V500,
-            CanUseTopicAliases: capabilities.TopicAliases == MqttBrokerFeatureSupport.Supported);
+            CanUseMqtt5RequestResponse: capabilities.GetFeatureSupport(MqttProtocolFeature.RequestResponse) == MqttBrokerFeatureSupport.Supported,
+            CanUseTopicAliases: capabilities.GetFeatureSupport(MqttProtocolFeature.TopicAliases) == MqttBrokerFeatureSupport.Supported);
     }
 }
 

@@ -11,6 +11,9 @@ The library owns the protocol boundary:
   silently dropping them.
 - `Pulse.Mqtt.Analyzers` reports `PMQ0004` for explicit MQTT 3.1.1 packet initializers that set
   known MQTT 5-only properties.
+- `MqttProtocolFeatures`, `ResilientMqttClient.CanUseProtocolFeature`, and
+  `ResilientMqttClient.EnsureProtocolFeature` provide explicit feature guards for application
+  branching.
 - `ResilientMqttClient.GetBrokerCapabilitiesSnapshot()` exposes negotiated protocol and broker
   feature support after a successful connection.
 
@@ -69,13 +72,37 @@ convention. The observability guide shows the same pattern for trace context.
 
 ## Capability checks
 
+Use protocol feature guards when application code needs to branch before using MQTT 5-only
+behavior:
+
+```csharp
+if (client.CanUseProtocolFeature(MqttProtocolFeature.RequestResponse))
+{
+    StatusReply reply = await client.RequestAsync<StatusRequest, StatusReply>(
+        "devices/boiler-1/status",
+        request,
+        cancellationToken: token);
+}
+```
+
+For strict paths, fail explicitly at the boundary:
+
+```csharp
+client.EnsureProtocolFeature(MqttProtocolFeature.TraceContextUserProperties, "trace propagation");
+```
+
+`MqttProtocolFeatures.IsSupported` and `MqttProtocolFeatures.EnsureSupported` are lower-level
+helpers for code that has only an `MqttProtocolVersion`. Client-level helpers additionally return
+`Unknown` for broker-negotiated features such as topic aliases, subscription identifiers, and
+shared subscriptions until the client is connected.
+
 After a successful connection, inspect broker-negotiated support before enabling optional MQTT 5
 behavior:
 
 ```csharp
 var capabilities = client.GetBrokerCapabilitiesSnapshot();
 
-if (capabilities?.TopicAliases == MqttBrokerFeatureSupport.Supported)
+if (capabilities?.GetFeatureSupport(MqttProtocolFeature.TopicAliases) == MqttBrokerFeatureSupport.Supported)
 {
     logger.LogInformation(
         "Broker supports {AliasCount} topic aliases",

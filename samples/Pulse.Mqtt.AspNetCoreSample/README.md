@@ -10,7 +10,7 @@ It demonstrates:
 - typed publishing from HTTP to MQTT
 - routed MQTT consumption into an in-memory store
 - diagnostics and broker capability snapshots
-- safe branching for MQTT 5-only behavior through broker capabilities
+- safe branching for MQTT 5-only behavior through protocol feature guards and broker capabilities
 
 Run it with the in-process test broker:
 

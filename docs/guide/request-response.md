@@ -10,6 +10,18 @@ throw `NotSupportedException` instead of timing out later. For MQTT 3.1.1, put r
 and correlation fields in your payload or topic contract explicitly.
 :::
 
+Use the protocol guard when request/response is optional in your application flow:
+
+```csharp
+if (client.CanUseProtocolFeature(MqttProtocolFeature.RequestResponse))
+{
+    StatusReply reply = await client.RequestAsync<StatusRequest, StatusReply>(
+        "devices/boiler-1/status",
+        request,
+        cancellationToken: token);
+}
+```
+
 ## Caller
 
 ```csharp

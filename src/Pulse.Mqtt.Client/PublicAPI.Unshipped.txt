@@ -1,1 +1,5 @@
 #nullable enable
+Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.GetFeatureSupport(Pulse.Mqtt.Protocol.MqttProtocolFeature feature) -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
+Pulse.Mqtt.Client.ResilientMqttClient.CanUseProtocolFeature(Pulse.Mqtt.Protocol.MqttProtocolFeature feature) -> bool
+Pulse.Mqtt.Client.ResilientMqttClient.EnsureProtocolFeature(Pulse.Mqtt.Protocol.MqttProtocolFeature feature, string? operation = null) -> void
+Pulse.Mqtt.Client.ResilientMqttClient.GetProtocolFeatureSupport(Pulse.Mqtt.Protocol.MqttProtocolFeature feature) -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport

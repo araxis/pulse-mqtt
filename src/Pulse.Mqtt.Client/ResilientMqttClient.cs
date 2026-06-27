@@ -192,6 +192,55 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         }
     }
 
+    /// <summary>Returns the current support state for a library-known MQTT protocol feature.</summary>
+    public MqttBrokerFeatureSupport GetProtocolFeatureSupport(MqttProtocolFeature feature)
+    {
+        var protocolVersion = _options.Connect.ProtocolVersion;
+        if (!MqttProtocolFeatures.IsSupported(protocolVersion, feature))
+        {
+            return MqttBrokerFeatureSupport.NotSupported;
+        }
+
+        if (!IsBrokerNegotiatedFeature(feature))
+        {
+            return MqttBrokerFeatureSupport.Supported;
+        }
+
+        lock (_stateGate)
+        {
+            if (State == ConnectionState.Connected && _brokerCapabilities is { } capabilities)
+            {
+                return capabilities.GetFeatureSupport(feature);
+            }
+        }
+
+        return MqttBrokerFeatureSupport.Unknown;
+    }
+
+    /// <summary>Returns <c>true</c> when a library-known MQTT protocol feature is available now.</summary>
+    public bool CanUseProtocolFeature(MqttProtocolFeature feature) =>
+        GetProtocolFeatureSupport(feature) == MqttBrokerFeatureSupport.Supported;
+
+    /// <summary>Throws <see cref="NotSupportedException"/> when a library-known MQTT protocol feature is unavailable now.</summary>
+    public void EnsureProtocolFeature(MqttProtocolFeature feature, string? operation = null)
+    {
+        var support = GetProtocolFeatureSupport(feature);
+        if (support == MqttBrokerFeatureSupport.Supported)
+        {
+            return;
+        }
+
+        var operationText = string.IsNullOrWhiteSpace(operation)
+            ? "This operation"
+            : operation;
+
+        var message = support == MqttBrokerFeatureSupport.Unknown
+            ? $"{operationText} requires MQTT feature '{feature}', but broker support is unknown until the client is connected."
+            : $"{operationText} requires MQTT feature '{feature}', but it is not supported by the current MQTT protocol or broker capabilities.";
+
+        throw new NotSupportedException(message);
+    }
+
     /// <summary>
     /// Connects this resilient client. The first connection attempt starts immediately, while
     /// reconnects continue in the background; watch <see cref="State"/> for progress.
@@ -272,7 +321,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         // can parent its receive span on this publish. Off unless the caller opts in.
         var currentContext = Activity.Current?.Context;
         if (_options.PropagateTraceContext &&
-            _options.Connect.ProtocolVersion == MqttProtocolVersion.V500 &&
+            CanUseProtocolFeature(MqttProtocolFeature.TraceContextUserProperties) &&
             currentContext is { } current)
         {
             packet = TraceContextPropagation.Inject(packet, current);
@@ -1048,12 +1097,17 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     private void EnsureRequestResponseSupported()
     {
-        if (_options.Connect.ProtocolVersion != MqttProtocolVersion.V500)
+        if (!CanUseProtocolFeature(MqttProtocolFeature.RequestResponse))
         {
             throw new NotSupportedException(
                 "Request/response requires MQTT 5.0 because it uses response-topic and correlation-data publish properties. MQTT 3.1.1 applications should use an explicit payload or topic convention.");
         }
     }
+
+    private static bool IsBrokerNegotiatedFeature(MqttProtocolFeature feature) =>
+        feature is MqttProtocolFeature.TopicAliases
+            or MqttProtocolFeature.SubscriptionIdentifiers
+            or MqttProtocolFeature.SharedSubscriptions;
 
     // One open request-stream's delivery target: the channel the route handler writes responses to,
     // plus a flag set when a full buffer forced the stream to fail rather than block or drop.

@@ -133,8 +133,8 @@ public sealed class TelemetryPipelineWorker(
     private void LogCapabilities(ResilientMqttClient client)
     {
         var capabilities = client.GetBrokerCapabilitiesSnapshot();
-        var canUseRequestResponse = capabilities?.ProtocolVersion == MqttProtocolVersion.V500;
-        var canUseTopicAliases = capabilities?.TopicAliases == MqttBrokerFeatureSupport.Supported;
+        var canUseRequestResponse = client.CanUseProtocolFeature(MqttProtocolFeature.RequestResponse);
+        var canUseTopicAliases = client.CanUseProtocolFeature(MqttProtocolFeature.TopicAliases);
 
         logger.LogInformation(
             "Connected with {ProtocolVersion}; request/response={RequestResponse}; topic aliases={TopicAliases}",

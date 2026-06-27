@@ -7,7 +7,7 @@ pipeline. It demonstrates:
 - explicit broker subscription ownership with `SubscribeAsync`
 - `ToRouteSourceBlock` from `Pulse.Mqtt.Dataflow`
 - bounded Dataflow source, parse, and processing stages
-- protocol capability checks after connection
+- protocol feature guard checks after connection
 - graceful completion and host shutdown
 
 Run it with the in-process test broker:
