@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.15.0 (unreleased)
+## 2.15.0
 
 - Hardened `Pulse.Mqtt.Testing` broker-side routing so stale or closing in-memory sessions do
   not fail broker publishes or retained replay to unrelated subscribers.
