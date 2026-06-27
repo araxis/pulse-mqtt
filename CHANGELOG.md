@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.16.0 (unreleased)
+
 ## 2.15.0
 
 - Hardened `Pulse.Mqtt.Testing` broker-side routing so stale or closing in-memory sessions do
