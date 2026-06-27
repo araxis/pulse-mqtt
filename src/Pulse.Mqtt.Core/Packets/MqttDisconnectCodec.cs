@@ -17,6 +17,8 @@ public static class MqttDisconnectCodec
         using var body = new PooledBufferWriter();
         var writer = new MqttBufferWriter(body);
 
+        ValidateProtocolProperties(packet);
+
         if (packet.ProtocolVersion == MqttProtocolVersion.V500)
         {
             var hasProperties = packet.SessionExpiryInterval is not null
@@ -124,5 +126,34 @@ public static class MqttDisconnectCodec
         }
 
         MqttPropertySection.Write(body, scratch.WrittenSpan);
+    }
+
+    private static void ValidateProtocolProperties(MqttDisconnectPacket packet)
+    {
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ReasonCode != MqttReasonCode.Success,
+            nameof(MqttDisconnectPacket),
+            nameof(MqttDisconnectPacket.ReasonCode));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.SessionExpiryInterval is not null,
+            nameof(MqttDisconnectPacket),
+            nameof(MqttDisconnectPacket.SessionExpiryInterval));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ReasonString is not null,
+            nameof(MqttDisconnectPacket),
+            nameof(MqttDisconnectPacket.ReasonString));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ServerReference is not null,
+            nameof(MqttDisconnectPacket),
+            nameof(MqttDisconnectPacket.ServerReference));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.UserProperties.Count > 0,
+            nameof(MqttDisconnectPacket),
+            nameof(MqttDisconnectPacket.UserProperties));
     }
 }

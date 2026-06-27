@@ -23,6 +23,8 @@ public static class MqttConnAckCodec
         writer.WriteByte((byte)(packet.SessionPresent ? SessionPresentFlag : 0));
         writer.WriteByte((byte)packet.ReasonCode);
 
+        ValidateProtocolProperties(packet);
+
         if (packet.ProtocolVersion == MqttProtocolVersion.V500)
         {
             WriteProperties(body, packet);
@@ -251,5 +253,94 @@ public static class MqttConnAckCodec
         }
 
         MqttPropertySection.Write(body, scratch.WrittenSpan);
+    }
+
+    private static void ValidateProtocolProperties(MqttConnAckPacket packet)
+    {
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.SessionExpiryInterval is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.SessionExpiryInterval));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ReceiveMaximum is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.ReceiveMaximum));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.MaximumQoS is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.MaximumQoS));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.RetainAvailable is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.RetainAvailable));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.MaximumPacketSize is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.MaximumPacketSize));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.AssignedClientIdentifier is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.AssignedClientIdentifier));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.TopicAliasMaximum is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.TopicAliasMaximum));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ReasonString is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.ReasonString));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.UserProperties.Count > 0,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.UserProperties));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.WildcardSubscriptionAvailable is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.WildcardSubscriptionAvailable));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.SubscriptionIdentifiersAvailable is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.SubscriptionIdentifiersAvailable));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.SharedSubscriptionAvailable is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.SharedSubscriptionAvailable));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ServerKeepAlive is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.ServerKeepAlive));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ResponseInformation is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.ResponseInformation));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ServerReference is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.ServerReference));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.AuthenticationMethod is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.AuthenticationMethod));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.AuthenticationData is not null,
+            nameof(MqttConnAckPacket),
+            nameof(MqttConnAckPacket.AuthenticationData));
     }
 }

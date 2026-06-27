@@ -34,6 +34,7 @@ public static class MqttPublishCodec
         }
 
         var isV5 = packet.ProtocolVersion == MqttProtocolVersion.V500;
+        ValidateProtocolProperties(packet);
         if (!isV5 || !HasProperties(packet))
         {
             EncodeWithoutProperties(output, packet, hasPacketId, isV5);
@@ -123,6 +124,50 @@ public static class MqttPublishCodec
         || packet.ContentType is not null
         || packet.SubscriptionIdentifiers.Count > 0
         || packet.UserProperties.Count > 0;
+
+    private static void ValidateProtocolProperties(MqttPublishPacket packet)
+    {
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.PayloadFormatIndicator != MqttPayloadFormatIndicator.Unspecified,
+            nameof(MqttPublishPacket),
+            nameof(MqttPublishPacket.PayloadFormatIndicator));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.MessageExpiryInterval is not null,
+            nameof(MqttPublishPacket),
+            nameof(MqttPublishPacket.MessageExpiryInterval));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.TopicAlias is not null,
+            nameof(MqttPublishPacket),
+            nameof(MqttPublishPacket.TopicAlias));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ResponseTopic is not null,
+            nameof(MqttPublishPacket),
+            nameof(MqttPublishPacket.ResponseTopic));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.CorrelationData is not null,
+            nameof(MqttPublishPacket),
+            nameof(MqttPublishPacket.CorrelationData));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ContentType is not null,
+            nameof(MqttPublishPacket),
+            nameof(MqttPublishPacket.ContentType));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.SubscriptionIdentifiers.Count > 0,
+            nameof(MqttPublishPacket),
+            nameof(MqttPublishPacket.SubscriptionIdentifiers));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.UserProperties.Count > 0,
+            nameof(MqttPublishPacket),
+            nameof(MqttPublishPacket.UserProperties));
+    }
 
     /// <summary>Decodes a PUBLISH packet using the fixed header's flags for the negotiated <paramref name="version"/>.</summary>
     /// <exception cref="MqttProtocolException">The packet is malformed.</exception>

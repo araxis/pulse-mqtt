@@ -123,6 +123,22 @@ dotnet run --project samples/Pulse.Mqtt.Sample
 dotnet run --project samples/Pulse.Mqtt.Sample -- --host localhost --port 1883
 ```
 
+For ASP.NET Core hosting, health checks, keyed DI, diagnostics snapshots, and capability-aware
+MQTT 5 feature branching, run the Minimal API sample:
+
+```shell
+dotnet run --project samples/Pulse.Mqtt.AspNetCoreSample
+dotnet run --project samples/Pulse.Mqtt.AspNetCoreSample -- --Mqtt:Host localhost --Mqtt:Port 1883
+```
+
+For worker pipelines with bounded Dataflow stages, explicit subscriptions, graceful shutdown, and
+the same capability-aware MQTT 5 branching, run the worker sample:
+
+```shell
+dotnet run --project samples/Pulse.Mqtt.WorkerSample
+dotnet run --project samples/Pulse.Mqtt.WorkerSample -- --Mqtt:Host localhost --Mqtt:Port 1883
+```
+
 ## Next steps
 
 - [Connecting](./connecting) — TLS, WebSocket, credentials, protocol versions.

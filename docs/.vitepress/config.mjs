@@ -90,6 +90,7 @@ export default defineConfig({
           items: [
             { text: 'Packages', link: '/reference/packages' },
             { text: 'Options', link: '/reference/options' },
+            { text: 'MQTT protocol compatibility', link: '/reference/protocol-compatibility' },
             { text: 'Connection states', link: '/reference/connection-states' },
             { text: 'Errors', link: '/reference/errors' },
             { text: 'Broker compatibility', link: '/reference/broker-compatibility' },

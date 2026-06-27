@@ -63,6 +63,14 @@ await client.SubscribeAsync([new MqttTopicFilter(filter)], token);
 
 The broker delivers each matching message to **one** member of the group.
 
+## MQTT 5 subscription options
+
+`MqttTopicFilter.NoLocal`, `RetainAsPublished`, and `RetainHandling`, plus
+`MqttSubscribePacket.SubscriptionIdentifier`, are MQTT 5-only. Pulse rejects those options when a
+SUBSCRIBE packet is encoded as `MqttProtocolVersion.V311`; MQTT 3.1.1 can only carry the topic
+filter and maximum QoS. See the
+[MQTT protocol compatibility matrix](../reference/protocol-compatibility).
+
 ## Consuming the raw message stream
 
 Below routing sits a single bounded channel of everything the client receives:

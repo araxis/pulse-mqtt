@@ -165,9 +165,10 @@ options.ProtocolVersion = MqttProtocolVersion.V311;
 ```
 
 The codec implements both protocol versions. MQTT 5-only features are not available on a 3.1.1
-session: properties cannot travel on the wire, request/response helpers and enhanced
-authentication fail fast, and broker-negotiated limits such as receive maximum or topic aliases
-are absent.
+session: properties cannot travel on the wire, packet codecs reject MQTT 5-only properties
+instead of silently dropping them, request/response helpers and enhanced authentication fail fast,
+and broker-negotiated limits such as receive maximum or topic aliases are absent. See
+[MQTT protocol compatibility](../reference/protocol-compatibility) for the full feature matrix.
 
 ## Keep-alive
 

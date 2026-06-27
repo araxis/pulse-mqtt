@@ -21,6 +21,8 @@ public static class MqttPublishAckCodec
             throw new ArgumentException($"{packet.PacketType} is not a publish acknowledgement.", nameof(packet));
         }
 
+        ValidateProtocolProperties(packet);
+
         var flags = packet.PacketType == MqttPacketType.PubRel ? (byte)0x02 : (byte)0x00;
         var isV5 = packet.ProtocolVersion == MqttProtocolVersion.V500;
         var hasProperties = isV5 && (packet.ReasonString is not null || packet.UserProperties.Count > 0);
@@ -136,5 +138,24 @@ public static class MqttPublishAckCodec
         }
 
         MqttPropertySection.Write(body, scratch.WrittenSpan);
+    }
+
+    private static void ValidateProtocolProperties(MqttPublishAckPacket packet)
+    {
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ReasonCode != MqttReasonCode.Success,
+            nameof(MqttPublishAckPacket),
+            nameof(MqttPublishAckPacket.ReasonCode));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ReasonString is not null,
+            nameof(MqttPublishAckPacket),
+            nameof(MqttPublishAckPacket.ReasonString));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.UserProperties.Count > 0,
+            nameof(MqttPublishAckPacket),
+            nameof(MqttPublishAckPacket.UserProperties));
     }
 }
