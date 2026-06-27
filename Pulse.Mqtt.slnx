@@ -7,7 +7,9 @@
     <Project Path="bench/Pulse.Mqtt.ComparisonBenchmarks/Pulse.Mqtt.ComparisonBenchmarks.csproj" />
   </Folder>
   <Folder Name="/samples/">
+    <Project Path="samples/Pulse.Mqtt.AspNetCoreSample/Pulse.Mqtt.AspNetCoreSample.csproj" />
     <Project Path="samples/Pulse.Mqtt.Sample/Pulse.Mqtt.Sample.csproj" />
+    <Project Path="samples/Pulse.Mqtt.WorkerSample/Pulse.Mqtt.WorkerSample.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Pulse.Mqtt.Analyzers/Pulse.Mqtt.Analyzers.csproj" />

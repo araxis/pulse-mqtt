@@ -45,3 +45,7 @@ complete when the underlying stream completes and fault when the pump fails.
 
 See [Routing](/guide/routing#dataflow-source-blocks), [Subscribing](/guide/subscribing#consuming-the-raw-message-stream),
 and [Lifecycle and state](/guide/lifecycle) for usage details.
+
+The runnable worker sample combines `SubscribeAsync`, `ToRouteSourceBlock`, bounded processing
+stages, capability checks, and graceful shutdown:
+[`samples/Pulse.Mqtt.WorkerSample`](https://github.com/araxis/pulse-mqtt/tree/main/samples/Pulse.Mqtt.WorkerSample).

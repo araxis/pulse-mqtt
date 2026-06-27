@@ -21,6 +21,8 @@ public static class MqttUnsubAckCodec
             throw new ArgumentException("A v5 UNSUBACK must contain at least one reason code.", nameof(packet));
         }
 
+        ValidateProtocolProperties(packet);
+
         using var body = new PooledBufferWriter();
         var writer = new MqttBufferWriter(body);
 
@@ -107,5 +109,24 @@ public static class MqttUnsubAckCodec
         }
 
         MqttPropertySection.Write(body, scratch.WrittenSpan);
+    }
+
+    private static void ValidateProtocolProperties(MqttUnsubAckPacket packet)
+    {
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ReasonCodes.Count > 0,
+            nameof(MqttUnsubAckPacket),
+            nameof(MqttUnsubAckPacket.ReasonCodes));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ReasonString is not null,
+            nameof(MqttUnsubAckPacket),
+            nameof(MqttUnsubAckPacket.ReasonString));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.UserProperties.Count > 0,
+            nameof(MqttUnsubAckPacket),
+            nameof(MqttUnsubAckPacket.UserProperties));
     }
 }

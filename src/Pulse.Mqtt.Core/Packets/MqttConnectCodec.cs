@@ -34,6 +34,7 @@ public static class MqttConnectCodec
         writer.WriteUInt16(packet.KeepAliveSeconds);
 
         var isV5 = packet.ProtocolVersion == MqttProtocolVersion.V500;
+        ValidateProtocolProperties(packet);
         if (isV5)
         {
             WriteConnectProperties(body, packet);
@@ -268,6 +269,99 @@ public static class MqttConnectCodec
     {
         var length = reader.ReadVarInt();
         return reader.ReadSpan((int)length);
+    }
+
+    private static void ValidateProtocolProperties(MqttConnectPacket packet)
+    {
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.SessionExpiryInterval is not null,
+            nameof(MqttConnectPacket),
+            nameof(MqttConnectPacket.SessionExpiryInterval));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ReceiveMaximum is not null,
+            nameof(MqttConnectPacket),
+            nameof(MqttConnectPacket.ReceiveMaximum));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.MaximumPacketSize is not null,
+            nameof(MqttConnectPacket),
+            nameof(MqttConnectPacket.MaximumPacketSize));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.TopicAliasMaximum is not null,
+            nameof(MqttConnectPacket),
+            nameof(MqttConnectPacket.TopicAliasMaximum));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.RequestResponseInformation,
+            nameof(MqttConnectPacket),
+            nameof(MqttConnectPacket.RequestResponseInformation));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            !packet.RequestProblemInformation,
+            nameof(MqttConnectPacket),
+            nameof(MqttConnectPacket.RequestProblemInformation));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.AuthenticationMethod is not null,
+            nameof(MqttConnectPacket),
+            nameof(MqttConnectPacket.AuthenticationMethod));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.AuthenticationData is not null,
+            nameof(MqttConnectPacket),
+            nameof(MqttConnectPacket.AuthenticationData));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.UserProperties.Count > 0,
+            nameof(MqttConnectPacket),
+            nameof(MqttConnectPacket.UserProperties));
+
+        if (packet.Will is { } will)
+        {
+            ValidateProtocolProperties(packet.ProtocolVersion, will);
+        }
+    }
+
+    private static void ValidateProtocolProperties(MqttProtocolVersion protocolVersion, MqttWillMessage will)
+    {
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            protocolVersion,
+            will.DelayInterval is not null,
+            nameof(MqttWillMessage),
+            nameof(MqttWillMessage.DelayInterval));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            protocolVersion,
+            will.PayloadFormatIndicator != MqttPayloadFormatIndicator.Unspecified,
+            nameof(MqttWillMessage),
+            nameof(MqttWillMessage.PayloadFormatIndicator));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            protocolVersion,
+            will.MessageExpiryInterval is not null,
+            nameof(MqttWillMessage),
+            nameof(MqttWillMessage.MessageExpiryInterval));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            protocolVersion,
+            will.ContentType is not null,
+            nameof(MqttWillMessage),
+            nameof(MqttWillMessage.ContentType));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            protocolVersion,
+            will.ResponseTopic is not null,
+            nameof(MqttWillMessage),
+            nameof(MqttWillMessage.ResponseTopic));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            protocolVersion,
+            will.CorrelationData is not null,
+            nameof(MqttWillMessage),
+            nameof(MqttWillMessage.CorrelationData));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            protocolVersion,
+            will.UserProperties.Count > 0,
+            nameof(MqttWillMessage),
+            nameof(MqttWillMessage.UserProperties));
     }
 
     private static byte BuildConnectFlags(MqttConnectPacket packet)

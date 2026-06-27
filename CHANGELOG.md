@@ -4,6 +4,15 @@
 
 - Hardened `Pulse.Mqtt.Testing` broker-side routing so stale or closing in-memory sessions do
   not fail broker publishes or retained replay to unrelated subscribers.
+- Added MQTT 3.1.1 vs MQTT 5 clarity guardrails: packet codecs now reject MQTT 5-only packet
+  properties when encoded as `MqttProtocolVersion.V311`, analyzers report `PMQ0004` for explicit
+  MQTT 3.1.1 packet initializers that set MQTT 5-only properties, and the docs include a protocol
+  compatibility matrix.
+- Added an ASP.NET Core Minimal API sample covering named/keyed dependency injection, health
+  checks, diagnostics snapshots, typed publishing, routed consumption, and broker-capability
+  checks for MQTT 5-only behavior.
+- Added a Worker/Dataflow sample covering bounded route source processing, explicit
+  subscriptions, graceful shutdown, and capability checks.
 
 ## 2.14.0
 

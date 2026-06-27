@@ -20,6 +20,8 @@ public static class MqttSubAckCodec
             throw new ArgumentException("A SUBACK must contain at least one reason code.", nameof(packet));
         }
 
+        ValidateProtocolProperties(packet);
+
         using var body = new PooledBufferWriter();
         var writer = new MqttBufferWriter(body);
 
@@ -111,5 +113,19 @@ public static class MqttSubAckCodec
         }
 
         MqttPropertySection.Write(body, scratch.WrittenSpan);
+    }
+
+    private static void ValidateProtocolProperties(MqttSubAckPacket packet)
+    {
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.ReasonString is not null,
+            nameof(MqttSubAckPacket),
+            nameof(MqttSubAckPacket.ReasonString));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.UserProperties.Count > 0,
+            nameof(MqttSubAckPacket),
+            nameof(MqttSubAckPacket.UserProperties));
     }
 }

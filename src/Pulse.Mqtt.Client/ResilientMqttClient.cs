@@ -143,6 +143,8 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// </summary>
     public MqttRouter Router => _router.Value;
 
+    internal MqttProtocolVersion ConfiguredProtocolVersion => _options.Connect.ProtocolVersion;
+
     /// <summary>Returns a synchronous point-in-time diagnostics snapshot for this client.</summary>
     public MqttClientDiagnosticsSnapshot GetDiagnosticsSnapshot()
     {

@@ -86,10 +86,12 @@ new MqttPublishPacket
 [Typed publishes](./typed-messaging) stamp `ContentType` and `PayloadFormatIndicator` from the
 serializer automatically.
 
-These properties are MQTT 5-only. With `MqttProtocolVersion.V311`, the publish still carries the
-topic, payload, QoS, retain flag, and packet identifier, but MQTT 5 metadata has no wire slot and
-is not transmitted. If an MQTT 3.1.1 deployment needs expiry, content type, correlation, or custom
-metadata, encode it in the payload or topic convention.
+These properties are MQTT 5-only. With `MqttProtocolVersion.V311`, the publish can still carry the
+topic, payload, QoS, retain flag, and packet identifier, but MQTT 5 metadata has no wire slot.
+Pulse rejects MQTT 5-only publish properties on MQTT 3.1.1 packets instead of silently dropping
+them. If an MQTT 3.1.1 deployment needs expiry, content type, correlation, or custom metadata,
+encode it in the payload or topic convention. See the
+[MQTT protocol compatibility matrix](../reference/protocol-compatibility).
 
 ## Publishing while offline
 

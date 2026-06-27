@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -44,9 +45,23 @@ public sealed class MqttUsageAnalyzer : DiagnosticAnalyzer
         description: "Pulse MQTT async-owned resources should be disposed with DisposeAsync or await using.",
         helpLinkUri: HelpLinkBase + "#pmq0003-use-async-disposal");
 
+    private static readonly DiagnosticDescriptor Mqtt5PropertyOnMqtt311Packet = new(
+        "PMQ0004",
+        "Do not use MQTT 5-only properties on MQTT 3.1.1 packets",
+        "MQTT 5-only property '{0}' is set on '{1}' while ProtocolVersion is V311",
+        Category,
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "MQTT 5-only packet properties are not encoded on MQTT 3.1.1 packets. Use MQTT 5.0 or remove the property.",
+        helpLinkUri: HelpLinkBase + "#pmq0004-do-not-use-mqtt-5-only-properties-on-mqtt-3-1-1-packets");
+
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-        ImmutableArray.Create(UnobservedAsyncOperation, MissingCancellationToken, SynchronousDispose);
+        ImmutableArray.Create(
+            UnobservedAsyncOperation,
+            MissingCancellationToken,
+            SynchronousDispose,
+            Mqtt5PropertyOnMqtt311Packet);
 
     /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
@@ -56,6 +71,10 @@ public sealed class MqttUsageAnalyzer : DiagnosticAnalyzer
         context.RegisterSyntaxNodeAction(AnalyzeInvocation, SyntaxKind.InvocationExpression);
         context.RegisterSyntaxNodeAction(AnalyzeUsingStatement, SyntaxKind.UsingStatement);
         context.RegisterSyntaxNodeAction(AnalyzeUsingDeclaration, SyntaxKind.LocalDeclarationStatement);
+        context.RegisterSyntaxNodeAction(
+            AnalyzeObjectCreation,
+            SyntaxKind.ObjectCreationExpression,
+            SyntaxKind.ImplicitObjectCreationExpression);
     }
 
     private static void AnalyzeInvocation(SyntaxNodeAnalysisContext context)
@@ -144,6 +163,36 @@ public sealed class MqttUsageAnalyzer : DiagnosticAnalyzer
         }
     }
 
+    private static void AnalyzeObjectCreation(SyntaxNodeAnalysisContext context)
+    {
+        var objectCreation = (BaseObjectCreationExpressionSyntax)context.Node;
+        if (objectCreation.Initializer is not { } initializer)
+        {
+            return;
+        }
+
+        var type = context.SemanticModel.GetTypeInfo(objectCreation, context.CancellationToken).Type;
+        if (type is null
+            || !PulseMqttApiFacts.TryGetMqtt5OnlyPacketProperties(type, out var mqtt5OnlyProperties)
+            || !InitializerSetsProtocolVersionV311(initializer, context))
+        {
+            return;
+        }
+
+        foreach (var expression in initializer.Expressions)
+        {
+            if (TryGetAssignedPropertyName(expression, out var propertyName)
+                && IsMqtt5OnlyProperty(mqtt5OnlyProperties, propertyName))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    Mqtt5PropertyOnMqtt311Packet,
+                    expression.GetLocation(),
+                    propertyName,
+                    type.Name));
+            }
+        }
+    }
+
     private static bool IsBareExpressionStatement(SyntaxNode syntax) =>
         syntax.Parent is ExpressionStatementSyntax;
 
@@ -193,6 +242,86 @@ public sealed class MqttUsageAnalyzer : DiagnosticAnalyzer
 
     private static bool IsCancellationTokenName(string name) =>
         name is "cancellationToken" or "ct" or "token";
+
+    private static bool InitializerSetsProtocolVersionV311(
+        InitializerExpressionSyntax initializer,
+        SyntaxNodeAnalysisContext context)
+    {
+        foreach (var expression in initializer.Expressions)
+        {
+            if (TryGetAssignedPropertyName(expression, out var propertyName)
+                && propertyName == "ProtocolVersion"
+                && expression is AssignmentExpressionSyntax assignment
+                && IsMqtt311ProtocolVersion(assignment.Right, context))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsMqtt311ProtocolVersion(
+        ExpressionSyntax expression,
+        SyntaxNodeAnalysisContext context)
+    {
+        var constant = context.SemanticModel.GetConstantValue(expression, context.CancellationToken);
+        if (!constant.HasValue || constant.Value is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return Convert.ToInt64(constant.Value, CultureInfo.InvariantCulture) == 4;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+        catch (InvalidCastException)
+        {
+            return false;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryGetAssignedPropertyName(ExpressionSyntax expression, out string propertyName)
+    {
+        if (expression is AssignmentExpressionSyntax assignment)
+        {
+            if (assignment.Left is IdentifierNameSyntax identifier)
+            {
+                propertyName = identifier.Identifier.ValueText;
+                return true;
+            }
+
+            if (assignment.Left is MemberAccessExpressionSyntax { Name: IdentifierNameSyntax member })
+            {
+                propertyName = member.Identifier.ValueText;
+                return true;
+            }
+        }
+
+        propertyName = string.Empty;
+        return false;
+    }
+
+    private static bool IsMqtt5OnlyProperty(string[] propertyNames, string propertyName)
+    {
+        foreach (var candidate in propertyNames)
+        {
+            if (candidate == propertyName)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool TryGetUsingStatementResourceType(
         UsingStatementSyntax usingStatement,

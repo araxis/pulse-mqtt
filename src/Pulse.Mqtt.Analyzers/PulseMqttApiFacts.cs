@@ -4,6 +4,87 @@ namespace Pulse.Mqtt.Analyzers;
 
 internal static class PulseMqttApiFacts
 {
+    private static readonly (string MetadataName, string[] PropertyNames)[] Mqtt5OnlyPacketProperties =
+    [
+        ("Pulse.Mqtt.Packets.MqttConnectPacket",
+        [
+            "SessionExpiryInterval",
+            "ReceiveMaximum",
+            "MaximumPacketSize",
+            "TopicAliasMaximum",
+            "RequestResponseInformation",
+            "RequestProblemInformation",
+            "AuthenticationMethod",
+            "AuthenticationData",
+            "UserProperties",
+        ]),
+        ("Pulse.Mqtt.Packets.MqttPublishPacket",
+        [
+            "PayloadFormatIndicator",
+            "MessageExpiryInterval",
+            "TopicAlias",
+            "ResponseTopic",
+            "CorrelationData",
+            "ContentType",
+            "SubscriptionIdentifiers",
+            "UserProperties",
+        ]),
+        ("Pulse.Mqtt.Packets.MqttSubscribePacket",
+        [
+            "SubscriptionIdentifier",
+            "UserProperties",
+        ]),
+        ("Pulse.Mqtt.Packets.MqttUnsubscribePacket",
+        [
+            "UserProperties",
+        ]),
+        ("Pulse.Mqtt.Packets.MqttDisconnectPacket",
+        [
+            "ReasonCode",
+            "SessionExpiryInterval",
+            "ReasonString",
+            "ServerReference",
+            "UserProperties",
+        ]),
+        ("Pulse.Mqtt.Packets.MqttPublishAckPacket",
+        [
+            "ReasonCode",
+            "ReasonString",
+            "UserProperties",
+        ]),
+        ("Pulse.Mqtt.Packets.MqttConnAckPacket",
+        [
+            "SessionExpiryInterval",
+            "ReceiveMaximum",
+            "MaximumQoS",
+            "RetainAvailable",
+            "MaximumPacketSize",
+            "AssignedClientIdentifier",
+            "TopicAliasMaximum",
+            "ReasonString",
+            "UserProperties",
+            "WildcardSubscriptionAvailable",
+            "SubscriptionIdentifiersAvailable",
+            "SharedSubscriptionAvailable",
+            "ServerKeepAlive",
+            "ResponseInformation",
+            "ServerReference",
+            "AuthenticationMethod",
+            "AuthenticationData",
+        ]),
+        ("Pulse.Mqtt.Packets.MqttSubAckPacket",
+        [
+            "ReasonString",
+            "UserProperties",
+        ]),
+        ("Pulse.Mqtt.Packets.MqttUnsubAckPacket",
+        [
+            "ReasonCodes",
+            "ReasonString",
+            "UserProperties",
+        ]),
+    ];
+
     private static readonly string[] AsyncOwnedResourceMetadataNames =
     [
         "Pulse.Mqtt.Client.MqttAcknowledgedRouteStream",
@@ -48,6 +129,22 @@ internal static class PulseMqttApiFacts
             }
         }
 
+        return false;
+    }
+
+    public static bool TryGetMqtt5OnlyPacketProperties(ITypeSymbol type, out string[] propertyNames)
+    {
+        var fullyQualifiedName = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        foreach (var entry in Mqtt5OnlyPacketProperties)
+        {
+            if (fullyQualifiedName == "global::" + entry.MetadataName)
+            {
+                propertyNames = entry.PropertyNames;
+                return true;
+            }
+        }
+
+        propertyNames = [];
         return false;
     }
 

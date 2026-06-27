@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Pulse.Mqtt.Packets;
+using Pulse.Mqtt.Protocol;
 using Pulse.Mqtt.Routing;
 
 namespace Pulse.Mqtt.Client;
@@ -28,9 +29,16 @@ public static class MqttTraceEnvelopeExtensions
             Topic = topic,
             QualityOfService = qualityOfService,
             Retain = retain,
-            ContentType = serializer.ContentType,
-            PayloadFormatIndicator = serializer.PayloadFormat,
         };
+
+        if (client.ConfiguredProtocolVersion == MqttProtocolVersion.V500)
+        {
+            packet = packet with
+            {
+                ContentType = serializer.ContentType,
+                PayloadFormatIndicator = serializer.PayloadFormat,
+            };
+        }
 
         return client.PublishAsync(
             packet,

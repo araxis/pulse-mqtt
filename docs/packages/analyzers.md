@@ -24,5 +24,6 @@ Keep the analyzer private in project files:
 | `PMQ0001` | A Pulse MQTT async operation is called as a bare statement and not awaited, returned, assigned, passed, or explicitly discarded. |
 | `PMQ0002` | A cancellable Pulse MQTT async API omits an available in-scope `CancellationToken`. |
 | `PMQ0003` | Known async-owned MQTT resources are disposed synchronously. |
+| `PMQ0004` | An explicit MQTT 3.1.1 packet initializer sets a known MQTT 5-only packet property. |
 
 See [Analyzers](/guide/analyzers) for fixes, suppression, and examples.

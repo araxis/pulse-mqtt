@@ -92,6 +92,10 @@ builder.Services.AddPulseMqttClient("commands", ConfigureCommands)
 
 Independent connections, independent settings, independent lifecycles.
 
+The ASP.NET Core sample shows the same named client resolved from Minimal API handlers with
+`[FromKeyedServices("telemetry")]`, plus health checks and diagnostics endpoints:
+[`samples/Pulse.Mqtt.AspNetCoreSample`](https://github.com/araxis/pulse-mqtt/tree/main/samples/Pulse.Mqtt.AspNetCoreSample).
+
 ## Lifecycle
 
 The hosted service connects each client with the host and disconnects it on shutdown. Set

@@ -21,6 +21,7 @@ public static class MqttSubscribeCodec
         }
 
         var isV5 = packet.ProtocolVersion == MqttProtocolVersion.V500;
+        ValidateProtocolProperties(packet);
 
         using var body = new PooledBufferWriter();
         var writer = new MqttBufferWriter(body);
@@ -117,5 +118,38 @@ public static class MqttSubscribeCodec
         }
 
         MqttPropertySection.Write(body, scratch.WrittenSpan);
+    }
+
+    private static void ValidateProtocolProperties(MqttSubscribePacket packet)
+    {
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.SubscriptionIdentifier is not null,
+            nameof(MqttSubscribePacket),
+            nameof(MqttSubscribePacket.SubscriptionIdentifier));
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.UserProperties.Count > 0,
+            nameof(MqttSubscribePacket),
+            nameof(MqttSubscribePacket.UserProperties));
+
+        foreach (var filter in packet.TopicFilters)
+        {
+            MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+                packet.ProtocolVersion,
+                filter.NoLocal,
+                nameof(MqttTopicFilter),
+                nameof(MqttTopicFilter.NoLocal));
+            MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+                packet.ProtocolVersion,
+                filter.RetainAsPublished,
+                nameof(MqttTopicFilter),
+                nameof(MqttTopicFilter.RetainAsPublished));
+            MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+                packet.ProtocolVersion,
+                filter.RetainHandling != MqttRetainHandling.SendAtSubscribe,
+                nameof(MqttTopicFilter),
+                nameof(MqttTopicFilter.RetainHandling));
+        }
     }
 }

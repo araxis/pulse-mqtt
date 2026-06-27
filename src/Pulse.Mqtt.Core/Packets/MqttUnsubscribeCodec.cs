@@ -20,6 +20,8 @@ public static class MqttUnsubscribeCodec
             throw new ArgumentException("An UNSUBSCRIBE must contain at least one topic filter.", nameof(packet));
         }
 
+        ValidateProtocolProperties(packet);
+
         using var body = new PooledBufferWriter();
         var writer = new MqttBufferWriter(body);
 
@@ -102,5 +104,14 @@ public static class MqttUnsubscribeCodec
         }
 
         MqttPropertySection.Write(body, scratch.WrittenSpan);
+    }
+
+    private static void ValidateProtocolProperties(MqttUnsubscribePacket packet)
+    {
+        MqttProtocolCompatibility.ThrowIfMqtt5PropertyUsedWithV311(
+            packet.ProtocolVersion,
+            packet.UserProperties.Count > 0,
+            nameof(MqttUnsubscribePacket),
+            nameof(MqttUnsubscribePacket.UserProperties));
     }
 }

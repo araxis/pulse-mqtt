@@ -278,4 +278,144 @@ public sealed class MqttUsageAnalyzerTests
 
         diagnostics.ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task PMQ0004_reports_mqtt5_only_publish_property_on_v311_packet()
+    {
+        var diagnostics = await AnalyzerVerifier.GetDiagnosticsAsync(
+            """
+            namespace Pulse.Mqtt.Protocol
+            {
+                public enum MqttProtocolVersion
+                {
+                    V311 = 4,
+                    V500 = 5,
+                }
+            }
+
+            namespace Pulse.Mqtt.Packets
+            {
+                using Pulse.Mqtt.Protocol;
+
+                public sealed class MqttPublishPacket
+                {
+                    public string Topic { get; set; } = "";
+                    public MqttProtocolVersion ProtocolVersion { get; set; }
+                    public string ContentType { get; set; } = "";
+                }
+
+                public sealed class Sample
+                {
+                    public MqttPublishPacket Create() => new()
+                    {
+                        Topic = "devices/1",
+                        ProtocolVersion = MqttProtocolVersion.V311,
+                        ContentType = "application/json",
+                    };
+                }
+            }
+            """);
+
+        diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["PMQ0004"]);
+    }
+
+    [Fact]
+    public async Task PMQ0004_reports_mqtt5_only_subscribe_property_on_v311_packet()
+    {
+        var diagnostics = await AnalyzerVerifier.GetDiagnosticsAsync(
+            """
+            namespace Pulse.Mqtt.Protocol
+            {
+                public enum MqttProtocolVersion
+                {
+                    V311 = 4,
+                    V500 = 5,
+                }
+            }
+
+            namespace Pulse.Mqtt.Packets
+            {
+                using Pulse.Mqtt.Protocol;
+
+                public sealed class MqttSubscribePacket
+                {
+                    public MqttProtocolVersion ProtocolVersion { get; set; }
+                    public uint? SubscriptionIdentifier { get; set; }
+                }
+
+                public sealed class Sample
+                {
+                    public MqttSubscribePacket Create() => new()
+                    {
+                        ProtocolVersion = MqttProtocolVersion.V311,
+                        SubscriptionIdentifier = 42,
+                    };
+                }
+            }
+            """);
+
+        diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["PMQ0004"]);
+    }
+
+    [Fact]
+    public async Task PMQ0004_ignores_v500_packets_common_properties_and_non_pulse_types()
+    {
+        var diagnostics = await AnalyzerVerifier.GetDiagnosticsAsync(
+            """
+            namespace Pulse.Mqtt.Protocol
+            {
+                public enum MqttProtocolVersion
+                {
+                    V311 = 4,
+                    V500 = 5,
+                }
+            }
+
+            namespace Pulse.Mqtt.Packets
+            {
+                using Pulse.Mqtt.Protocol;
+
+                public sealed class MqttPublishPacket
+                {
+                    public string Topic { get; set; } = "";
+                    public MqttProtocolVersion ProtocolVersion { get; set; }
+                    public string ContentType { get; set; } = "";
+                }
+            }
+
+            namespace Other
+            {
+                using Pulse.Mqtt.Protocol;
+
+                public sealed class MqttPublishPacket
+                {
+                    public MqttProtocolVersion ProtocolVersion { get; set; }
+                    public string ContentType { get; set; } = "";
+                }
+
+                public sealed class Sample
+                {
+                    public Pulse.Mqtt.Packets.MqttPublishPacket Mqtt5() => new()
+                    {
+                        ProtocolVersion = MqttProtocolVersion.V500,
+                        ContentType = "application/json",
+                    };
+
+                    public Pulse.Mqtt.Packets.MqttPublishPacket Mqtt311Common() => new()
+                    {
+                        Topic = "devices/1",
+                        ProtocolVersion = MqttProtocolVersion.V311,
+                    };
+
+                    public MqttPublishPacket OtherType() => new()
+                    {
+                        ProtocolVersion = MqttProtocolVersion.V311,
+                        ContentType = "application/json",
+                    };
+                }
+            }
+            """);
+
+        diagnostics.ShouldBeEmpty();
+    }
 }

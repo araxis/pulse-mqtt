@@ -120,6 +120,9 @@ Route source blocks are local adapters. They do not subscribe to the broker; cal
 raw stream directly from another place at the same time. See [Routing](./routing#dataflow-source-blocks)
 and [Subscribing](./subscribing#consuming-the-raw-message-stream).
 
+For a complete worker pipeline, see
+[`samples/Pulse.Mqtt.WorkerSample`](https://github.com/araxis/pulse-mqtt/tree/main/samples/Pulse.Mqtt.WorkerSample).
+
 ## Typed payload serializers
 
 One serializer is configured per client. The typed publish, route, stream, and request/response

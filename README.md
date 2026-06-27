@@ -164,6 +164,23 @@ dotnet run --project samples/Pulse.Mqtt.Sample
 dotnet run --project samples/Pulse.Mqtt.Sample -- --host localhost --port 1883
 ```
 
+[`samples/Pulse.Mqtt.AspNetCoreSample`](samples/Pulse.Mqtt.AspNetCoreSample) is a Minimal API
+host covering named/keyed dependency injection, health checks, diagnostics snapshots, typed
+publishing, routed consumption, and safe broker-capability checks for MQTT 5-only behavior:
+
+```
+dotnet run --project samples/Pulse.Mqtt.AspNetCoreSample
+dotnet run --project samples/Pulse.Mqtt.AspNetCoreSample -- --Mqtt:Host localhost --Mqtt:Port 1883
+```
+
+[`samples/Pulse.Mqtt.WorkerSample`](samples/Pulse.Mqtt.WorkerSample) is a worker pipeline using
+bounded Dataflow source blocks, explicit subscriptions, graceful shutdown, and capability checks:
+
+```
+dotnet run --project samples/Pulse.Mqtt.WorkerSample
+dotnet run --project samples/Pulse.Mqtt.WorkerSample -- --Mqtt:Host localhost --Mqtt:Port 1883
+```
+
 ## Performance
 
 Measured with BenchmarkDotNet (`MemoryDiagnoser`) on .NET 10:
@@ -209,7 +226,7 @@ The full documentation is a VitePress site under [`docs/`](docs) — run it loca
 - [Extending the client](docs/guide/extending.md) · [The raw client](docs/guide/raw-client.md) · [Native AOT](docs/guide/native-aot.md) · [Performance](docs/guide/performance.md) · [Releasing](docs/guide/releasing.md)
 
 **Reference**
-- [Package docs](docs/packages/index.md) · [Packages](docs/reference/packages.md) · [Options](docs/reference/options.md) · [Connection states](docs/reference/connection-states.md) · [Errors](docs/reference/errors.md)
+- [Package docs](docs/packages/index.md) · [Packages](docs/reference/packages.md) · [Options](docs/reference/options.md) · [MQTT protocol compatibility](docs/reference/protocol-compatibility.md) · [Connection states](docs/reference/connection-states.md) · [Errors](docs/reference/errors.md)
 
 **Project**
 - [Benchmark suite](docs/Benchmark-Suite.md) · [MQTTnet comparison](docs/Benchmark-vs-MQTTnet.md)

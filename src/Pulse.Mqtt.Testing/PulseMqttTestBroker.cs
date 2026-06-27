@@ -635,7 +635,9 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
                         {
                             ProtocolVersion = ProtocolVersion,
                             PacketIdentifier = unsubscribe.PacketIdentifier,
-                            ReasonCodes = [.. unsubscribe.TopicFilters.Select(_ => MqttReasonCode.Success)],
+                            ReasonCodes = ProtocolVersion == MqttProtocolVersion.V500
+                                ? [.. unsubscribe.TopicFilters.Select(_ => MqttReasonCode.Success)]
+                                : [],
                         },
                         cancellationToken).ConfigureAwait(false);
                     break;
