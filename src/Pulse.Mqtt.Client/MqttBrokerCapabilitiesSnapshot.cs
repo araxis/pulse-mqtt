@@ -78,6 +78,23 @@ public sealed record MqttBrokerCapabilitiesSnapshot
     /// <summary>The MQTT 5 enhanced-authentication method negotiated by the broker, when present.</summary>
     public string? AuthenticationMethod { get; private init; }
 
+    /// <summary>Returns broker-aware support for a library-known MQTT protocol feature.</summary>
+    public MqttBrokerFeatureSupport GetFeatureSupport(MqttProtocolFeature feature)
+    {
+        if (!MqttProtocolFeatures.IsSupported(ProtocolVersion, feature))
+        {
+            return MqttBrokerFeatureSupport.NotSupported;
+        }
+
+        return feature switch
+        {
+            MqttProtocolFeature.TopicAliases => TopicAliases,
+            MqttProtocolFeature.SubscriptionIdentifiers => SubscriptionIdentifiers,
+            MqttProtocolFeature.SharedSubscriptions => SharedSubscriptions,
+            _ => MqttBrokerFeatureSupport.Supported,
+        };
+    }
+
     internal static MqttBrokerCapabilitiesSnapshot From(MqttConnAckPacket connAck, MqttConnectPacket connect)
     {
         var isMqtt5 = connAck.ProtocolVersion == MqttProtocolVersion.V500;

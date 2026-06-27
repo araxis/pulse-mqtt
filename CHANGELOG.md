@@ -2,6 +2,10 @@
 
 ## 2.16.0 (unreleased)
 
+- Added protocol feature guard helpers so applications can explicitly check MQTT 5-only
+  behavior with `MqttProtocolFeatures`, `ResilientMqttClient.GetProtocolFeatureSupport`,
+  `CanUseProtocolFeature`, `EnsureProtocolFeature`, and broker snapshot `GetFeatureSupport`.
+
 ## 2.15.0
 
 - Hardened `Pulse.Mqtt.Testing` broker-side routing so stale or closing in-memory sessions do

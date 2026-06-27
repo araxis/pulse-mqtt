@@ -1,1 +1,21 @@
 #nullable enable
+Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.ConnectProperties = 3 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.EnhancedAuthentication = 10 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.MaximumPacketSize = 13 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.PublishProperties = 1 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.ReasonMetadata = 4 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.ReceiveMaximum = 12 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.RequestResponse = 5 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.ServerKeepAlive = 14 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.SessionExpiry = 11 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.SharedSubscriptions = 15 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.SubscriptionIdentifiers = 8 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.SubscriptionOptions = 7 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.TopicAliases = 9 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.TraceContextUserProperties = 6 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.UserProperties = 0 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeature.WillProperties = 2 -> Pulse.Mqtt.Protocol.MqttProtocolFeature
+Pulse.Mqtt.Protocol.MqttProtocolFeatures
+static Pulse.Mqtt.Protocol.MqttProtocolFeatures.EnsureSupported(Pulse.Mqtt.Protocol.MqttProtocolVersion protocolVersion, Pulse.Mqtt.Protocol.MqttProtocolFeature feature, string? operation = null) -> void
+static Pulse.Mqtt.Protocol.MqttProtocolFeatures.IsSupported(Pulse.Mqtt.Protocol.MqttProtocolVersion protocolVersion, Pulse.Mqtt.Protocol.MqttProtocolFeature feature) -> bool

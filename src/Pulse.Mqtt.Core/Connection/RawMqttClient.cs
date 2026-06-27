@@ -119,10 +119,20 @@ public sealed class RawMqttClient : IAsyncDisposable
             throw new InvalidOperationException("The client is already connected.");
         }
 
-        if (_options.Authenticator is not null && connect.ProtocolVersion != MqttProtocolVersion.V500)
+        if (_options.Authenticator is not null)
         {
-            throw new NotSupportedException(
-                "Enhanced authentication requires MQTT 5.0. MQTT 3.1.1 supports CONNECT username/password credentials only.");
+            try
+            {
+                MqttProtocolFeatures.EnsureSupported(
+                    connect.ProtocolVersion,
+                    MqttProtocolFeature.EnhancedAuthentication,
+                    "Enhanced authentication");
+            }
+            catch (NotSupportedException)
+            {
+                throw new NotSupportedException(
+                    "Enhanced authentication requires MQTT 5.0. MQTT 3.1.1 supports CONNECT username/password credentials only.");
+            }
         }
 
         var transport = await _transportFactory.ConnectAsync(cancellationToken).ConfigureAwait(false);
@@ -552,7 +562,14 @@ public sealed class RawMqttClient : IAsyncDisposable
     public async Task ReAuthenticateAsync(CancellationToken cancellationToken)
     {
         var connection = ConnectedOrThrow();
-        if (_protocolVersion != MqttProtocolVersion.V500)
+        try
+        {
+            MqttProtocolFeatures.EnsureSupported(
+                _protocolVersion,
+                MqttProtocolFeature.EnhancedAuthentication,
+                "Re-authentication");
+        }
+        catch (NotSupportedException)
         {
             throw new NotSupportedException(
                 "Re-authentication requires MQTT 5.0 because MQTT 3.1.1 has no AUTH packet.");
