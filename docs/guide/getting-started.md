@@ -8,9 +8,10 @@ dotnet add package Pulse.Mqtt.DependencyInjection
 dotnet add package Pulse.Mqtt.Serialization.Json
 ```
 
-`Pulse.Mqtt.Core` comes in transitively. See [Package add-ons](./package-add-ons) for install
-commands and setup examples covering durable storage, compact binary serializers, Dataflow
-pipelines, alternate transport, the in-process test broker, and optional analyzers.
+`Pulse.Mqtt.Core` comes in transitively. See [Package add-ons](./package-add-ons) to choose
+durable storage, compact binary serializers, Dataflow pipelines, alternate transport, the
+in-process test broker, and optional analyzers. Each package also has its own
+[package page](/packages/).
 
 ## Register a client
 

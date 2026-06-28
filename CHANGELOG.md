@@ -5,6 +5,8 @@
 - Added dynamic last-will providers so applications can compute the MQTT will from
   connection-attempt context on every connect or reconnect, including keyed dependency-injection
   registration.
+- Split package add-on documentation so each serializer, storage, transport, pipeline, testing,
+  analyzer, hosting, and reconnect add-on has its own detailed package page.
 
 ## 2.16.0 (unreleased)
 

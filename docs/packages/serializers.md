@@ -1,58 +1,31 @@
-# Serializer packages
+# Serializer package overview
 
-Typed publish, route, stream, and request/response APIs use one serializer per client.
+Typed publish, route, stream, and request/response APIs use one `IMqttSerializer` per client.
+Choose one serializer package for each named client and keep mixed wire formats on separate
+clients or on the raw `MqttPublishPacket` APIs.
 
-## JSON
+| Package | Page | Use when |
+| --- | --- | --- |
+| `Pulse.Mqtt.Serialization.Json` | [JSON serializer](./serialization-json) | Payloads should be human-readable UTF-8 JSON and Native AOT safe through source generation. |
+| `Pulse.Mqtt.Serialization.MessagePack` | [MessagePack serializer](./serialization-messagepack) | Payloads should be compact binary data while keeping generated resolver support. |
+| `Pulse.Mqtt.Serialization.Protobuf` | [Protobuf serializer](./serialization-protobuf) | Payloads are generated Protocol Buffers messages with explicit parser registration. |
 
-Package: `Pulse.Mqtt.Serialization.Json`
+All serializer packages plug into the same client option or dependency-injection swap:
 
-```shell
-dotnet add package Pulse.Mqtt.Serialization.Json
+```csharp
+.UseSerializer(_ => serializer)
 ```
 
 ```csharp
-[JsonSerializable(typeof(TelemetryReading))]
-public sealed partial class AppJsonContext : JsonSerializerContext;
-
-.UseSerializer(_ => new JsonMqttSerializer(AppJsonContext.Default))
-```
-
-Use source-generated metadata for trimming and Native AOT.
-
-## MessagePack
-
-Package: `Pulse.Mqtt.Serialization.MessagePack`
-
-```shell
-dotnet add package Pulse.Mqtt.Serialization.MessagePack
-```
-
-```csharp
-var serializer = new MessagePackMqttSerializer(messagePackOptions);
-```
-
-Build `MessagePackSerializerOptions` with generated resolvers for trimming and Native AOT.
-
-## Protocol Buffers
-
-Package: `Pulse.Mqtt.Serialization.Protobuf`
-
-```shell
-dotnet add package Pulse.Mqtt.Serialization.Protobuf
-```
-
-```csharp
-var registry = ProtobufMessageRegistry.Create(registry =>
+new ResilientMqttClientOptions
 {
-    registry.Add(TelemetryReading.Parser);
-    registry.Add(StatusReply.Parser);
-});
-
-var serializer = new ProtobufMqttSerializer(registry);
+    Connect = new MqttConnectPacket { ClientId = "worker" },
+    Serializer = serializer,
+};
 ```
 
-Deserialization uses explicit parser registration. Missing parsers and invalid payloads throw
-`MqttException`.
+The serializer stamps MQTT payload metadata on typed publishes. Consumers can inspect content
+type and payload format even when they are not using Pulse.Mqtt.
 
-See [Typed messaging](/guide/typed-messaging) for publish, route, stream, and request/response
-examples.
+See [Typed messaging](/guide/typed-messaging) for end-to-end publish, route, stream, and
+request/response examples.

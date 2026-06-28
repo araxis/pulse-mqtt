@@ -3,7 +3,7 @@
 Package: `Pulse.Mqtt.Resilience.Polly`
 
 Use this package when reconnect timing should be driven by an existing resilience pipeline instead
-of the built-in backoff strategy.
+of the built-in exponential backoff strategy.
 
 ## Install
 
@@ -11,17 +11,75 @@ of the built-in backoff strategy.
 dotnet add package Pulse.Mqtt.Resilience.Polly
 ```
 
-## Configure
+## What it provides
+
+| Type | Contract | Purpose |
+| --- | --- | --- |
+| `PollyReconnectStrategy` | `IReconnectStrategy` | Runs each connection attempt through a Polly v8 `ResiliencePipeline`. |
+
+The resilient client still owns state transitions, lifecycle hooks, re-subscription, offline
+queue flush, publish redelivery, and sticky terminal faults. The package only replaces the retry
+timing loop.
+
+## Configure a pipeline
 
 ```csharp
-.UseReconnectStrategy(_ => new PollyReconnectStrategy(pipeline))
+using Polly;
+using Polly.Retry;
+using Pulse.Mqtt.Resilience.Polly;
+
+var pipeline = new ResiliencePipelineBuilder()
+    .AddRetry(new RetryStrategyOptions
+    {
+        BackoffType = DelayBackoffType.Exponential,
+        UseJitter = true,
+        MaxRetryAttempts = int.MaxValue,
+        Delay = TimeSpan.FromMilliseconds(500),
+        MaxDelay = TimeSpan.FromSeconds(30),
+    })
+    .Build();
 ```
 
-The reconnect strategy controls retry counts, delays, jitter, and circuit breaking. The resilient
-client still owns state transitions, lifecycle hooks, re-subscription, offline queue flush, and
-sticky terminal faults.
+Register the strategy:
 
-Configure the pipeline so final authentication or identity failures escape rather than retrying
-forever.
+```csharp
+builder.Services
+    .AddPulseMqttClient("devices", configure)
+    .UseReconnectStrategy(_ => new PollyReconnectStrategy(pipeline));
+```
 
-See [Resilience](/guide/resilience#backoff) and [Extending](/guide/extending#custom-reconnect-strategy).
+Direct construction uses the same option:
+
+```csharp
+new ResilientMqttClientOptions
+{
+    Connect = new MqttConnectPacket { ClientId = "devices" },
+    ReconnectStrategy = new PollyReconnectStrategy(pipeline),
+};
+```
+
+## Retry classification
+
+`PollyReconnectStrategy` controls retry timing. `IReconnectDecision` still classifies whether an
+MQTT failure is retryable or terminal. Keep authentication and identity failures terminal unless
+the application has a real token-refresh path:
+
+```csharp
+.UseReconnectDecision(_ => new TokenAwareReconnectDecision(tokens))
+```
+
+If a decision says "do not retry", the client faults instead of feeding the attempt back into the
+pipeline.
+
+## Operational notes
+
+- Avoid unbounded rapid retries. Always include a delay, jitter, or circuit behavior.
+- Keep retry policies cancellation-aware; host shutdown should stop promptly.
+- Do not hide terminal broker rejections behind forever-retry policies.
+- Use diagnostics snapshots and health checks to observe reconnect pressure.
+
+## Related docs
+
+- [Resilience](/guide/resilience#backoff)
+- [Extending reconnect strategy](/guide/extending#reconnect-strategy)
+- [Health checks](/guide/health-checks)

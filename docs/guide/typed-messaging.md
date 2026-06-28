@@ -5,8 +5,9 @@ every typed API uses it.
 
 ## Configure a serializer
 
-The JSON implementation (package `Pulse.Mqtt.Serialization.Json`) is built on source-generated
-`System.Text.Json` — reflection-free and Native AOT safe. Hand it your `JsonSerializerContext`:
+The JSON implementation (package
+[`Pulse.Mqtt.Serialization.Json`](/packages/serialization-json)) is built on source-generated
+`System.Text.Json`: reflection-free and Native AOT safe. Hand it your `JsonSerializerContext`:
 
 ```csharp
 [JsonSerializable(typeof(TelemetryReading))]
@@ -60,7 +61,8 @@ serializer on both sides.
 
 ## MessagePack
 
-For a compact binary wire format, add the `Pulse.Mqtt.Serialization.MessagePack` package. Like the
+For a compact binary wire format, add the
+[`Pulse.Mqtt.Serialization.MessagePack`](/packages/serialization-messagepack) package. Like the
 JSON serializer it stays reflection-free: hand it `MessagePackSerializerOptions` built from a
 [source-generated resolver](https://github.com/MessagePack-CSharp/MessagePack-CSharp#aot-code-generation-to-support-unityxamarin-and-native-aot)
 (annotate your types with `[MessagePackObject]`), so there is no dynamic codegen and it is Native
@@ -78,7 +80,8 @@ It stamps `ContentType` (`application/x-msgpack`) and a binary `PayloadFormatInd
 
 ## Protobuf
 
-For generated Protocol Buffers messages, add the `Pulse.Mqtt.Serialization.Protobuf` package:
+For generated Protocol Buffers messages, add the
+[`Pulse.Mqtt.Serialization.Protobuf`](/packages/serialization-protobuf) package:
 
 ```shell
 dotnet add package Pulse.Mqtt.Serialization.Protobuf

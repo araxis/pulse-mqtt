@@ -11,9 +11,9 @@ pipeline, serializer, transport, test, or analyzer packages only when the projec
 | `Pulse.Mqtt.Dataflow` | [Dataflow](./dataflow) | MQTT input should feed bounded source blocks and pipeline consumers. |
 | `Pulse.Mqtt.Storage.Sqlite` | [SQLite storage](./storage-sqlite) | Session state and offline queue need a durable relational file store. |
 | `Pulse.Mqtt.Storage.LiteDB` | [LiteDB storage](./storage-litedb) | Session state and offline queue need a durable embedded document store. |
-| `Pulse.Mqtt.Serialization.Json` | [Serializers](./serializers) | Typed payloads use source-generated JSON. |
-| `Pulse.Mqtt.Serialization.MessagePack` | [Serializers](./serializers) | Typed payloads use compact binary messages. |
-| `Pulse.Mqtt.Serialization.Protobuf` | [Serializers](./serializers) | Typed payloads use generated Protocol Buffers messages. |
+| `Pulse.Mqtt.Serialization.Json` | [JSON serializer](./serialization-json) | Typed payloads use source-generated JSON. |
+| `Pulse.Mqtt.Serialization.MessagePack` | [MessagePack serializer](./serialization-messagepack) | Typed payloads use compact binary messages. |
+| `Pulse.Mqtt.Serialization.Protobuf` | [Protobuf serializer](./serialization-protobuf) | Typed payloads use generated Protocol Buffers messages. |
 | `Pulse.Mqtt.Transport.WebSocket` | [WebSocket transport](./transport-websocket) | The broker is reached through `ws` or `wss`. |
 | `Pulse.Mqtt.Resilience.Polly` | [Reconnect policy](./resilience-polly) | Reconnect timing should be owned by a resilience pipeline. |
 | `Pulse.Mqtt.Testing` | [Testing](./testing) | Tests need an in-process broker. |
@@ -21,3 +21,6 @@ pipeline, serializer, transport, test, or analyzer packages only when the projec
 
 For a task-oriented install map, see [Package add-ons](/guide/package-add-ons). For targets and
 dependencies, see [Packages](/reference/packages).
+
+Serializer packages also have a [serializer overview](./serializers) when you need to choose
+between JSON, MessagePack, and Protobuf.
