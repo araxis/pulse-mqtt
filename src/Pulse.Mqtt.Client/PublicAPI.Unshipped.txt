@@ -1,18 +1,1 @@
 #nullable enable
-Pulse.Mqtt.Client.IMqttWillProvider
-Pulse.Mqtt.Client.IMqttWillProvider.CreateWillAsync(Pulse.Mqtt.Client.MqttWillContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Packets.MqttWillMessage?>
-Pulse.Mqtt.Client.MqttBrokerCapabilitiesSnapshot.GetFeatureSupport(Pulse.Mqtt.Protocol.MqttProtocolFeature feature) -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
-Pulse.Mqtt.Client.MqttWillContext
-Pulse.Mqtt.Client.MqttWillContext.Attempt.get -> int
-Pulse.Mqtt.Client.MqttWillContext.CleanStart.get -> bool
-Pulse.Mqtt.Client.MqttWillContext.ClientId.get -> string!
-Pulse.Mqtt.Client.MqttWillContext.KeepAliveSeconds.get -> ushort
-Pulse.Mqtt.Client.MqttWillContext.MqttWillContext(string! clientId, int attempt, Pulse.Mqtt.Protocol.MqttProtocolVersion protocolVersion, bool cleanStart, ushort keepAliveSeconds, System.DateTimeOffset timestamp) -> void
-Pulse.Mqtt.Client.MqttWillContext.ProtocolVersion.get -> Pulse.Mqtt.Protocol.MqttProtocolVersion
-Pulse.Mqtt.Client.MqttWillContext.Timestamp.get -> System.DateTimeOffset
-Pulse.Mqtt.Client.PulseMqttClientBuilder.WithWillProvider(Pulse.Mqtt.Client.IMqttWillProvider! provider) -> Pulse.Mqtt.Client.PulseMqttClientBuilder!
-Pulse.Mqtt.Client.ResilientMqttClient.CanUseProtocolFeature(Pulse.Mqtt.Protocol.MqttProtocolFeature feature) -> bool
-Pulse.Mqtt.Client.ResilientMqttClient.EnsureProtocolFeature(Pulse.Mqtt.Protocol.MqttProtocolFeature feature, string? operation = null) -> void
-Pulse.Mqtt.Client.ResilientMqttClient.GetProtocolFeatureSupport(Pulse.Mqtt.Protocol.MqttProtocolFeature feature) -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
-Pulse.Mqtt.Client.ResilientMqttClientOptions.WillProvider.get -> Pulse.Mqtt.Client.IMqttWillProvider?
-Pulse.Mqtt.Client.ResilientMqttClientOptions.WillProvider.init -> void
