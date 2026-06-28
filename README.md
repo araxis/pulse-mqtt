@@ -146,6 +146,7 @@ acknowledgement failure, or broker-disconnect behavior in a workflow test? Pass
 | Connection up/down | `IConnectionLifecycle` | Re-subscribe from the session store | Add cache warming on reconnect |
 | Session state | `ISessionStore` | In-memory | A durable store that survives restarts |
 | Offline queue | `IMessageStore` | Bounded in-memory, 4 overflow policies | A durable queue |
+| Last-will generation | `IMqttWillProvider` | Static/factory will | Per-attempt will from client context |
 | Payload format | `IMqttSerializer` | none (raw bytes) | JSON, MessagePack, Protobuf, or your own |
 | Transport | `IMqttTransportFactory` | TCP / TLS | WebSocket, or the in-memory test broker |
 

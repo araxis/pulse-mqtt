@@ -46,6 +46,7 @@ public sealed class PulseMqttClientBuilder
     private ILogger? _logger;
     private TimeProvider? _timeProvider;
     private MqttWillMessage? _will;
+    private IMqttWillProvider? _willProvider;
     private Func<CancellationToken, ValueTask<MqttWillMessage>>? _willFactory;
     private Func<IMqttSerializer, MqttWillMessage>? _typedWill;
     private MqttPublishPacket? _birth;
@@ -266,6 +267,14 @@ public sealed class PulseMqttClientBuilder
         return this;
     }
 
+    /// <summary>Computes the will fresh for every connection attempt with connection context.</summary>
+    public PulseMqttClientBuilder WithWillProvider(IMqttWillProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        _willProvider = provider;
+        return this;
+    }
+
     /// <summary>Computes the will fresh for every connection attempt.</summary>
     public PulseMqttClientBuilder WithWill(Func<CancellationToken, ValueTask<MqttWillMessage>> factory)
     {
@@ -400,6 +409,7 @@ public sealed class PulseMqttClientBuilder
             Serializer = _serializer,
             Logger = _logger,
             Will = _typedWill is { } typedWill ? typedWill(_serializer!) : _will,
+            WillProvider = _willProvider,
             WillFactory = _willFactory,
             Birth = _typedBirth is { } typedBirth ? typedBirth(_serializer!) : _birth,
             BirthFactory = _birthFactory,

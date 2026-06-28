@@ -40,6 +40,7 @@ The package also exposes per-client swap points:
 .UseReconnectStrategy(_ => reconnectStrategy)
 .UseSessionStore(_ => sessionStore)
 .UseMessageStore(_ => messageStore)
+.UseWillProvider<DeviceWillProvider>()
 .UseSerializer(_ => serializer)
 ```
 

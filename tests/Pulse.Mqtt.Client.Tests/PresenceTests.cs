@@ -69,6 +69,144 @@ public sealed class PresenceTests
     }
 
     [Fact]
+    public async Task A_will_provider_receives_context_and_produces_a_fresh_will_per_attempt()
+    {
+        var provider = new RecordingWillProvider(context => new MqttWillMessage($"status/{context.ClientId}/{context.Attempt}")
+        {
+            Payload = new byte[] { (byte)context.Attempt },
+            Retain = true,
+        });
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket
+            {
+                ClientId = "provider",
+                ProtocolVersion = MqttProtocolVersion.V500,
+                CleanStart = false,
+                KeepAliveSeconds = 12,
+            },
+            WillProvider = provider,
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+
+        var broker1 = await factory.NextBrokerAsync(timeout.Token);
+        var connect1 = (await broker1.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
+        connect1.Will.ShouldNotBeNull().Topic.ShouldBe("status/provider/0");
+        connect1.Will!.Retain.ShouldBeTrue();
+        await broker1.SendAsync(new MqttConnAckPacket(), timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        await broker1.DisposeAsync();
+        var broker2 = await factory.NextBrokerAsync(timeout.Token);
+        var connect2 = (await broker2.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
+        connect2.Will.ShouldNotBeNull().Topic.ShouldBe("status/provider/1");
+
+        provider.Contexts.Count.ShouldBe(2);
+        provider.Contexts[0].ClientId.ShouldBe("provider");
+        provider.Contexts[0].Attempt.ShouldBe(0);
+        provider.Contexts[0].ProtocolVersion.ShouldBe(MqttProtocolVersion.V500);
+        provider.Contexts[0].CleanStart.ShouldBeFalse();
+        provider.Contexts[0].KeepAliveSeconds.ShouldBe((ushort)12);
+        provider.Contexts[0].Timestamp.ShouldNotBe(default);
+        provider.Contexts[1].Attempt.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_will_provider_wins_over_factory_static_and_connect_template_will()
+    {
+        var provider = new RecordingWillProvider(_ => new MqttWillMessage("status/provider"));
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket
+            {
+                ClientId = "provider",
+                KeepAliveSeconds = 0,
+                Will = new MqttWillMessage("status/template"),
+            },
+            Will = new MqttWillMessage("status/static"),
+            WillFactory = _ => ValueTask.FromResult(new MqttWillMessage("status/factory")),
+            WillProvider = provider,
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        var connect = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
+
+        connect.Will.ShouldNotBeNull().Topic.ShouldBe("status/provider");
+        provider.Contexts.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task A_will_provider_can_suppress_the_will_for_an_attempt()
+    {
+        var provider = new RecordingWillProvider(_ => null);
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket
+            {
+                ClientId = "provider",
+                KeepAliveSeconds = 0,
+                Will = new MqttWillMessage("status/template"),
+            },
+            Will = new MqttWillMessage("status/static"),
+            WillFactory = _ => ValueTask.FromResult(new MqttWillMessage("status/factory")),
+            WillProvider = provider,
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        var connect = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
+
+        connect.Will.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_failing_will_provider_fails_the_attempt_and_retries()
+    {
+        var calls = 0;
+        var provider = new RecordingWillProvider(_ =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                throw new InvalidOperationException("will unavailable");
+            }
+
+            return new MqttWillMessage("status/provider/retry");
+        });
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "provider", KeepAliveSeconds = 0 },
+            Backoff = new BackoffOptions
+            {
+                BaseDelay = TimeSpan.FromMilliseconds(1),
+                MaxDelay = TimeSpan.FromMilliseconds(1),
+            },
+            WillProvider = provider,
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        var connect = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttConnectPacket>();
+        connect.Will.ShouldNotBeNull().Topic.ShouldBe("status/provider/retry");
+        await broker.SendAsync(new MqttConnAckPacket(), timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        calls.ShouldBe(2);
+    }
+
+    [Fact]
     public async Task The_birth_publishes_after_resubscription_and_before_the_queue_flush()
     {
         var factory = new SequencedTransportFactory();
@@ -204,6 +342,19 @@ public sealed class PresenceTests
         while (client.State != state)
         {
             await Task.Delay(1, cancellationToken);
+        }
+    }
+
+    private sealed class RecordingWillProvider(Func<MqttWillContext, MqttWillMessage?> factory) : IMqttWillProvider
+    {
+        public List<MqttWillContext> Contexts { get; } = [];
+
+        public ValueTask<MqttWillMessage?> CreateWillAsync(
+            MqttWillContext context,
+            CancellationToken cancellationToken)
+        {
+            Contexts.Add(context);
+            return ValueTask.FromResult(factory(context));
         }
     }
 }

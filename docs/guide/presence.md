@@ -52,10 +52,57 @@ The v5 **will delay** (`DelayInterval`/`DelaySeconds`) is worth knowing: the bro
 long before publishing the will, so a fast reconnect cancels the "offline" entirely — no
 flapping on brief network blips.
 
+## Dynamic will providers
+
+A static will is frozen at startup. Use an `IMqttWillProvider` when the will belongs in a
+reusable service or needs connection context such as the client id, attempt counter, protocol
+version, clean-start flag, keep-alive, or timestamp:
+
+```csharp
+public sealed class DeviceWillProvider : IMqttWillProvider
+{
+    public ValueTask<MqttWillMessage?> CreateWillAsync(MqttWillContext context, CancellationToken ct)
+    {
+        return ValueTask.FromResult<MqttWillMessage?>(new MqttWillMessage($"status/{context.ClientId}")
+        {
+            Payload = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                state = "offline",
+                attempt = context.Attempt,
+                at = context.Timestamp,
+            }),
+            Retain = true,
+        });
+    }
+}
+```
+
+Register it fluently:
+
+```csharp
+.WithWillProvider(new DeviceWillProvider())
+```
+
+Or as a keyed dependency-injection service:
+
+```csharp
+builder.Services
+    .AddPulseMqttClient("devices", options =>
+    {
+        options.Host = "broker.example.com";
+        options.ClientId = "device-7";
+    })
+    .UseWillProvider<DeviceWillProvider>();
+```
+
+The provider runs before every CONNECT. Returning `null` connects without a will for that
+attempt. Throwing fails the attempt and lets the reconnect policy decide whether to retry.
+The provider wins over the legacy will factory, static `Will`, and any `Connect.Will` template.
+
 ## The will factory — fresh per connection
 
-A static will is frozen at startup. A **factory** runs on *every connection attempt*, before
-CONNECT is sent, so the will can carry timestamps, session counters, or current configuration:
+A **factory** also runs on *every connection attempt*, before CONNECT is sent, but it only
+receives a cancellation token. It remains supported for small inline cases:
 
 ```csharp
 .WithWill(ct => ValueTask.FromResult(new MqttWillMessage("status/device-7")
@@ -67,7 +114,13 @@ CONNECT is sent, so the will can carry timestamps, session counters, or current 
 
 A throwing factory fails that connection attempt like any connect failure — classified by the
 reconnect decision, never swallowed. With DI, register it via
-`UseWillFactory(sp => token => ...)`.
+`UseWillFactory(sp => token => ...)`. Prefer `IMqttWillProvider` for reusable components or
+when the will needs connection context.
+
+MQTT 5-only will properties such as content type, payload format, message expiry, response
+topic, correlation data, user properties, and will delay still follow the configured protocol
+version. Use `context.ProtocolVersion` or the protocol feature guards when one provider supports
+both MQTT 5 and MQTT 3.1.1 clients.
 
 ## The birth message
 

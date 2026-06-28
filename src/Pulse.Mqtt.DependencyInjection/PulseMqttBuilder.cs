@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Pulse.Mqtt.Client;
@@ -56,8 +57,27 @@ public sealed class PulseMqttBuilder
         AddKeyed(factory);
 
     /// <summary>
+    /// Replaces last-will generation with a provider that sees connection-attempt context.
+    /// Wins over the static will and legacy will factory.
+    /// </summary>
+    public PulseMqttBuilder UseWillProvider(Func<IServiceProvider, IMqttWillProvider> factory) =>
+        AddKeyed(factory);
+
+    /// <summary>
+    /// Registers a keyed last-will provider type for this client. Wins over the static will and
+    /// legacy will factory.
+    /// </summary>
+    public PulseMqttBuilder UseWillProvider<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TProvider>()
+        where TProvider : class, IMqttWillProvider
+    {
+        Services.AddKeyedSingleton<IMqttWillProvider, TProvider>(Name);
+        return this;
+    }
+
+    /// <summary>
     /// Computes the last-will message fresh for every connection attempt — wins over the
-    /// static will in the options.
+    /// static will in the options. Ignored when a will provider is registered.
     /// </summary>
     public PulseMqttBuilder UseWillFactory(
         Func<IServiceProvider, Func<CancellationToken, ValueTask<MqttWillMessage>>> factory) =>

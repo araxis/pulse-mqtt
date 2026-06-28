@@ -76,6 +76,7 @@ public static class ServiceCollectionExtensions
                         DelayInterval = will.DelaySeconds,
                     }
                     : null,
+                WillProvider = provider.GetKeyedService<IMqttWillProvider>(clientName),
                 WillFactory = provider.GetKeyedService<Func<CancellationToken, ValueTask<MqttWillMessage>>>(clientName),
                 Birth = options.Birth is { } birth
                     ? new MqttPublishPacket

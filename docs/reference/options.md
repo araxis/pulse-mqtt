@@ -39,7 +39,8 @@ For direct construction; with DI these come from `PulseMqttClientOptions` plus b
 | `Serializer` | `null` | Typed messaging; typed APIs throw until set |
 | `Logger` | `null` (silent) | Structured log sink |
 | `Will` | `null` | Last-will message registered with every CONNECT ([presence](../guide/presence)) |
-| `WillFactory` | `null` | Computes the will fresh per connection attempt; wins over `Will` |
+| `WillProvider` | `null` | Computes the will fresh per connection attempt with context; wins over `WillFactory`, `Will`, and `Connect.Will` |
+| `WillFactory` | `null` | Computes the will fresh per connection attempt; wins over `Will` when no provider is set |
 | `Birth` | `null` | Message published automatically on every connection-up |
 | `BirthFactory` | `null` | Computes the birth per connection-up (sees the attempt counter); wins over `Birth` |
 | `BirthFailure` | `FailConnection` | `FailConnection` or `LogAndContinue` when the birth publish fails |
