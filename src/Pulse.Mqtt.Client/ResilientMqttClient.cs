@@ -1360,18 +1360,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                             connectActivity?.SetTag("client.id", _clientId);
                             try
                             {
-                                // The will is computed per attempt: a factory produces a fresh
-                                // topic and payload for every reconnect, and a throwing factory
-                                // fails this attempt like any other connect failure.
-                                var connect = _options.Connect;
-                                if (_options.WillFactory is { } willFactory)
-                                {
-                                    connect = connect with { Will = await willFactory(token).ConfigureAwait(false) };
-                                }
-                                else if (_options.Will is { } will)
-                                {
-                                    connect = connect with { Will = will };
-                                }
+                                var connect = await BuildConnectForAttemptAsync(token).ConfigureAwait(false);
 
                                 // Held in-flight work is only redeliverable if the broker keeps
                                 // the session; capture the count first so a clean session that
@@ -1560,6 +1549,34 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 new KeyValuePair<string, object?>("client.id", _clientId),
                 new KeyValuePair<string, object?>("disposition", "BirthFailed"));
         }
+    }
+
+    private async ValueTask<MqttConnectPacket> BuildConnectForAttemptAsync(CancellationToken cancellationToken)
+    {
+        var connect = _options.Connect;
+        if (_options.WillProvider is { } provider)
+        {
+            var context = new MqttWillContext(
+                _clientId,
+                _attempt,
+                connect.ProtocolVersion,
+                connect.CleanStart,
+                connect.KeepAliveSeconds,
+                _time.GetUtcNow());
+            return connect with
+            {
+                Will = await provider.CreateWillAsync(context, cancellationToken).ConfigureAwait(false),
+            };
+        }
+
+        if (_options.WillFactory is { } willFactory)
+        {
+            return connect with { Will = await willFactory(cancellationToken).ConfigureAwait(false) };
+        }
+
+        return _options.Will is { } will
+            ? connect with { Will = will }
+            : connect;
     }
 
     private async Task FlushQueuedAsync(RawMqttClient raw, CancellationToken cancellationToken)

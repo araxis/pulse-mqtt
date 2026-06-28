@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.17.0 (unreleased)
+
+- Added dynamic last-will providers so applications can compute the MQTT will from
+  connection-attempt context on every connect or reconnect, including keyed dependency-injection
+  registration.
+
 ## 2.16.0 (unreleased)
 
 - Added protocol feature guard helpers so applications can explicitly check MQTT 5-only

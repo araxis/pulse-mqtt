@@ -19,6 +19,7 @@ are **per named client**, so two clients can mix freely.
 | Session store | `ISessionStore` | In-memory | `UseSessionStore` | `SessionStore` |
 | Offline queue | `IMessageStore` | Bounded in-memory | `UseMessageStore` | `MessageStore` |
 | Serializer | `IMqttSerializer` | none | `UseSerializer` | `Serializer` |
+| Last-will generation | `IMqttWillProvider` | static/factory will | `UseWillProvider` | `WillProvider` |
 
 ## Reconnect strategy
 
@@ -179,6 +180,55 @@ public sealed class WarmCacheLifecycle(ISessionStore sessions, ICache cache) : I
 
 If you own re-subscription entirely (custom ordering, extra filters), call
 `context.Subscriptions.SubscribeAsync(...)` yourself instead of delegating.
+
+## Last-will provider
+
+**Contract.** Generates the CONNECT will for each connection attempt.
+
+```csharp
+public interface IMqttWillProvider
+{
+    ValueTask<MqttWillMessage?> CreateWillAsync(
+        MqttWillContext context,
+        CancellationToken cancellationToken);
+}
+```
+
+`MqttWillContext` carries the client id, attempt counter, protocol version, clean-start flag,
+keep-alive seconds, and a UTC timestamp. Return `null` to connect without a will for that
+attempt. Throwing fails the attempt and leaves retry/fault handling to the reconnect strategy
+and decision.
+
+**Default:** no provider. The client falls back to `WillFactory`, then static `Will`, then the
+will already present on the CONNECT template.
+
+```csharp
+public sealed class DeviceWillProvider(TimeProvider timeProvider) : IMqttWillProvider
+{
+    public ValueTask<MqttWillMessage?> CreateWillAsync(MqttWillContext context, CancellationToken ct)
+    {
+        return ValueTask.FromResult<MqttWillMessage?>(new MqttWillMessage($"status/{context.ClientId}")
+        {
+            Payload = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                state = "offline",
+                at = timeProvider.GetUtcNow(),
+                attempt = context.Attempt,
+            }),
+            Retain = true,
+        });
+    }
+}
+```
+
+With DI, register the provider per named client:
+
+```csharp
+.UseWillProvider<DeviceWillProvider>()
+```
+
+With direct construction, set `ResilientMqttClientOptions.WillProvider` or use
+`PulseMqttClientBuilder.WithWillProvider(...)`.
 
 ## Session store
 

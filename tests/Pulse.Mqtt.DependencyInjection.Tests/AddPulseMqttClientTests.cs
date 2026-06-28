@@ -33,6 +33,22 @@ public sealed class AddPulseMqttClientTests
         }
     }
 
+    private sealed class StaticWillProvider(string topic) : IMqttWillProvider
+    {
+        public ValueTask<MqttWillMessage?> CreateWillAsync(
+            MqttWillContext context,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult<MqttWillMessage?>(new MqttWillMessage(topic));
+    }
+
+    private sealed class GenericWillProvider : IMqttWillProvider
+    {
+        public ValueTask<MqttWillMessage?> CreateWillAsync(
+            MqttWillContext context,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult<MqttWillMessage?>(new MqttWillMessage($"status/{context.ClientId}/generic"));
+    }
+
     private static void ValidOptions(PulseMqttClientOptions options)
     {
         options.Host = "broker.local";
@@ -88,6 +104,67 @@ public sealed class AddPulseMqttClientTests
 
         var saved = await store.LoadSubscriptionsAsync(CancellationToken.None);
         saved.ShouldHaveSingleItem().Topic.ShouldBe("a/+");
+    }
+
+    [Fact]
+    public async Task A_registered_will_provider_is_used_by_the_named_client()
+    {
+        MqttConnectPacket? capturedConnect = null;
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+        {
+            ConnAckFactory = context =>
+            {
+                capturedConnect = context.Connect;
+                return context.DefaultConnAck;
+            },
+        });
+        var services = new ServiceCollection();
+        services.AddPulseMqttClient("will-provider", options =>
+        {
+            ValidOptions(options);
+            options.Will = new PulseMqttWillOptions
+            {
+                Topic = "status/static",
+                Payload = "offline",
+            };
+        })
+            .UseTransportFactory(_ => broker)
+            .UseWillFactory(_ => _ => ValueTask.FromResult(new MqttWillMessage("status/factory")))
+            .UseWillProvider(_ => new StaticWillProvider("status/provider"));
+        await using var provider = services.BuildServiceProvider();
+
+        var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("will-provider");
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        capturedConnect.ShouldNotBeNull().Will.ShouldNotBeNull().Topic.ShouldBe("status/provider");
+    }
+
+    [Fact]
+    public async Task A_generic_will_provider_registration_is_used_by_the_named_client()
+    {
+        MqttConnectPacket? capturedConnect = null;
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+        {
+            ConnAckFactory = context =>
+            {
+                capturedConnect = context.Connect;
+                return context.DefaultConnAck;
+            },
+        });
+        var services = new ServiceCollection();
+        services.AddPulseMqttClient("generic-will", ValidOptions)
+            .UseTransportFactory(_ => broker)
+            .UseWillProvider<GenericWillProvider>();
+        await using var provider = services.BuildServiceProvider();
+
+        var client = provider.GetRequiredService<IPulseMqttClientFactory>().GetClient("generic-will");
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        capturedConnect.ShouldNotBeNull().Will.ShouldNotBeNull().Topic.ShouldBe("status/test-client/generic");
     }
 
     [Theory]

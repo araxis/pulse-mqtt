@@ -1,1 +1,3 @@
 #nullable enable
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseWillProvider(System.Func<System.IServiceProvider!, Pulse.Mqtt.Client.IMqttWillProvider!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseWillProvider<TProvider>() -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!

@@ -75,6 +75,7 @@ builder.Services
     .UseLifecycle(sp => new WarmCacheLifecycle(sp.GetRequiredService<ICache>()))
     .UseSessionStore(sp => new SqliteSessionStore(connectionString))
     .UseMessageStore(sp => new SqliteMessageStore(connectionString))
+    .UseWillProvider<DeviceWillProvider>()
     .UseSerializer(sp => new JsonMqttSerializer(AppJsonContext.Default));
 ```
 

@@ -60,14 +60,24 @@ public sealed record ResilientMqttClientOptions
     /// <summary>
     /// The last-will message registered with every CONNECT — the broker publishes it when the
     /// connection dies ungracefully. Overrides <see cref="MqttConnectPacket.Will"/> on
-    /// <see cref="Connect"/> when set; <see cref="WillFactory"/> wins over both.
+    /// <see cref="Connect"/> when set; <see cref="WillProvider"/> and <see cref="WillFactory"/>
+    /// win over both.
     /// </summary>
     public MqttWillMessage? Will { get; init; }
 
     /// <summary>
+    /// Computes the will fresh for every connection attempt with structured connection context.
+    /// Returning <see langword="null"/> connects without a will for that attempt. Wins over
+    /// <see cref="WillFactory"/>, <see cref="Will"/>, and <see cref="MqttConnectPacket.Will"/>
+    /// on <see cref="Connect"/>.
+    /// </summary>
+    public IMqttWillProvider? WillProvider { get; init; }
+
+    /// <summary>
     /// Computes the will fresh for every connection attempt — timestamps, session counters,
     /// current configuration — instead of freezing it at startup. A throwing factory fails
-    /// that attempt like any connect failure, classified by the reconnect decision.
+    /// that attempt like any connect failure, classified by the reconnect decision. Ignored
+    /// when <see cref="WillProvider"/> is set.
     /// </summary>
     public Func<CancellationToken, ValueTask<MqttWillMessage>>? WillFactory { get; init; }
 
