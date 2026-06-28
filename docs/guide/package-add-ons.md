@@ -19,7 +19,6 @@ builder.Services
     .AddPulseMqttClient("devices", options =>
     {
         options.Host = "broker.example.com";
-        options.Port = 1883;
         options.ClientId = "device-worker";
     })
     .UseSerializer(_ => new JsonMqttSerializer(AppJsonContext.Default));
@@ -30,195 +29,48 @@ codec, raw client, or swap-point contracts without the resilient client.
 
 ## Pick add-ons by job
 
-| Job | Add package | Use when |
+| Job | Add package | Package docs |
 | --- | --- | --- |
-| Host-managed clients | `Pulse.Mqtt.DependencyInjection` | You want named clients, options binding, hosted lifecycle, and health checks. |
-| Durable sessions and offline queue | `Pulse.Mqtt.Storage.Sqlite` or `Pulse.Mqtt.Storage.LiteDB` | Subscriptions, in-flight QoS state, and queued publishes must survive process restart. |
-| Bounded processing pipelines | `Pulse.Mqtt.Dataflow` | Messages, routes, acknowledged routes, or state changes feed source blocks. |
-| Typed JSON payloads | `Pulse.Mqtt.Serialization.Json` | You want source-generated JSON for typed publish, route, stream, and request/response APIs. |
-| Compact binary payloads | `Pulse.Mqtt.Serialization.MessagePack` or `Pulse.Mqtt.Serialization.Protobuf` | You want smaller generated binary payloads. |
-| MQTT over WebSocket | `Pulse.Mqtt.Transport.WebSocket` | The broker is exposed through `ws` or `wss`, often behind a proxy or gateway. |
-| Custom reconnect policy | `Pulse.Mqtt.Resilience.Polly` | Reconnect attempts should be driven by an existing resilience pipeline. |
-| In-process workflow tests | `Pulse.Mqtt.Testing` | Tests need a broker in the same process, with optional retained messages, persistent sessions, and scripted responses. |
-| Compiler warnings | `Pulse.Mqtt.Analyzers` | You want warnings for unawaited operations, missing cancellation tokens, and sync disposal mistakes. |
+| Host-managed clients, keyed DI, options binding, health checks | `Pulse.Mqtt.DependencyInjection` | [Dependency injection](/packages/dependency-injection) |
+| Durable relational session and queue storage | `Pulse.Mqtt.Storage.Sqlite` | [SQLite storage](/packages/storage-sqlite) |
+| Durable embedded document session and queue storage | `Pulse.Mqtt.Storage.LiteDB` | [LiteDB storage](/packages/storage-litedb) |
+| Bounded worker pipelines over messages, routes, acknowledgements, or state | `Pulse.Mqtt.Dataflow` | [Dataflow](/packages/dataflow) |
+| Source-generated UTF-8 JSON typed payloads | `Pulse.Mqtt.Serialization.Json` | [JSON serializer](/packages/serialization-json) |
+| Compact binary typed payloads with generated resolvers | `Pulse.Mqtt.Serialization.MessagePack` | [MessagePack serializer](/packages/serialization-messagepack) |
+| Generated Protocol Buffers typed payloads | `Pulse.Mqtt.Serialization.Protobuf` | [Protobuf serializer](/packages/serialization-protobuf) |
+| MQTT over `ws` or `wss` | `Pulse.Mqtt.Transport.WebSocket` | [WebSocket transport](/packages/transport-websocket) |
+| Reconnect timing owned by a resilience pipeline | `Pulse.Mqtt.Resilience.Polly` | [Reconnect policy](/packages/resilience-polly) |
+| In-process workflow tests | `Pulse.Mqtt.Testing` | [Testing](/packages/testing) |
+| Compile-time warnings for common mistakes | `Pulse.Mqtt.Analyzers` | [Analyzers](/packages/analyzers) |
 
-Dedicated package pages are in [Package docs](/packages/). The full package list, targets, and
-dependencies are in [Packages](/reference/packages).
+The full package list, targets, and dependency relationships are in [Packages](/reference/packages).
 
-## Durable storage
+## Common combinations
 
-The default stores are in-memory. Add one durable store package when a client must resume its
-subscription set, in-flight QoS state, and offline queue after a process restart:
+| Application shape | Packages |
+| --- | --- |
+| Hosted service with typed JSON | `Client`, `DependencyInjection`, `Serialization.Json` |
+| Durable offline worker | `Client`, `DependencyInjection`, `Serialization.Json`, one storage package |
+| Bounded processing pipeline | `Client`, `DependencyInjection`, `Dataflow`, one serializer |
+| Browser/proxy broker endpoint | `Client`, `DependencyInjection`, `Transport.WebSocket`, one serializer |
+| Integration-style tests | `Client`, `Testing`, optionally `DependencyInjection` |
+| Strict application project | runtime packages plus `Analyzers` with `PrivateAssets="all"` |
 
-```shell
-dotnet add package Pulse.Mqtt.Storage.Sqlite
-# or
-dotnet add package Pulse.Mqtt.Storage.LiteDB
-```
+## Choosing between similar add-ons
 
-With dependency injection:
+Choose one serializer per named client. Use JSON for readable payloads and broad interop,
+MessagePack for compact generated binary contracts, and Protobuf when messages already come from
+`.proto` definitions.
 
-```csharp
-using Pulse.Mqtt.Resilience;
-using Pulse.Mqtt.Storage.Sqlite;
+Choose one durable storage package per client in most applications. SQLite is a good default when
+you want a relational file store and easy inspection. LiteDB is a good fit when an embedded
+document database is already part of the application.
 
-builder.Services
-    .AddPulseMqttClient("devices", configure)
-    .UseSessionStore(_ => new SqliteSessionStore("devices-session.db"))
-    .UseMessageStore(_ => new SqliteMessageStore(
-        "devices-queue.db",
-        new OfflineQueueOptions { Capacity = 1024 }));
-```
+Use Dataflow when pipeline composition, bounded buffering, backpressure, completion, or fault
+propagation matter. Use the client route and stream APIs directly when a simple handler or
+`await foreach` loop is enough.
 
-The document-store package has the same shape:
+## Package docs
 
-```csharp
-using Pulse.Mqtt.Resilience;
-using Pulse.Mqtt.Storage.LiteDB;
-
-builder.Services
-    .AddPulseMqttClient("devices", configure)
-    .UseSessionStore(_ => new LiteDbSessionStore("devices-session.db"))
-    .UseMessageStore(_ => new LiteDbMessageStore(
-        "devices-queue.db",
-        new OfflineQueueOptions { Capacity = 1024 }));
-```
-
-Both packages use the same `ISessionStore` and `IMessageStore` contracts as the in-memory
-defaults, so publishing, subscribing, and reconnect behavior does not change. See
-[Resilience](./resilience#durable-storage) for the restart and redelivery details.
-
-## Pipeline source blocks
-
-Add the Dataflow package when MQTT input should feed bounded pipeline blocks:
-
-```shell
-dotnet add package Pulse.Mqtt.Dataflow
-```
-
-```csharp
-using Pulse.Mqtt.Dataflow;
-using System.Threading.Tasks.Dataflow;
-
-var template = MqttRouteTemplate.Parse("sensors/{deviceId}/temp");
-await client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, token);
-
-await using var source = client.ToRouteSourceBlock(
-    template,
-    sourceOptions: new MqttDataflowSourceOptions { BoundedCapacity = 128 },
-    cancellationToken: token);
-
-using var link = source.LinkTo(
-    new ActionBlock<MqttRoutedMessage>(
-        routed => ProcessAsync(routed, token),
-        new ExecutionDataflowBlockOptions { BoundedCapacity = 64 }),
-    new DataflowLinkOptions { PropagateCompletion = true });
-```
-
-Route source blocks are local adapters. They do not subscribe to the broker; call
-`SubscribeAsync` first. Raw message source blocks consume `client.Messages`, so do not read the
-raw stream directly from another place at the same time. See [Routing](./routing#dataflow-source-blocks)
-and [Subscribing](./subscribing#consuming-the-raw-message-stream).
-
-For a complete worker pipeline, see
-[`samples/Pulse.Mqtt.WorkerSample`](https://github.com/araxis/pulse-mqtt/tree/main/samples/Pulse.Mqtt.WorkerSample).
-
-## Typed payload serializers
-
-One serializer is configured per client. The typed publish, route, stream, and request/response
-APIs all use it.
-
-```shell
-dotnet add package Pulse.Mqtt.Serialization.Json
-dotnet add package Pulse.Mqtt.Serialization.MessagePack
-dotnet add package Pulse.Mqtt.Serialization.Protobuf
-```
-
-JSON:
-
-```csharp
-.UseSerializer(_ => new JsonMqttSerializer(AppJsonContext.Default))
-```
-
-MessagePack:
-
-```csharp
-var serializer = new MessagePackMqttSerializer(messagePackOptions);
-```
-
-Protocol Buffers:
-
-```csharp
-var registry = ProtobufMessageRegistry.Create(registry =>
-{
-    registry.Add(TelemetryReading.Parser);
-});
-
-var serializer = new ProtobufMqttSerializer(registry);
-```
-
-Use generated serializers or explicit parser registration for trimming and Native AOT. See
-[Typed messaging](./typed-messaging) for full setup, metadata, and limitations.
-
-## Transport and reconnect add-ons
-
-Use the WebSocket transport when TCP is not the broker-facing path:
-
-```shell
-dotnet add package Pulse.Mqtt.Transport.WebSocket
-```
-
-```csharp
-.UseTransportFactory(_ => new WebSocketTransportFactory(new WebSocketTransportOptions
-{
-    Uri = new Uri("wss://broker.example.com/mqtt"),
-}))
-```
-
-Use the reconnect add-on when retry timing should be owned by an existing resilience pipeline:
-
-```shell
-dotnet add package Pulse.Mqtt.Resilience.Polly
-```
-
-```csharp
-.UseReconnectStrategy(_ => new PollyReconnectStrategy(pipeline))
-```
-
-See [Connecting](./connecting#websocket) and [Resilience](./resilience#backoff) for the behavior
-around proxy headers, terminal failures, and retry classification.
-
-## Tests and analyzers
-
-For workflow tests:
-
-```shell
-dotnet add package Pulse.Mqtt.Testing
-```
-
-```csharp
-await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
-{
-    RetainedMessages = true,
-    PersistentSessions = true,
-});
-```
-
-The broker is an `IMqttTransportFactory`, so production client code can use it in tests without a
-network port. It can also script rejected connects, denied subscriptions, publish
-acknowledgement failures, timeouts, and broker-initiated disconnects. See [Testing](./testing).
-
-For compiler guidance:
-
-```shell
-dotnet add package Pulse.Mqtt.Analyzers
-```
-
-Keep analyzer references private in project files. If the project does not use central package
-management, keep the version that `dotnet add package` inserted:
-
-```xml
-<PackageReference Include="Pulse.Mqtt.Analyzers" PrivateAssets="all" />
-```
-
-See [Analyzers](./analyzers) for diagnostic IDs, fixes, and suppression options.
+Every add-on has a dedicated page under [Package docs](/packages/). Those pages include install
+commands, setup examples, behavior notes, limitations, and links to the deeper guide pages.

@@ -9,17 +9,17 @@ For package-specific setup, see [Package docs](/packages/). For a task-oriented 
 | --- | --- | --- |
 | `Pulse.Mqtt.Core` | Wire codec (all 15 control packets, MQTT 5.0 + 3.1.1), transports (TCP/TLS, in-memory loopback), `MqttConnection`, `RawMqttClient`, every swap-point contract | BCL + `System.IO.Pipelines` only |
 | `Pulse.Mqtt.Client` | `ResilientMqttClient`: supervision, topic routing, typed messaging, request/response, diagnostics | Core, `Microsoft.Extensions.Logging.Abstractions` |
-| `Pulse.Mqtt.Dataflow` | `ISourceBlock<T>` adapters for messages, routes, acknowledged routes, and state transitions | Client |
-| `Pulse.Mqtt.DependencyInjection` | `AddPulseMqttClient`, named clients, options binding, hosted lifecycle, health checks | Client + `Microsoft.Extensions.*` abstractions |
-| `Pulse.Mqtt.Serialization.Json` | Source-generated `System.Text.Json` serializer | Client |
-| `Pulse.Mqtt.Serialization.MessagePack` | MessagePack serializer (compact binary, source-generated resolvers) | Core, `MessagePack` |
-| `Pulse.Mqtt.Serialization.Protobuf` | Protocol Buffers serializer (compact binary, explicit parser registry) | Core, Protobuf runtime |
-| `Pulse.Mqtt.Resilience.Polly` | `PollyReconnectStrategy` over a Polly v8 `ResiliencePipeline` | Core, `Polly.Core` |
-| `Pulse.Mqtt.Storage.LiteDB` | `LiteDbSessionStore` + `LiteDbMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `LiteDB` |
-| `Pulse.Mqtt.Storage.Sqlite` | `SqliteSessionStore` + `SqliteMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `Microsoft.Data.Sqlite` |
-| `Pulse.Mqtt.Transport.WebSocket` | MQTT over `ws`/`wss` | Core |
-| `Pulse.Mqtt.Testing` | `PulseMqttTestBroker`, the in-process broker with opt-in retained messages, persistent sessions, and scripted responses | Core |
-| `Pulse.Mqtt.Analyzers` | Optional C# diagnostics for common Pulse MQTT usage mistakes | none |
+| [`Pulse.Mqtt.Dataflow`](/packages/dataflow) | `ISourceBlock<T>` adapters for messages, routes, acknowledged routes, and state transitions | Client |
+| [`Pulse.Mqtt.DependencyInjection`](/packages/dependency-injection) | `AddPulseMqttClient`, named clients, options binding, hosted lifecycle, health checks | Client + `Microsoft.Extensions.*` abstractions |
+| [`Pulse.Mqtt.Serialization.Json`](/packages/serialization-json) | Source-generated `System.Text.Json` serializer | Client |
+| [`Pulse.Mqtt.Serialization.MessagePack`](/packages/serialization-messagepack) | MessagePack serializer (compact binary, source-generated resolvers) | Core, `MessagePack` |
+| [`Pulse.Mqtt.Serialization.Protobuf`](/packages/serialization-protobuf) | Protocol Buffers serializer (compact binary, explicit parser registry) | Core, Protobuf runtime |
+| [`Pulse.Mqtt.Resilience.Polly`](/packages/resilience-polly) | `PollyReconnectStrategy` over a Polly v8 `ResiliencePipeline` | Core, `Polly.Core` |
+| [`Pulse.Mqtt.Storage.LiteDB`](/packages/storage-litedb) | `LiteDbSessionStore` + `LiteDbMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `LiteDB` |
+| [`Pulse.Mqtt.Storage.Sqlite`](/packages/storage-sqlite) | `SqliteSessionStore` + `SqliteMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `Microsoft.Data.Sqlite` |
+| [`Pulse.Mqtt.Transport.WebSocket`](/packages/transport-websocket) | MQTT over `ws`/`wss` | Core |
+| [`Pulse.Mqtt.Testing`](/packages/testing) | `PulseMqttTestBroker`, the in-process broker with opt-in retained messages, persistent sessions, and scripted responses | Core |
+| [`Pulse.Mqtt.Analyzers`](/packages/analyzers) | Optional C# diagnostics for common Pulse MQTT usage mistakes | none |
 
 ## Which do I need?
 
