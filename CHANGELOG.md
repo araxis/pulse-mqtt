@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.18.0 (unreleased)
+
 ## 2.17.0
 
 - Added protocol feature guard helpers so applications can explicitly check MQTT 5-only
