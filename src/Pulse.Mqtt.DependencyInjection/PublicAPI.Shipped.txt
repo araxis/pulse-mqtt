@@ -25,6 +25,8 @@ Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseSerializer(System.Func<System
 Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseSessionStore(System.Func<System.IServiceProvider!, Pulse.Mqtt.Resilience.ISessionStore!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
 Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseTransportFactory(System.Func<System.IServiceProvider!, Pulse.Mqtt.Transport.IMqttTransportFactory!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
 Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseWillFactory(System.Func<System.IServiceProvider!, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<Pulse.Mqtt.Packets.MqttWillMessage!>>!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseWillProvider(System.Func<System.IServiceProvider!, Pulse.Mqtt.Client.IMqttWillProvider!>! factory) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
+Pulse.Mqtt.DependencyInjection.PulseMqttBuilder.UseWillProvider<TProvider>() -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
 Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions
 Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Birth.get -> Pulse.Mqtt.DependencyInjection.PulseMqttBirthOptions?
 Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.Birth.set -> void
