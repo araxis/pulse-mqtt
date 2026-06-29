@@ -7,6 +7,9 @@ How this repository ships.
 - **CI** (`.github/workflows/ci.yml`): every push and pull request to `main` builds the
   solution, runs all test projects (the integration tests start Mosquitto in Docker on the
   runner), and uploads the packages as a build artifact.
+- **Broker matrix** (`.github/workflows/broker-matrix.yml`): source or integration-test changes
+  run the heavier cross-broker tests. A failed `main` run opens or updates a tracking issue, and
+  the next successful `main` run closes that issue with the recovery run link.
 - **Release** (`.github/workflows/release.yml`) publishes in two modes:
   - **Stable** — pushing a tag that starts with `v` builds, tests, packs every packable
     project with the tag's version, pushes to nuget.org, and creates a GitHub release whose

@@ -2,6 +2,9 @@
 
 ## 2.18.0 (unreleased)
 
+- Broker matrix maintenance: successful `main` runs now close the open broker-matrix tracking
+  issue after recovery with a link to the successful workflow run.
+
 ## 2.17.0
 
 - Added protocol feature guard helpers so applications can explicitly check MQTT 5-only
