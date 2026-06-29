@@ -69,3 +69,15 @@ jobs:
           else
             gh issue comment "$existing" --body "Still failing on \`${{ github.sha }}\`. Run: $RUN_URL"
           fi
+
+      - name: Close recovered main failure issue
+        if: success() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Broker matrix failing on main"
+          existing=$(gh issue list --state open --search "$title in:title" --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --comment "Broker matrix recovered on \`${{ github.sha }}\`. Run: $RUN_URL"
+          fi
