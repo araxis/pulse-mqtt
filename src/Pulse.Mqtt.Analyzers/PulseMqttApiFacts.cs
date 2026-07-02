@@ -100,6 +100,12 @@ internal static class PulseMqttApiFacts
         "Pulse.Mqtt.Transport.WebSocketTransport",
     ];
 
+    private static readonly string[] Mqtt5OnlyClientOptionProperties =
+    [
+        "UseOutboundTopicAliases",
+        "Authenticator",
+    ];
+
     public static bool IsPulseMqttAsyncOperation(IMethodSymbol method) =>
         method.Name.EndsWith("Async", StringComparison.Ordinal)
         && IsTaskLike(method.ReturnType)
@@ -134,10 +140,9 @@ internal static class PulseMqttApiFacts
 
     public static bool TryGetMqtt5OnlyPacketProperties(ITypeSymbol type, out string[] propertyNames)
     {
-        var fullyQualifiedName = type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         foreach (var entry in Mqtt5OnlyPacketProperties)
         {
-            if (fullyQualifiedName == "global::" + entry.MetadataName)
+            if (HasFullyQualifiedName(type, entry.MetadataName))
             {
                 propertyNames = entry.PropertyNames;
                 return true;
@@ -148,9 +153,35 @@ internal static class PulseMqttApiFacts
         return false;
     }
 
+    public static bool TryGetMqtt5OnlyClientOptionProperties(ITypeSymbol type, out string[] propertyNames)
+    {
+        if (HasFullyQualifiedName(type, "Pulse.Mqtt.Connection.RawMqttClientOptions"))
+        {
+            propertyNames = Mqtt5OnlyClientOptionProperties;
+            return true;
+        }
+
+        propertyNames = [];
+        return false;
+    }
+
+    public static bool IsResilientMqttClientOptions(ITypeSymbol type) =>
+        HasFullyQualifiedName(type, "Pulse.Mqtt.Client.ResilientMqttClientOptions");
+
+    public static bool IsMqttConnectPacket(ITypeSymbol type) =>
+        HasFullyQualifiedName(type, "Pulse.Mqtt.Packets.MqttConnectPacket");
+
+    public static bool IsPulseMqttClientBuilderMethod(IMethodSymbol method, string name) =>
+        method.Name == name
+        && HasFullyQualifiedName(method.ContainingType, "Pulse.Mqtt.Client.PulseMqttClientBuilder");
+
     public static bool IsCancellationToken(ITypeSymbol type) =>
         type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
         == "global::System.Threading.CancellationToken";
+
+    private static bool HasFullyQualifiedName(ITypeSymbol type, string metadataName) =>
+        type.OriginalDefinition.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+        == "global::" + metadataName;
 
     private static bool IsPulseMqttSymbol(IMethodSymbol method)
     {

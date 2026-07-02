@@ -418,4 +418,192 @@ public sealed class MqttUsageAnalyzerTests
 
         diagnostics.ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task PMQ0005_reports_mqtt5_only_raw_options_on_v311_resilient_options()
+    {
+        var diagnostics = await AnalyzerVerifier.GetDiagnosticsAsync(
+            ProtocolClientOptionsSource(
+                """
+                public sealed class Sample
+                {
+                    public ResilientMqttClientOptions Create() => new()
+                    {
+                        Connect = new MqttConnectPacket { ProtocolVersion = MqttProtocolVersion.V311 },
+                        Raw = new RawMqttClientOptions
+                        {
+                            UseOutboundTopicAliases = true,
+                            Authenticator = new Authenticator(),
+                        },
+                    };
+                }
+                """));
+
+        diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["PMQ0005", "PMQ0005"]);
+    }
+
+    [Fact]
+    public async Task PMQ0005_reports_mqtt5_only_raw_options_on_v311_fluent_builder_chain()
+    {
+        var diagnostics = await AnalyzerVerifier.GetDiagnosticsAsync(
+            ProtocolClientOptionsSource(
+                """
+                public sealed class Sample
+                {
+                    public void Create()
+                    {
+                        new PulseMqttClientBuilder()
+                            .WithProtocolVersion(MqttProtocolVersion.V311)
+                            .WithRawOptions(new RawMqttClientOptions { UseOutboundTopicAliases = true });
+
+                        new PulseMqttClientBuilder()
+                            .WithRawOptions(new RawMqttClientOptions { Authenticator = new Authenticator() })
+                            .WithConnect(new MqttConnectPacket { ProtocolVersion = MqttProtocolVersion.V311 });
+                    }
+                }
+                """));
+
+        diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["PMQ0005", "PMQ0005"]);
+    }
+
+    [Fact]
+    public async Task PMQ0005_ignores_v500_unknown_protocol_disabled_options_and_non_pulse_types()
+    {
+        var diagnostics = await AnalyzerVerifier.GetDiagnosticsAsync(
+            ProtocolClientOptionsSource(
+                """
+                namespace Other
+                {
+                    public sealed class RawMqttClientOptions
+                    {
+                        public bool UseOutboundTopicAliases { get; set; }
+                    }
+                }
+
+                public sealed class Sample
+                {
+                    public object[] Create(MqttProtocolVersion version) =>
+                    new object[]
+                    {
+                        new ResilientMqttClientOptions
+                        {
+                            Connect = new MqttConnectPacket { ProtocolVersion = MqttProtocolVersion.V500 },
+                            Raw = new RawMqttClientOptions
+                            {
+                                UseOutboundTopicAliases = true,
+                                Authenticator = new Authenticator(),
+                            },
+                        },
+                        new ResilientMqttClientOptions
+                        {
+                            Connect = new MqttConnectPacket { ProtocolVersion = version },
+                            Raw = new RawMqttClientOptions { UseOutboundTopicAliases = true },
+                        },
+                        new ResilientMqttClientOptions
+                        {
+                            Connect = new MqttConnectPacket { ProtocolVersion = MqttProtocolVersion.V311 },
+                            Raw = new RawMqttClientOptions
+                            {
+                                UseOutboundTopicAliases = false,
+                                Authenticator = null,
+                            },
+                        },
+                        new PulseMqttClientBuilder()
+                            .WithProtocolVersion(MqttProtocolVersion.V500)
+                            .WithRawOptions(new RawMqttClientOptions { UseOutboundTopicAliases = true }),
+                        new Other.RawMqttClientOptions { UseOutboundTopicAliases = true },
+                    };
+                }
+                """));
+
+        diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task PMQ0005_does_not_duplicate_packet_protocol_diagnostics()
+    {
+        var diagnostics = await AnalyzerVerifier.GetDiagnosticsAsync(
+            ProtocolClientOptionsSource(
+                """
+                public sealed class Sample
+                {
+                    public ResilientMqttClientOptions Create() => new()
+                    {
+                        Connect = new MqttConnectPacket
+                        {
+                            ProtocolVersion = MqttProtocolVersion.V311,
+                            AuthenticationMethod = "SCRAM-SHA-256",
+                        },
+                        Raw = new RawMqttClientOptions { UseOutboundTopicAliases = true },
+                    };
+                }
+                """));
+
+        diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["PMQ0004", "PMQ0005"]);
+    }
+
+    private static string ProtocolClientOptionsSource(string sample) =>
+        """
+        namespace Pulse.Mqtt.Protocol
+        {
+            public enum MqttProtocolVersion
+            {
+                V311 = 4,
+                V500 = 5,
+            }
+        }
+
+        namespace Pulse.Mqtt.Packets
+        {
+            using Pulse.Mqtt.Protocol;
+
+            public sealed class MqttConnectPacket
+            {
+                public MqttProtocolVersion ProtocolVersion { get; set; }
+                public string AuthenticationMethod { get; set; } = "";
+            }
+        }
+
+        namespace Pulse.Mqtt.Connection
+        {
+            public interface IMqttAuthenticator
+            {
+            }
+
+            public sealed class RawMqttClientOptions
+            {
+                public bool UseOutboundTopicAliases { get; set; }
+                public IMqttAuthenticator Authenticator { get; set; }
+            }
+        }
+
+        namespace Pulse.Mqtt.Client
+        {
+            using Pulse.Mqtt.Connection;
+            using Pulse.Mqtt.Packets;
+            using Pulse.Mqtt.Protocol;
+
+            public sealed class ResilientMqttClientOptions
+            {
+                public MqttConnectPacket Connect { get; set; } = new();
+                public RawMqttClientOptions Raw { get; set; } = new();
+            }
+
+            public sealed class PulseMqttClientBuilder
+            {
+                public PulseMqttClientBuilder WithProtocolVersion(MqttProtocolVersion version) => this;
+                public PulseMqttClientBuilder WithConnect(MqttConnectPacket connect) => this;
+                public PulseMqttClientBuilder WithRawOptions(RawMqttClientOptions options) => this;
+            }
+
+            public sealed class Authenticator : IMqttAuthenticator
+            {
+            }
+
+        """
+        + sample
+        + """
+
+        }
+        """;
 }
