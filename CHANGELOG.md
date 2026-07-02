@@ -2,6 +2,14 @@
 
 ## 2.21.0 (unreleased)
 
+- Fixed the QUIC transport silently dropping quiet connections: msquic's default 30-second
+  idle timeout now defaults to disabled (`QuicTransportOptions.IdleTimeout`, TCP parity), with
+  an opt-in `KeepAliveInterval` for QUIC-level pings against brokers that enforce their own
+  idle timeout.
+- The QUIC transport now waits (bounded) for the peer to acknowledge the final bytes before
+  closing the connection, so a graceful MQTT DISCONNECT is no longer racing the connection
+  close.
+
 ## 2.20.0
 
 - Extended chaos and soak coverage to the QUIC transport: the broker matrix now runs the
