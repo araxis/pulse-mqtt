@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitepress'
 
-// One entry per add-on package; shared by the guide sidebar and the packages sidebar so the
-// two lists cannot drift apart.
+// One entry per add-on package. The Add-ons group lives in the shared sidebar below, so these
+// pages sit in the same tree as the rest of the docs even though they live under /packages/.
 const addOnPackages = [
+  { text: 'Overview', link: '/packages/' },
   { text: 'Dependency injection', link: '/packages/dependency-injection' },
   { text: 'Dataflow', link: '/packages/dataflow' },
   { text: 'SQLite storage', link: '/packages/storage-sqlite' },
@@ -16,6 +17,60 @@ const addOnPackages = [
   { text: 'Reconnect policy', link: '/packages/resilience-polly' },
   { text: 'Testing', link: '/packages/testing' },
   { text: 'Analyzers', link: '/packages/analyzers' },
+]
+
+// The Guide and Packages sections share one sidebar, so following an add-on link never swaps the
+// sidebar out from under the reader or drops them into a different-looking tree.
+const mainSidebar = [
+  {
+    text: 'Start here',
+    items: [
+      { text: 'Introduction', link: '/guide/introduction' },
+      { text: 'Getting started', link: '/guide/getting-started' },
+      { text: 'Package add-ons', link: '/guide/package-add-ons' },
+      { text: 'Connecting', link: '/guide/connecting' },
+    ],
+  },
+  {
+    text: 'Add-ons',
+    collapsed: false,
+    items: addOnPackages,
+  },
+  {
+    text: 'Messaging',
+    items: [
+      { text: 'Publishing', link: '/guide/publishing' },
+      { text: 'Subscribing', link: '/guide/subscribing' },
+      { text: 'Routing', link: '/guide/routing' },
+      { text: 'Typed messaging', link: '/guide/typed-messaging' },
+      { text: 'Request and response', link: '/guide/request-response' },
+      { text: 'Fluent API', link: '/guide/fluent-api' },
+    ],
+  },
+  {
+    text: 'Operations',
+    items: [
+      { text: 'Resilience', link: '/guide/resilience' },
+      { text: 'Presence', link: '/guide/presence' },
+      { text: 'Lifecycle and state', link: '/guide/lifecycle' },
+      { text: 'Dependency injection', link: '/guide/dependency-injection' },
+      { text: 'Health checks', link: '/guide/health-checks' },
+      { text: 'Observability', link: '/guide/observability' },
+      { text: 'Testing', link: '/guide/testing' },
+      { text: 'Analyzers', link: '/guide/analyzers' },
+    ],
+  },
+  {
+    text: 'Going deeper',
+    items: [
+      { text: 'Migrating from MQTTnet', link: '/guide/migrating-from-mqttnet' },
+      { text: 'Extending the client', link: '/guide/extending' },
+      { text: 'The raw client', link: '/guide/raw-client' },
+      { text: 'Native AOT', link: '/guide/native-aot' },
+      { text: 'Performance', link: '/guide/performance' },
+      { text: 'Releasing', link: '/guide/releasing' },
+    ],
+  },
 ]
 
 export default defineConfig({
@@ -39,69 +94,8 @@ export default defineConfig({
       message: 'Released under the MIT License.',
     },
     sidebar: {
-      '/guide/': [
-        {
-          text: 'Start here',
-          items: [
-            { text: 'Introduction', link: '/guide/introduction' },
-            { text: 'Getting started', link: '/guide/getting-started' },
-            { text: 'Package add-ons', link: '/guide/package-add-ons' },
-            { text: 'Connecting', link: '/guide/connecting' },
-          ],
-        },
-        {
-          text: 'Add-ons',
-          collapsed: false,
-          items: [
-            { text: 'Overview', link: '/packages/' },
-            ...addOnPackages,
-          ],
-        },
-        {
-          text: 'Messaging',
-          items: [
-            { text: 'Publishing', link: '/guide/publishing' },
-            { text: 'Subscribing', link: '/guide/subscribing' },
-            { text: 'Routing', link: '/guide/routing' },
-            { text: 'Typed messaging', link: '/guide/typed-messaging' },
-            { text: 'Request and response', link: '/guide/request-response' },
-            { text: 'Fluent API', link: '/guide/fluent-api' },
-          ],
-        },
-        {
-          text: 'Operations',
-          items: [
-            { text: 'Resilience', link: '/guide/resilience' },
-            { text: 'Presence', link: '/guide/presence' },
-            { text: 'Lifecycle and state', link: '/guide/lifecycle' },
-            { text: 'Dependency injection', link: '/guide/dependency-injection' },
-            { text: 'Health checks', link: '/guide/health-checks' },
-            { text: 'Observability', link: '/guide/observability' },
-            { text: 'Testing', link: '/guide/testing' },
-            { text: 'Analyzers', link: '/guide/analyzers' },
-          ],
-        },
-        {
-          text: 'Going deeper',
-          items: [
-            { text: 'Migrating from MQTTnet', link: '/guide/migrating-from-mqttnet' },
-            { text: 'Extending the client', link: '/guide/extending' },
-            { text: 'The raw client', link: '/guide/raw-client' },
-            { text: 'Native AOT', link: '/guide/native-aot' },
-            { text: 'Performance', link: '/guide/performance' },
-            { text: 'Releasing', link: '/guide/releasing' },
-          ],
-        },
-      ],
-      '/packages/': [
-        {
-          text: 'Packages',
-          items: [
-            { text: 'Overview', link: '/packages/' },
-            ...addOnPackages,
-          ],
-        },
-      ],
+      '/guide/': mainSidebar,
+      '/packages/': mainSidebar,
       '/reference/': [
         {
           text: 'Reference',
