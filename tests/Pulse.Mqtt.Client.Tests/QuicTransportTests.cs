@@ -154,6 +154,65 @@ public sealed class QuicTransportTests
         options.Alpn.ShouldBe("mqtt");
     }
 
+    [Fact]
+    public void Liveness_defaults_leave_timeouts_to_the_mqtt_layer()
+    {
+        var options = new QuicTransportOptions { Host = "broker" };
+        // TCP parity: the transport itself must never silently close a quiet connection
+        // (msquic would default to a 30s idle timeout), and QUIC-level pings stay opt-in.
+        options.IdleTimeout.ShouldBe(Timeout.InfiniteTimeSpan);
+        options.KeepAliveInterval.ShouldBe(Timeout.InfiniteTimeSpan);
+    }
+
+    [QuicFact]
+    public async Task Liveness_options_reach_the_quic_connection()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        using var certificate = CreateServerCertificate();
+        await using var listener = await StartListenerAsync(certificate);
+        DrainFailedAccept(listener, timeout.Token);
+
+        QuicClientConnectionOptions? seen = null;
+        var factory = new QuicTransportFactory(TrustingOptions(listener) with
+        {
+            KeepAliveInterval = TimeSpan.FromSeconds(7),
+            ConfigureConnection = options => seen = options,
+        });
+
+        await using var transport = await factory.ConnectAsync(timeout.Token);
+
+        var connection = seen.ShouldNotBeNull();
+        connection.IdleTimeout.ShouldBe(Timeout.InfiniteTimeSpan);
+        connection.KeepAliveInterval.ShouldBe(TimeSpan.FromSeconds(7));
+    }
+
+    [QuicFact]
+    public async Task Bytes_flushed_just_before_disposal_reach_the_peer()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        using var certificate = CreateServerCertificate();
+        await using var listener = await StartListenerAsync(certificate);
+
+        var acceptTask = AcceptAsync(listener, timeout.Token);
+        var factory = new QuicTransportFactory(TrustingOptions(listener));
+        var transport = await factory.ConnectAsync(timeout.Token);
+
+        // A graceful MQTT shutdown ends exactly like this: the DISCONNECT packet is flushed and
+        // the transport is disposed straight after. The bytes must still arrive, then a clean
+        // end of stream — disposal may not abort them.
+        MqttPingCodec.WriteRequest(transport.Output);
+        await transport.Output.FlushAsync(timeout.Token);
+        await transport.DisposeAsync();
+
+        var (serverConnection, serverStream) = await acceptTask.WaitAsync(timeout.Token);
+        await using var ownedConnection = serverConnection;
+        await using var ownedStream = serverStream;
+
+        var received = await ReadExactAsync(serverStream, 2, timeout.Token);
+        received.ShouldBe(new byte[] { 0xC0, 0x00 });
+        (await serverStream.ReadAsync(new byte[1], timeout.Token)).ShouldBe(0, "the stream should end gracefully after the final bytes");
+    }
+
     private static QuicTransportOptions TrustingOptions(QuicListener listener) => new()
     {
         Host = "127.0.0.1",

@@ -1,1 +1,5 @@
 #nullable enable
+Pulse.Mqtt.Transport.QuicTransportOptions.IdleTimeout.get -> System.TimeSpan
+Pulse.Mqtt.Transport.QuicTransportOptions.IdleTimeout.init -> void
+Pulse.Mqtt.Transport.QuicTransportOptions.KeepAliveInterval.get -> System.TimeSpan
+Pulse.Mqtt.Transport.QuicTransportOptions.KeepAliveInterval.init -> void

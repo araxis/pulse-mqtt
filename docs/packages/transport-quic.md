@@ -64,6 +64,30 @@ await using var client = new ResilientMqttClient(
     });
 ```
 
+## Liveness: idle timeout and keep-alive
+
+QUIC has its own connection liveness rules, separate from the MQTT keep-alive:
+
+- **`IdleTimeout`** — how long the connection may stay silent before the QUIC layer closes it.
+  The default is `Timeout.InfiniteTimeSpan`: the transport never times out on its own, matching
+  TCP, so the MQTT keep-alive owns liveness. Without this default, msquic would silently close
+  a quiet connection after its own 30-second default.
+- **`KeepAliveInterval`** — how often the QUIC layer sends PING frames, defaulting to
+  `Timeout.InfiniteTimeSpan` (off).
+
+One caveat the protocol imposes: the effective idle timeout is the **minimum of what both
+peers advertise** (RFC 9000 §10.1). An infinite client timeout stops the *client* from closing
+a quiet connection, but a broker can still enforce its own. If you run with a long or zero
+MQTT keep-alive against such a broker, set `KeepAliveInterval` below the broker's idle timeout:
+
+```csharp
+new QuicTransportOptions
+{
+    Host = "broker.example.com",
+    KeepAliveInterval = TimeSpan.FromSeconds(15),
+}
+```
+
 ## TLS options
 
 QUIC always negotiates TLS 1.3; there is no plaintext mode.

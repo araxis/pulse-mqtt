@@ -15,6 +15,10 @@ namespace Pulse.Mqtt.Transport;
 [SupportedOSPlatform("macos")]
 public sealed class QuicTransport : IMqttTransport
 {
+    // How long disposal waits for the peer to acknowledge the final bytes. Live connections ack
+    // in a round trip; a dead one just runs this out before the connection is torn down anyway.
+    private static readonly TimeSpan GracefulCloseTimeout = TimeSpan.FromSeconds(2);
+
     private readonly QuicConnection _connection;
     private readonly QuicStream _stream;
 
@@ -49,6 +53,18 @@ public sealed class QuicTransport : IMqttTransport
             await Input.CompleteAsync().ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException or ArgumentException)
+        {
+        }
+
+        // Closing the connection stops retransmission of anything the peer has not acknowledged
+        // yet, so give the final bytes — typically an MQTT DISCONNECT — a bounded chance to land.
+        // QuicStream disposal closes writes gracefully but does not wait for the acknowledgement.
+        try
+        {
+            _stream.CompleteWrites();
+            await _stream.WritesClosed.WaitAsync(GracefulCloseTimeout).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException or ObjectDisposedException or InvalidOperationException)
         {
         }
 
@@ -91,6 +107,8 @@ public sealed class QuicTransportFactory : IMqttTransportFactory
             RemoteEndPoint = new DnsEndPoint(_options.Host, _options.Port),
             DefaultStreamErrorCode = 0,
             DefaultCloseErrorCode = 0,
+            IdleTimeout = _options.IdleTimeout,
+            KeepAliveInterval = _options.KeepAliveInterval,
             ClientAuthenticationOptions = new SslClientAuthenticationOptions
             {
                 ApplicationProtocols = [new SslApplicationProtocol(_options.Alpn)],

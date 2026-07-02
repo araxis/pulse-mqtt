@@ -26,6 +26,21 @@ public sealed record QuicTransportOptions
     public X509CertificateCollection? ClientCertificates { get; init; }
 
     /// <summary>
+    /// How long the QUIC connection may stay silent before the QUIC layer closes it. The default
+    /// is <see cref="Timeout.InfiniteTimeSpan"/> — no transport-level timeout, matching TCP, so
+    /// the MQTT keep-alive owns liveness. Left unset, msquic would silently close a quiet
+    /// connection after its own 30-second default.
+    /// </summary>
+    public TimeSpan IdleTimeout { get; init; } = Timeout.InfiniteTimeSpan;
+
+    /// <summary>
+    /// How often the QUIC layer sends PING frames to keep the connection (and NAT bindings)
+    /// alive, independently of the MQTT keep-alive. The default is
+    /// <see cref="Timeout.InfiniteTimeSpan"/> — no QUIC-level pings.
+    /// </summary>
+    public TimeSpan KeepAliveInterval { get; init; } = Timeout.InfiniteTimeSpan;
+
+    /// <summary>
     /// Overrides server certificate validation. Leave unset to use the platform default chain
     /// validation. Supplying a callback that returns <see langword="true"/> unconditionally
     /// disables validation and should only be done in tests.
