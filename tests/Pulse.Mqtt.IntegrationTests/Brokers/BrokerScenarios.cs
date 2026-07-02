@@ -302,10 +302,10 @@ public static class BrokerScenarios
     }
 
     private static RawMqttClient Connect(IMqttBroker broker) =>
-        new(new TcpTransportFactory(new TcpTransportOptions { Host = broker.Host, Port = broker.Port }));
+        new(broker.CreateTransport());
 
     private static RawMqttClient Connect(IMqttBroker broker, RawMqttClientOptions options) =>
-        new(new TcpTransportFactory(new TcpTransportOptions { Host = broker.Host, Port = broker.Port }), options);
+        new(broker.CreateTransport(), options);
 
     private static MqttConnectPacket NewConnect() => new()
     {
