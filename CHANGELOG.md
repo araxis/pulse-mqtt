@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.22.0 (unreleased)
+
 ## 2.21.0
 
 - Fixed the QUIC transport silently dropping quiet connections: msquic's default 30-second
