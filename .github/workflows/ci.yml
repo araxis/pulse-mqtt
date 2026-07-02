@@ -21,6 +21,15 @@ jobs:
         with:
           global-json-file: global.json
 
+      # System.Net.Quic needs the msquic native library; without it the QUIC transport tests
+      # would be skipped instead of run.
+      - name: Install msquic
+        run: |
+          wget -q "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y libmsquic
+
       - name: Build
         run: dotnet build -c Release
 
