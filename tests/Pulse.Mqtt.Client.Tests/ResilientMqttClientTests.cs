@@ -38,7 +38,22 @@ public sealed class ResilientMqttClientTests
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
 
-        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+        // Wait on the recorded events, not client.State: the state property is published before
+        // the event fires, so a state poll could observe Connected while the list still ends at
+        // Connecting.
+        while (true)
+        {
+            lock (states)
+            {
+                if (states.Contains(ConnectionState.Connected))
+                {
+                    break;
+                }
+            }
+
+            await Task.Delay(1, timeout.Token);
+        }
+
         lock (states)
         {
             states.ShouldContain(ConnectionState.Connecting);

@@ -10,6 +10,10 @@ public sealed class ServerDisconnectTests
 {
     private static readonly TimeSpan SafetyTimeout = TimeSpan.FromSeconds(10);
 
+    // These tests synchronize on the StateChanged *event*, not on polling client.State: the state
+    // property is published before the event fires, so a state poll can win the race and assert
+    // on the transition list before the matching entry was recorded.
+
     [Fact]
     public async Task A_transient_broker_disconnect_reconnects_and_carries_the_reason()
     {
@@ -20,15 +24,17 @@ public sealed class ServerDisconnectTests
         await client.ConnectAsync(timeout.Token);
         var broker1 = await factory.NextBrokerAsync(timeout.Token);
         await broker1.AcceptConnectionAsync(timeout.Token);
-        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+        await transitions.WaitForAsync(
+            changes => changes.Any(change => change.Current == ConnectionState.Connected), timeout.Token);
 
         await broker1.SendAsync(new MqttDisconnectPacket { ReasonCode = MqttReasonCode.ServerShuttingDown }, timeout.Token);
 
         var broker2 = await factory.NextBrokerAsync(timeout.Token);
         await broker2.AcceptConnectionAsync(timeout.Token);
-        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+        await transitions.WaitForAsync(
+            changes => changes.Count(change => change.Current == ConnectionState.Connected) == 2, timeout.Token);
 
-        transitions.ShouldContain(change =>
+        transitions.Snapshot().ShouldContain(change =>
             change.Current == ConnectionState.Reconnecting &&
             change.Reason == MqttReasonCode.ServerShuttingDown &&
             change.Error is MqttServerDisconnectedException);
@@ -44,13 +50,15 @@ public sealed class ServerDisconnectTests
         await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
-        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+        await transitions.WaitForAsync(
+            changes => changes.Any(change => change.Current == ConnectionState.Connected), timeout.Token);
 
         await broker.SendAsync(new MqttDisconnectPacket { ReasonCode = MqttReasonCode.SessionTakenOver }, timeout.Token);
 
-        await WaitForStateAsync(client, ConnectionState.Faulted, timeout.Token);
+        await transitions.WaitForAsync(
+            changes => changes.Any(change => change.Current == ConnectionState.Faulted), timeout.Token);
         factory.ConnectionsHandedOut.ShouldBe(1); // no reconnect attempt — the session has a new owner
-        transitions.ShouldContain(change =>
+        transitions.Snapshot().ShouldContain(change =>
             change.Current == ConnectionState.Faulted &&
             change.Reason == MqttReasonCode.SessionTakenOver &&
             change.Error is MqttServerDisconnectedException);
@@ -61,19 +69,20 @@ public sealed class ServerDisconnectTests
     {
         var factory = new SequencedTransportFactory();
         var lifecycle = new RecordingLifecycle();
-        var transitions = new List<ConnectionStateChanged>();
+        var transitions = new TransitionRecorder();
         await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
         {
             Connect = new MqttConnectPacket { ClientId = "down-context", KeepAliveSeconds = 0 },
             Lifecycle = lifecycle,
         });
-        client.StateChanged += transitions.Add;
+        client.StateChanged += transitions.Record;
 
         using var timeout = new CancellationTokenSource(SafetyTimeout);
         await client.ConnectAsync(timeout.Token);
         var broker = await factory.NextBrokerAsync(timeout.Token);
         await broker.AcceptConnectionAsync(timeout.Token);
-        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+        await transitions.WaitForAsync(
+            changes => changes.Any(change => change.Current == ConnectionState.Connected), timeout.Token);
 
         await broker.SendAsync(
             new MqttDisconnectPacket
@@ -84,7 +93,10 @@ public sealed class ServerDisconnectTests
             },
             timeout.Token);
 
-        await WaitForStateAsync(client, ConnectionState.Faulted, timeout.Token);
+        // The lifecycle callback completes before the Faulted transition is raised, so waiting
+        // for the Faulted event also guarantees LastDown is visible.
+        await transitions.WaitForAsync(
+            changes => changes.Any(change => change.Current == ConnectionState.Faulted), timeout.Token);
 
         var context = lifecycle.LastDown.ShouldNotBeNull();
         context.Reason.ShouldBe(MqttReasonCode.UseAnotherServer);
@@ -92,7 +104,7 @@ public sealed class ServerDisconnectTests
         context.ServerReference.ShouldBe("backup.example:1883");
         context.Error.ShouldBeOfType<MqttServerDisconnectedException>();
 
-        transitions.ShouldContain(change =>
+        transitions.Snapshot().ShouldContain(change =>
             change.Current == ConnectionState.Faulted &&
             change.Reason == MqttReasonCode.UseAnotherServer &&
             change.ReasonString == "rebalancing" &&
@@ -114,24 +126,66 @@ public sealed class ServerDisconnectTests
         }
     }
 
-    private static ResilientMqttClient NewClient(SequencedTransportFactory factory, out List<ConnectionStateChanged> transitions)
+    /// <summary>
+    /// Collects state transitions from the event thread and lets the test await a condition over
+    /// everything recorded so far, without racing the recording or enumerating a live list.
+    /// </summary>
+    private sealed class TransitionRecorder
+    {
+        private readonly Lock _gate = new();
+        private readonly List<ConnectionStateChanged> _changes = [];
+        private readonly List<(Func<IReadOnlyList<ConnectionStateChanged>, bool> Condition, TaskCompletionSource Signal)> _waiters = [];
+
+        public void Record(ConnectionStateChanged change)
+        {
+            lock (_gate)
+            {
+                _changes.Add(change);
+                for (var i = _waiters.Count - 1; i >= 0; i--)
+                {
+                    if (_waiters[i].Condition(_changes))
+                    {
+                        _waiters[i].Signal.TrySetResult();
+                        _waiters.RemoveAt(i);
+                    }
+                }
+            }
+        }
+
+        public ConnectionStateChanged[] Snapshot()
+        {
+            lock (_gate)
+            {
+                return [.. _changes];
+            }
+        }
+
+        public Task WaitForAsync(Func<IReadOnlyList<ConnectionStateChanged>, bool> condition, CancellationToken cancellationToken)
+        {
+            lock (_gate)
+            {
+                if (condition(_changes))
+                {
+                    return Task.CompletedTask;
+                }
+
+                var signal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _waiters.Add((condition, signal));
+                return signal.Task.WaitAsync(cancellationToken);
+            }
+        }
+    }
+
+    private static ResilientMqttClient NewClient(SequencedTransportFactory factory, out TransitionRecorder transitions)
     {
         var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
         {
             Connect = new MqttConnectPacket { ClientId = "disconnect-tests", KeepAliveSeconds = 0 },
         });
 
-        var recorded = new List<ConnectionStateChanged>();
-        client.StateChanged += recorded.Add;
-        transitions = recorded;
+        var recorder = new TransitionRecorder();
+        client.StateChanged += recorder.Record;
+        transitions = recorder;
         return client;
-    }
-
-    private static async Task WaitForStateAsync(ResilientMqttClient client, ConnectionState state, CancellationToken cancellationToken)
-    {
-        while (client.State != state)
-        {
-            await Task.Delay(1, cancellationToken);
-        }
     }
 }
