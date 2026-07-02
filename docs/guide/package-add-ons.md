@@ -39,6 +39,7 @@ codec, raw client, or swap-point contracts without the resilient client.
 | Compact binary typed payloads with generated resolvers | `Pulse.Mqtt.Serialization.MessagePack` | [MessagePack serializer](/packages/serialization-messagepack) |
 | Generated Protocol Buffers typed payloads | `Pulse.Mqtt.Serialization.Protobuf` | [Protobuf serializer](/packages/serialization-protobuf) |
 | MQTT over `ws` or `wss` | `Pulse.Mqtt.Transport.WebSocket` | [WebSocket transport](/packages/transport-websocket) |
+| MQTT over QUIC (EMQX-style listeners, .NET 10) | `Pulse.Mqtt.Transport.Quic` | [QUIC transport](/packages/transport-quic) |
 | Reconnect timing owned by a resilience pipeline | `Pulse.Mqtt.Resilience.Polly` | [Reconnect policy](/packages/resilience-polly) |
 | In-process workflow tests | `Pulse.Mqtt.Testing` | [Testing](/packages/testing) |
 | Compile-time warnings for common mistakes | `Pulse.Mqtt.Analyzers` | [Analyzers](/packages/analyzers) |

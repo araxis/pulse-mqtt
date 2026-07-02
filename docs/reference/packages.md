@@ -18,6 +18,7 @@ For package-specific setup, see [Package docs](/packages/). For a task-oriented 
 | [`Pulse.Mqtt.Storage.LiteDB`](/packages/storage-litedb) | `LiteDbSessionStore` + `LiteDbMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `LiteDB` |
 | [`Pulse.Mqtt.Storage.Sqlite`](/packages/storage-sqlite) | `SqliteSessionStore` + `SqliteMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `Microsoft.Data.Sqlite` |
 | [`Pulse.Mqtt.Transport.WebSocket`](/packages/transport-websocket) | MQTT over `ws`/`wss` | Core |
+| [`Pulse.Mqtt.Transport.Quic`](/packages/transport-quic) | MQTT over QUIC, one bidirectional stream (.NET 10 only) | Core |
 | [`Pulse.Mqtt.Testing`](/packages/testing) | `PulseMqttTestBroker`, the in-process broker with opt-in retained messages, persistent sessions, and scripted responses | Core |
 | [`Pulse.Mqtt.Analyzers`](/packages/analyzers) | Optional C# diagnostics for common Pulse MQTT usage mistakes | none |
 
