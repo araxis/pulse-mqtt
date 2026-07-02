@@ -20,6 +20,17 @@ public sealed class EmqxCompatibilityTests(EmqxBroker broker) : BrokerCompatibil
 [Collection("emqx")]
 public sealed class EmqxQuicCompatibilityTests(EmqxBroker broker) : BrokerCompatibilitySuite(new EmqxQuicBroker(broker));
 
+// Reconnect-under-chaos over QUIC: random connection kills under sustained QoS 1 load must lose
+// nothing, exactly as over TCP. This is the resilience layer's QUIC gate, not just the codec's.
+[Trait("Category", "BrokerMatrix")]
+[Collection("emqx")]
+public sealed class EmqxQuicChaosTests(EmqxBroker broker)
+{
+    [Fact]
+    public Task Random_disconnects_under_load_lose_no_qos1_messages_with_a_persistent_session() =>
+        ChaosScenario.RandomDisconnectsLoseNoQos1MessagesAsync(new EmqxQuicBroker(broker));
+}
+
 [Trait("Category", "BrokerMatrix")]
 [Collection("hivemq")]
 public sealed class HiveMqCompatibilityTests(HiveMqBroker broker) : BrokerCompatibilitySuite(broker);

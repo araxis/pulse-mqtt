@@ -110,7 +110,9 @@ public sealed class SoakTests
         var started = DateTimeOffset.UtcNow;
         var deadline = started + duration;
         var nextCheckpoint = started + TimeSpan.FromSeconds(30);
-        checkpoint.Write($"START duration={duration} baselineMB={baseline / (1024 * 1024)} broker={Environment.GetEnvironmentVariable("PULSE_MQTT_BROKER") ?? "docker"}");
+        checkpoint.Write(
+            $"START duration={duration} baselineMB={baseline / (1024 * 1024)} broker={Environment.GetEnvironmentVariable("PULSE_MQTT_BROKER") ?? "docker"} " +
+            $"transport={Environment.GetEnvironmentVariable("PULSE_SOAK_TRANSPORT") ?? "tcp"}");
         while (DateTimeOffset.UtcNow < deadline)
         {
             await publisher.PublishAsync(
@@ -199,8 +201,18 @@ public sealed class SoakTests
             : TimeSpan.FromSeconds(30);
     }
 
-    private TcpTransportFactory NewFactory() =>
-        new(new TcpTransportOptions { Host = _broker.Host, Port = _broker.Port });
+    // PULSE_SOAK_TRANSPORT=quic runs the same soak over the QUIC transport; point PULSE_MQTT_BROKER
+    // at a broker's QUIC (UDP) listener, e.g. an EMQX container. Default remains TCP.
+    private IMqttTransportFactory NewFactory() =>
+        string.Equals(Environment.GetEnvironmentVariable("PULSE_SOAK_TRANSPORT"), "quic", StringComparison.OrdinalIgnoreCase)
+            ? new QuicTransportFactory(new QuicTransportOptions
+            {
+                Host = _broker.Host,
+                Port = _broker.Port,
+                // Soak brokers run with self-signed demo certificates.
+                ServerCertificateValidation = (_, _, _, _) => true,
+            })
+            : new TcpTransportFactory(new TcpTransportOptions { Host = _broker.Host, Port = _broker.Port });
 
     private static async Task WaitConnectedAsync(ResilientMqttClient client, CancellationToken cancellationToken)
     {
