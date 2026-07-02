@@ -1,5 +1,23 @@
 import { defineConfig } from 'vitepress'
 
+// One entry per add-on package; shared by the guide sidebar and the packages sidebar so the
+// two lists cannot drift apart.
+const addOnPackages = [
+  { text: 'Dependency injection', link: '/packages/dependency-injection' },
+  { text: 'Dataflow', link: '/packages/dataflow' },
+  { text: 'SQLite storage', link: '/packages/storage-sqlite' },
+  { text: 'LiteDB storage', link: '/packages/storage-litedb' },
+  { text: 'Serializer overview', link: '/packages/serializers' },
+  { text: 'JSON serializer', link: '/packages/serialization-json' },
+  { text: 'MessagePack serializer', link: '/packages/serialization-messagepack' },
+  { text: 'Protobuf serializer', link: '/packages/serialization-protobuf' },
+  { text: 'WebSocket transport', link: '/packages/transport-websocket' },
+  { text: 'QUIC transport', link: '/packages/transport-quic' },
+  { text: 'Reconnect policy', link: '/packages/resilience-polly' },
+  { text: 'Testing', link: '/packages/testing' },
+  { text: 'Analyzers', link: '/packages/analyzers' },
+]
+
 export default defineConfig({
   title: 'Pulse.Mqtt',
   description: 'A high-performance, resilient MQTT 5.0 client for modern .NET',
@@ -29,6 +47,14 @@ export default defineConfig({
             { text: 'Getting started', link: '/guide/getting-started' },
             { text: 'Package add-ons', link: '/guide/package-add-ons' },
             { text: 'Connecting', link: '/guide/connecting' },
+          ],
+        },
+        {
+          text: 'Add-ons',
+          collapsed: false,
+          items: [
+            { text: 'Overview', link: '/packages/' },
+            ...addOnPackages,
           ],
         },
         {
@@ -72,19 +98,7 @@ export default defineConfig({
           text: 'Packages',
           items: [
             { text: 'Overview', link: '/packages/' },
-            { text: 'Dependency injection', link: '/packages/dependency-injection' },
-            { text: 'Dataflow', link: '/packages/dataflow' },
-            { text: 'SQLite storage', link: '/packages/storage-sqlite' },
-            { text: 'LiteDB storage', link: '/packages/storage-litedb' },
-            { text: 'Serializer overview', link: '/packages/serializers' },
-            { text: 'JSON serializer', link: '/packages/serialization-json' },
-            { text: 'MessagePack serializer', link: '/packages/serialization-messagepack' },
-            { text: 'Protobuf serializer', link: '/packages/serialization-protobuf' },
-            { text: 'WebSocket transport', link: '/packages/transport-websocket' },
-            { text: 'QUIC transport', link: '/packages/transport-quic' },
-            { text: 'Reconnect policy', link: '/packages/resilience-polly' },
-            { text: 'Testing', link: '/packages/testing' },
-            { text: 'Analyzers', link: '/packages/analyzers' },
+            ...addOnPackages,
           ],
         },
       ],
