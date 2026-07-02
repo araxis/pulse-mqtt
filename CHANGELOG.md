@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.20.0 (unreleased)
+
 ## 2.19.0
 
 - Added `Pulse.Mqtt.Transport.Quic`, an MQTT-over-QUIC transport (.NET 10) with a single
