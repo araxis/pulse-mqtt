@@ -103,9 +103,15 @@ guidance.
 - The factory creates a fresh QUIC connection and one bidirectional stream per reconnect
   attempt; the resilient client still owns reconnect, subscriptions, offline queue flush, and
   health.
-- The conformance suite runs against EMQX's QUIC listener in CI, alongside the TCP matrix.
+- The conformance suite and the reconnect-under-chaos invariant both run against EMQX's QUIC
+  listener in CI, alongside the TCP matrix.
 - Multi-stream mode (one QUIC stream per topic, an EMQX extension) is not implemented; the
-  transport uses the single-stream mode every MQTT-over-QUIC broker supports.
+  transport uses the single-stream mode every MQTT-over-QUIC broker supports. Splitting control
+  and data across streams is a connection-engine feature, not a transport swap, so it is a
+  deliberate non-goal for this package until demand justifies it.
+- 0-RTT session resumption is not available: `System.Net.Quic` does not expose it yet. The
+  transport will adopt it when the platform does; until then every reconnect pays one TLS 1.3
+  round trip.
 
 ## Related docs
 

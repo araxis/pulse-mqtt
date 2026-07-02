@@ -2,6 +2,10 @@
 
 ## 2.20.0 (unreleased)
 
+- Extended chaos and soak coverage to the QUIC transport: the broker matrix now runs the
+  reconnect-under-chaos invariant against EMQX's QUIC listener, and the soak harness accepts
+  `PULSE_SOAK_TRANSPORT=quic` to run its full duration over QUIC.
+
 ## 2.19.0
 
 - Added `Pulse.Mqtt.Transport.Quic`, an MQTT-over-QUIC transport (.NET 10) with a single
