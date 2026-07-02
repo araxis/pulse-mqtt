@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.19.0 (unreleased)
+
+- Analyzer tooling: `PMQ0005` now warns when directly analyzable MQTT 3.1.1
+  client configuration sets MQTT 5-only raw client options such as outbound topic
+  aliases or enhanced authentication.
+
 ## 2.18.0
 
 - Broker matrix maintenance: successful `main` runs now close the open broker-matrix tracking

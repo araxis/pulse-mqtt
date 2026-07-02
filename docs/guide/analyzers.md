@@ -25,6 +25,7 @@ use central package management, keep the version that `dotnet add package` inser
 | `PMQ0002` | Warning | A Pulse MQTT async operation has an optional `CancellationToken`, a caller token is in scope, and the call omits it. | Pass the caller token. |
 | `PMQ0003` | Warning | A known async-owned MQTT resource is disposed through synchronous `Dispose()` or regular `using`. | Use `await using` or `DisposeAsync`. |
 | `PMQ0004` | Warning | A Pulse MQTT packet initializer explicitly sets `ProtocolVersion = MqttProtocolVersion.V311` while also setting a known MQTT 5-only packet property. | Use MQTT 5.0 or remove the MQTT 5-only property. |
+| `PMQ0005` | Warning | Directly analyzable client configuration explicitly selects MQTT 3.1.1 while setting MQTT 5-only raw client options. | Use MQTT 5.0 or remove the MQTT 5-only option. |
 
 ## Examples
 
@@ -94,6 +95,32 @@ var mqtt311Packet = new MqttPublishPacket
 `ProtocolVersion` to `V311`; runtime validation still protects codec/send paths where the protocol
 version is known later. See [MQTT protocol compatibility](../reference/protocol-compatibility).
 
+### PMQ0005: Do not use MQTT 5-only client options with MQTT 3.1.1
+
+Keep raw-client options that rely on MQTT 5 off MQTT 3.1.1 client configurations:
+
+```csharp
+// PMQ0005
+var options = new ResilientMqttClientOptions
+{
+    Connect = new MqttConnectPacket { ProtocolVersion = MqttProtocolVersion.V311 },
+    Raw = new RawMqttClientOptions { UseOutboundTopicAliases = true },
+};
+
+// OK
+var mqtt5Options = new ResilientMqttClientOptions
+{
+    Connect = new MqttConnectPacket { ProtocolVersion = MqttProtocolVersion.V500 },
+    Raw = new RawMqttClientOptions { UseOutboundTopicAliases = true },
+};
+```
+
+The same warning applies to equivalent fluent builder chains that combine
+`WithProtocolVersion(MqttProtocolVersion.V311)` or a V311 `WithConnect(...)` initializer with
+`WithRawOptions(...)` setting MQTT 5-only options such as outbound topic aliases or enhanced
+authentication. Like `PMQ0004`, this rule is intentionally conservative and does not infer protocol
+state across variables or helper methods.
+
 ## Suppression
 
 Prefer a local suppression when the code is intentionally outside the normal pattern:
@@ -111,4 +138,5 @@ dotnet_diagnostic.PMQ0001.severity = none
 dotnet_diagnostic.PMQ0002.severity = suggestion
 dotnet_diagnostic.PMQ0003.severity = warning
 dotnet_diagnostic.PMQ0004.severity = warning
+dotnet_diagnostic.PMQ0005.severity = warning
 ```

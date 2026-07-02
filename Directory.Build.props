@@ -13,7 +13,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <VersionPrefix>2.18.0</VersionPrefix>
+    <VersionPrefix>2.19.0</VersionPrefix>
     <Authors>araxis</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://araxis.github.io/pulse-mqtt/</PackageProjectUrl>
