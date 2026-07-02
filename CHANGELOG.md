@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.20.0 (unreleased)
+## 2.20.0
 
 - Extended chaos and soak coverage to the QUIC transport: the broker matrix now runs the
   reconnect-under-chaos invariant against EMQX's QUIC listener, and the soak harness accepts
