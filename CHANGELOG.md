@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.18.0 (unreleased)
+## 2.18.0
 
 - Broker matrix maintenance: successful `main` runs now close the open broker-matrix tracking
   issue after recovery with a link to the successful workflow run.
