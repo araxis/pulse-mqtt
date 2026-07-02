@@ -15,6 +15,7 @@ pipeline, serializer, transport, test, or analyzer packages only when the projec
 | `Pulse.Mqtt.Serialization.MessagePack` | [MessagePack serializer](./serialization-messagepack) | Typed payloads use compact binary messages. |
 | `Pulse.Mqtt.Serialization.Protobuf` | [Protobuf serializer](./serialization-protobuf) | Typed payloads use generated Protocol Buffers messages. |
 | `Pulse.Mqtt.Transport.WebSocket` | [WebSocket transport](./transport-websocket) | The broker is reached through `ws` or `wss`. |
+| `Pulse.Mqtt.Transport.Quic` | [QUIC transport](./transport-quic) | The broker has an MQTT-over-QUIC listener (EMQX, NanoMQ). |
 | `Pulse.Mqtt.Resilience.Polly` | [Reconnect policy](./resilience-polly) | Reconnect timing should be owned by a resilience pipeline. |
 | `Pulse.Mqtt.Testing` | [Testing](./testing) | Tests need an in-process broker. |
 | `Pulse.Mqtt.Analyzers` | [Analyzers](./analyzers) | Projects should get compile-time warnings for common MQTT usage mistakes. |

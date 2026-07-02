@@ -41,6 +41,15 @@ jobs:
             echo "STABLE=false" >> "$GITHUB_ENV"
           fi
 
+      # System.Net.Quic needs the msquic native library; without it the QUIC transport tests
+      # would be skipped instead of run.
+      - name: Install msquic
+        run: |
+          wget -q "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y libmsquic
+
       - name: Build
         run: dotnet build -c Release -p:Version=$VERSION -p:ContinuousIntegrationBuild=true
 
@@ -97,6 +106,7 @@ jobs:
               Pulse.Mqtt.Resilience.Polly \
               Pulse.Mqtt.Storage.LiteDB \
               Pulse.Mqtt.Storage.Sqlite \
+              Pulse.Mqtt.Transport.Quic \
               Pulse.Mqtt.Transport.WebSocket \
               Pulse.Mqtt.Testing \
               Pulse.Mqtt.Analyzers; do

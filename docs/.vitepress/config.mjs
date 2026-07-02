@@ -81,6 +81,7 @@ export default defineConfig({
             { text: 'MessagePack serializer', link: '/packages/serialization-messagepack' },
             { text: 'Protobuf serializer', link: '/packages/serialization-protobuf' },
             { text: 'WebSocket transport', link: '/packages/transport-websocket' },
+            { text: 'QUIC transport', link: '/packages/transport-quic' },
             { text: 'Reconnect policy', link: '/packages/resilience-polly' },
             { text: 'Testing', link: '/packages/testing' },
             { text: 'Analyzers', link: '/packages/analyzers' },

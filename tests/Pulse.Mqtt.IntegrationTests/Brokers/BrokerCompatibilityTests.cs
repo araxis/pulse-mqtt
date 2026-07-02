@@ -14,6 +14,12 @@ public sealed class MosquittoCompatibilityTests(MosquittoFixture broker) : Broke
 [Collection("emqx")]
 public sealed class EmqxCompatibilityTests(EmqxBroker broker) : BrokerCompatibilitySuite(broker);
 
+// The same suite through the QUIC listener of the same container — proves the QUIC transport
+// against a real broker, not just loopback. Requires msquic on the machine running the matrix.
+[Trait("Category", "BrokerMatrix")]
+[Collection("emqx")]
+public sealed class EmqxQuicCompatibilityTests(EmqxBroker broker) : BrokerCompatibilitySuite(new EmqxQuicBroker(broker));
+
 [Trait("Category", "BrokerMatrix")]
 [Collection("hivemq")]
 public sealed class HiveMqCompatibilityTests(HiveMqBroker broker) : BrokerCompatibilitySuite(broker);

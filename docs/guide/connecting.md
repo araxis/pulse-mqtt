@@ -84,6 +84,23 @@ new WebSocketTransportOptions
 `ConfigureClient` is still there for anything these do not cover (client certificates, cookies,
 custom keep-alive); it runs last, so it can override `Headers` and `Proxy`.
 
+## QUIC
+
+From the `Pulse.Mqtt.Transport.Quic` package (.NET 10, brokers with a QUIC listener such as
+EMQX):
+
+```csharp
+.UseTransportFactory(_ => new QuicTransportFactory(new QuicTransportOptions
+{
+    Host = "broker.example.com",
+    // Port defaults to 14567, ALPN to "mqtt"; TLS 1.3 is always on.
+}))
+```
+
+QUIC needs OS and msquic support — check `QuicTransportFactory.IsSupported` and fall back to
+TCP or WebSocket when it is `false`. Details and platform notes:
+[QUIC transport](/packages/transport-quic).
+
 ## Credentials and identity
 
 ```csharp

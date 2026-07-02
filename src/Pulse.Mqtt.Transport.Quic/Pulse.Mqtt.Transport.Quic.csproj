@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- System.Net.Quic is stable from .NET 9; net8.0 would need preview features. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Pulse.Mqtt.Transport.Quic</PackageId>
+    <Description>MQTT-over-QUIC transport for the Pulse MQTT client.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pulse.Mqtt.Core\Pulse.Mqtt.Core.csproj" />
+  </ItemGroup>
+
+</Project>

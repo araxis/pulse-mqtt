@@ -46,6 +46,14 @@ jobs:
         with:
           global-json-file: global.json
 
+      # The EMQX-over-QUIC suite needs the msquic native library on the runner.
+      - name: Install msquic
+        run: |
+          wget -q "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y libmsquic
+
       - name: Build
         run: dotnet build tests/Pulse.Mqtt.IntegrationTests/Pulse.Mqtt.IntegrationTests.csproj -c Release
 

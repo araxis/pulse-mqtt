@@ -1,0 +1,24 @@
+#nullable enable
+Pulse.Mqtt.Transport.QuicTransport
+Pulse.Mqtt.Transport.QuicTransport.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Transport.QuicTransport.Input.get -> System.IO.Pipelines.PipeReader!
+Pulse.Mqtt.Transport.QuicTransport.Output.get -> System.IO.Pipelines.PipeWriter!
+Pulse.Mqtt.Transport.QuicTransportFactory
+Pulse.Mqtt.Transport.QuicTransportFactory.ConnectAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Transport.IMqttTransport!>
+Pulse.Mqtt.Transport.QuicTransportFactory.QuicTransportFactory(Pulse.Mqtt.Transport.QuicTransportOptions! options) -> void
+Pulse.Mqtt.Transport.QuicTransportOptions
+Pulse.Mqtt.Transport.QuicTransportOptions.Alpn.get -> string!
+Pulse.Mqtt.Transport.QuicTransportOptions.Alpn.init -> void
+Pulse.Mqtt.Transport.QuicTransportOptions.ClientCertificates.get -> System.Security.Cryptography.X509Certificates.X509CertificateCollection?
+Pulse.Mqtt.Transport.QuicTransportOptions.ClientCertificates.init -> void
+Pulse.Mqtt.Transport.QuicTransportOptions.ConfigureConnection.get -> System.Action<System.Net.Quic.QuicClientConnectionOptions!>?
+Pulse.Mqtt.Transport.QuicTransportOptions.ConfigureConnection.init -> void
+Pulse.Mqtt.Transport.QuicTransportOptions.Host.get -> string!
+Pulse.Mqtt.Transport.QuicTransportOptions.Host.init -> void
+Pulse.Mqtt.Transport.QuicTransportOptions.Port.get -> int
+Pulse.Mqtt.Transport.QuicTransportOptions.Port.init -> void
+Pulse.Mqtt.Transport.QuicTransportOptions.ServerCertificateValidation.get -> System.Net.Security.RemoteCertificateValidationCallback?
+Pulse.Mqtt.Transport.QuicTransportOptions.ServerCertificateValidation.init -> void
+Pulse.Mqtt.Transport.QuicTransportOptions.TlsTargetHost.get -> string?
+Pulse.Mqtt.Transport.QuicTransportOptions.TlsTargetHost.init -> void
+static Pulse.Mqtt.Transport.QuicTransportFactory.IsSupported.get -> bool

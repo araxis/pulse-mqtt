@@ -24,6 +24,7 @@
     <Project Path="src/Pulse.Mqtt.Storage.LiteDB/Pulse.Mqtt.Storage.LiteDB.csproj" />
     <Project Path="src/Pulse.Mqtt.Storage.Sqlite/Pulse.Mqtt.Storage.Sqlite.csproj" />
     <Project Path="src/Pulse.Mqtt.Testing/Pulse.Mqtt.Testing.csproj" />
+    <Project Path="src/Pulse.Mqtt.Transport.Quic/Pulse.Mqtt.Transport.Quic.csproj" />
     <Project Path="src/Pulse.Mqtt.Transport.WebSocket/Pulse.Mqtt.Transport.WebSocket.csproj" />
   </Folder>
   <Folder Name="/tests/">

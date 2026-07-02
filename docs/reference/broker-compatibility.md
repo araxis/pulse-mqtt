@@ -10,6 +10,7 @@ the broker and the capability that regressed rather than a one-off test.
 | --- | --- | --- | --- |
 | [Eclipse Mosquitto](https://mosquitto.org/) | 2.x (`eclipse-mosquitto:2`) | `mosquitto-no-auth.conf` | Every PR and every merge |
 | [EMQX](https://www.emqx.io/) | 5.8 (`emqx/emqx:5.8`) | Default listener | PRs that touch source, merges to `main`, on demand |
+| [EMQX](https://www.emqx.io/) over QUIC | 5.8, QUIC listener on 14567/udp | Default listener | Same as EMQX; needs msquic on the machine |
 | [HiveMQ CE](https://www.hivemq.com/developers/community/) | 2024.3 (`hivemq/hivemq-ce:2024.3`) | Default listener | PRs that touch source, merges to `main`, on demand |
 
 The brokers run as [Testcontainers](https://testcontainers.com/) images, so the suite needs only
@@ -35,6 +36,10 @@ Each broker passes all of the following:
 TLS is covered separately by a dedicated integration test (`TlsIntegrationTests`) that round-trips a
 message over a real TLS connection to a Mosquitto broker configured with a generated self-signed
 certificate.
+
+The EMQX-over-QUIC row runs the identical scenario suite through the
+[QUIC transport](/packages/transport-quic) against the same EMQX container's QUIC listener, so
+transport differences cannot hide behind broker differences.
 
 ## How the matrix is gated in CI
 
