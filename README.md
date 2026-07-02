@@ -12,11 +12,38 @@ A high-performance, resilient MQTT 5.0 / 3.1.1 client for modern .NET (`net8.0` 
 Most .NET MQTT clients leave the hard parts to the application: reconnecting, re-subscribing,
 queueing while offline, routing topics to handlers, typed payloads. Pulse makes all of that
 first-class — and every major behavior is **swappable** behind a small contract, so replacing
-the reconnect policy with Polly, the offline store with a durable one, or TCP with WebSocket is
-one line, not a fork.
+the reconnect policy with Polly, the offline store with a durable one, or TCP with WebSocket or
+QUIC is one line, not a fork.
 
 **Verified Native AOT:** the full stack compiles with zero trim/AOT warnings and runs as a
 3.15 MB self-contained native binary.
+
+## Highlights
+
+- **MQTT 5.0 and 3.1.1** behind one API, with guardrails that reject v5-only features on a
+  v3.1.1 connection instead of putting invalid bytes on the wire.
+- **Resilient by default** — a supervisor reconnects, re-subscribes, drains a bounded offline
+  queue, and reports health. Terminal failures (for example `NotAuthorized`) fault *sticky*
+  rather than looping forever.
+- **Topic routing** with route templates (`sensors/{deviceId}/temp`), typed payloads, and
+  request/response with response-topic and correlation data handled for you.
+- **Swap any layer** behind a small contract: reconnect policy, retry-vs-fault decision,
+  session and offline stores, serializer, last-will generation, transport.
+- **Four transports** — TCP/TLS and an in-memory loopback in the core; WebSocket and QUIC as
+  opt-in add-ons.
+- **Durable when you need it** — SQLite or LiteDB session and offline-queue stores survive
+  restarts; the default is bounded in-memory.
+- **Bounded everywhere** — inbound, per-route, and offline queues all apply backpressure to the
+  socket instead of buffering without limit. All timing flows through `TimeProvider`.
+- **Test in memory** — an in-process broker delivers full pub/sub, QoS acknowledgements, and
+  cross-client routing in milliseconds, no container required.
+
+## Requirements
+
+- **.NET 8** or **.NET 10** for the core and most add-ons.
+- The **QUIC transport** targets **.NET 10 only** and needs the msquic native library (bundled
+  with the runtime on Windows 11+; `libmsquic` on Linux). Check
+  `QuicTransportFactory.IsSupported` and fall back to TCP or WebSocket where it is unavailable.
 
 ## Packages
 
@@ -149,7 +176,7 @@ acknowledgement failure, or broker-disconnect behavior in a workflow test? Pass
 | Offline queue | `IMessageStore` | Bounded in-memory, 4 overflow policies | A durable queue |
 | Last-will generation | `IMqttWillProvider` | Static/factory will | Per-attempt will from client context |
 | Payload format | `IMqttSerializer` | none (raw bytes) | JSON, MessagePack, Protobuf, or your own |
-| Transport | `IMqttTransportFactory` | TCP / TLS | WebSocket, or the in-memory test broker |
+| Transport | `IMqttTransportFactory` | TCP / TLS | WebSocket, QUIC, the in-memory test broker, or your own |
 
 Terminal failures (for example a broker answering `NotAuthorized`) fault the client **sticky** —
 it stops instead of retrying forever, and an explicit `ConnectAsync` recovers after the cause is
@@ -203,18 +230,34 @@ Everything is bounded: inbound queues, per-route queues, the offline queue. Back
 to the socket instead of buffering without limits. All timing goes through `TimeProvider`, so
 the whole stack is testable with a fake clock.
 
+## Broker compatibility
+
+A single conformance suite (`BrokerScenarios`) runs the same scenarios — handshake, all three
+QoS round trips, retained messages, shared subscriptions, large payloads, persistent-session
+resume, receive-maximum flow control, and topic aliases — against every supported broker, so a
+failure names the broker and the capability, not a one-off test.
+
+| Broker | How it runs |
+|---|---|
+| [Eclipse Mosquitto](https://mosquitto.org/) 2.x | Every push and merge (the fast lane) |
+| [EMQX](https://www.emqx.io/) 5.8 | Broker matrix, over both TCP and its QUIC listener |
+| [HiveMQ CE](https://www.hivemq.com/) 2024.3 | Broker matrix |
+
+Brokers run as [Testcontainers](https://testcontainers.com/) images, so the suite needs only a
+Docker daemon — no broker installs. See the
+[broker compatibility reference](docs/reference/broker-compatibility.md).
+
 ## Verification
 
-- 300+ unit tests (codec round-trips and fuzzing, QoS state machines, reconnect scenarios,
-  routing isolation, RPC) plus integration tests against a real Mosquitto broker.
+- **600+ tests**: codec round-trips and fuzzing, QoS state machines, reconnect scenarios,
+  routing isolation, and RPC as fast unit tests, plus the multi-broker conformance matrix above.
+- **Chaos and soak coverage** over both TCP and QUIC: a persistent-session publisher takes
+  random connection kills under sustained QoS 1 load and must lose nothing — verified in a
+  captured multi-thousand-message soak with flat heap and zero loss.
 - The decoder never throws anything but `MqttProtocolException`, fuzz-proven on tens of
   thousands of malformed inputs.
-- Native AOT: zero warnings; the published native smoke binary runs the full stack.
-
-## Scope notes
-
-MQTT over QUIC, broker-side feature probes, and more protocol-specific tooling are tracked as
-post-1.0 horizon items.
+- **Native AOT**: zero warnings; the published native smoke binary runs the full stack, enforced
+  in CI.
 
 ## Documentation
 
@@ -223,12 +266,12 @@ The full documentation is a VitePress site under [`docs/`](docs) — run it loca
 
 **Guides**
 - [Introduction](docs/guide/introduction.md) · [Getting started](docs/guide/getting-started.md) · [Package add-ons](docs/guide/package-add-ons.md) · [Connecting](docs/guide/connecting.md)
-- [Publishing](docs/guide/publishing.md) · [Subscribing](docs/guide/subscribing.md) · [Routing](docs/guide/routing.md) · [Typed messaging](docs/guide/typed-messaging.md) · [Request and response](docs/guide/request-response.md)
-- [Resilience](docs/guide/resilience.md) · [Lifecycle and state](docs/guide/lifecycle.md) · [Dependency injection](docs/guide/dependency-injection.md) · [Observability](docs/guide/observability.md) · [Testing](docs/guide/testing.md) · [Analyzers](docs/guide/analyzers.md)
-- [Extending the client](docs/guide/extending.md) · [The raw client](docs/guide/raw-client.md) · [Native AOT](docs/guide/native-aot.md) · [Performance](docs/guide/performance.md) · [Releasing](docs/guide/releasing.md)
+- [Publishing](docs/guide/publishing.md) · [Subscribing](docs/guide/subscribing.md) · [Routing](docs/guide/routing.md) · [Typed messaging](docs/guide/typed-messaging.md) · [Request and response](docs/guide/request-response.md) · [Fluent API](docs/guide/fluent-api.md)
+- [Resilience](docs/guide/resilience.md) · [Presence](docs/guide/presence.md) · [Lifecycle and state](docs/guide/lifecycle.md) · [Dependency injection](docs/guide/dependency-injection.md) · [Health checks](docs/guide/health-checks.md) · [Observability](docs/guide/observability.md) · [Testing](docs/guide/testing.md) · [Analyzers](docs/guide/analyzers.md)
+- [Migrating from MQTTnet](docs/guide/migrating-from-mqttnet.md) · [Extending the client](docs/guide/extending.md) · [The raw client](docs/guide/raw-client.md) · [Native AOT](docs/guide/native-aot.md) · [Performance](docs/guide/performance.md) · [Releasing](docs/guide/releasing.md)
 
 **Reference**
-- [Package docs](docs/packages/index.md) · [Packages](docs/reference/packages.md) · [Options](docs/reference/options.md) · [MQTT protocol compatibility](docs/reference/protocol-compatibility.md) · [Connection states](docs/reference/connection-states.md) · [Errors](docs/reference/errors.md)
+- [Package docs](docs/packages/index.md) · [Packages](docs/reference/packages.md) · [Options](docs/reference/options.md) · [MQTT protocol compatibility](docs/reference/protocol-compatibility.md) · [Connection states](docs/reference/connection-states.md) · [Errors](docs/reference/errors.md) · [Broker compatibility](docs/reference/broker-compatibility.md)
 
 **Project**
 - [Benchmark suite](docs/Benchmark-Suite.md) · [MQTTnet comparison](docs/Benchmark-vs-MQTTnet.md)
