@@ -688,7 +688,16 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             {
                 foreach (var filter in toSubscribe)
                 {
-                    _pendingSubscribe.Remove(filter.Topic);
+                    // Remove only the exact filter that was reconciled. A concurrent app-level
+                    // SubscribeAsync during the in-flight round-trip (where _raw is still null, so it
+                    // takes the pending path) may have re-added the same topic with different options
+                    // — a QoS upgrade, NoLocal, RetainHandling — and that newer filter must survive to
+                    // apply on the next connection-up. MqttTopicFilter is a record, so equality tells
+                    // the reconciled filter from a changed one.
+                    if (_pendingSubscribe.TryGetValue(filter.Topic, out var current) && current == filter)
+                    {
+                        _pendingSubscribe.Remove(filter.Topic);
+                    }
                 }
             }
         }
