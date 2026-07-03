@@ -341,7 +341,12 @@ public sealed class RawMqttClient : IAsyncDisposable
 
                 if (_session is { } qos1Session)
                 {
-                    await qos1Session.OutboundCompletedAsync(id, cancellationToken).ConfigureAwait(false);
+                    // The exchange is already acknowledged on the wire, so this completion bookkeeping
+                    // must run to completion regardless of the caller's token: a late publish
+                    // cancellation must not abandon it, or the finally would see settled == false and
+                    // park the id and receive-quota slot for a session entry that has already been
+                    // removed and can never be resumed — leaking both for the life of the connection.
+                    await qos1Session.OutboundCompletedAsync(id, CancellationToken.None).ConfigureAwait(false);
                 }
 
                 settled = true;
@@ -360,7 +365,9 @@ public sealed class RawMqttClient : IAsyncDisposable
             {
                 if (_session is { } rejectedSession)
                 {
-                    await rejectedSession.OutboundCompletedAsync(id, cancellationToken).ConfigureAwait(false);
+                    // Completion bookkeeping for an exchange already resolved on the wire — see the
+                    // QoS 1 path — runs on CancellationToken.None so a late cancel cannot park the id.
+                    await rejectedSession.OutboundCompletedAsync(id, CancellationToken.None).ConfigureAwait(false);
                 }
 
                 settled = true;
@@ -375,7 +382,9 @@ public sealed class RawMqttClient : IAsyncDisposable
             var reason = await ReleaseExchangeAsync(connection, id, cancellationToken).ConfigureAwait(false);
             if (_session is { } completedSession)
             {
-                await completedSession.OutboundCompletedAsync(id, cancellationToken).ConfigureAwait(false);
+                // The PUBCOMP is in; complete the bookkeeping on CancellationToken.None so a late
+                // cancel cannot park the id/quota for an entry that is already being removed.
+                await completedSession.OutboundCompletedAsync(id, CancellationToken.None).ConfigureAwait(false);
             }
 
             settled = true;

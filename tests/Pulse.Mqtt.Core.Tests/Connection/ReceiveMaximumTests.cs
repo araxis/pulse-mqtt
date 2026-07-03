@@ -173,6 +173,65 @@ public sealed class ReceiveMaximumTests
         gated.IsCompleted.ShouldBeFalse("a cancelled-but-in-flight publish must keep its receive-maximum slot until the connection re-arms");
     }
 
+    [Fact]
+    public async Task A_publish_cancelled_during_its_completion_persist_still_settles_and_frees_the_slot()
+    {
+        var persistReached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePersist = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sawSend = 0;
+        var blocked = 0;
+
+        // Block the completion persist (the removal after the ack, when Outbound is empty) once, after a
+        // send has been recorded, honoring whatever token it is handed. A completion run on the caller's
+        // token would throw here when the publish is cancelled; run on CancellationToken.None it will not.
+        var session = new MqttInFlightSession(async (state, ct) =>
+        {
+            if (state.Outbound.Count > 0)
+            {
+                Interlocked.Exchange(ref sawSend, 1);
+                return;
+            }
+
+            if (Volatile.Read(ref sawSend) == 1 && Interlocked.Exchange(ref blocked, 1) == 0)
+            {
+                persistReached.TrySetResult();
+                await Task.WhenAny(releasePersist.Task, Task.Delay(Timeout.Infinite, ct)).ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+            }
+        });
+
+        var (client, broker, timeout) = await ConnectedAsync(receiveMaximum: 1, session);
+
+        using var cancelPublish = new CancellationTokenSource();
+        var publish = Publish(client, "a", cancelPublish.Token);
+        var sent = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfType<MqttPublishPacket>();
+
+        // Acknowledge it: the exchange is now settled on the wire and the client runs its completion
+        // bookkeeping, whose persist blocks below.
+        await broker.SendAsync(
+            new MqttPublishAckPacket { PacketType = MqttPacketType.PubAck, PacketIdentifier = sent.PacketIdentifier!.Value },
+            timeout.Token);
+        await persistReached.Task.WaitAsync(timeout.Token);
+
+        // Cancel the publish while its completion persist is in flight. The wire exchange is already
+        // done, so completing it must not be abandoned: before the fix the completion ran on the caller
+        // token, so this cancel threw and left settled=false, parking the id and the only receive-maximum
+        // slot for the life of the connection (and PublishAsync threw instead of reporting the delivery).
+        cancelPublish.Cancel();
+        releasePersist.SetResult();
+
+        (await publish).ShouldBe(MqttReasonCode.Success);
+
+        // The slot the first publish held was released: a second publish flows instead of blocking on an
+        // exhausted receive-maximum window of 1.
+        var second = Publish(client, "b", timeout.Token);
+        var sentB = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfType<MqttPublishPacket>();
+        await broker.SendAsync(
+            new MqttPublishAckPacket { PacketType = MqttPacketType.PubAck, PacketIdentifier = sentB.PacketIdentifier!.Value },
+            timeout.Token);
+        (await second).ShouldBe(MqttReasonCode.Success);
+    }
+
     private static Task<MqttReasonCode> Publish(RawMqttClient client, string topic, CancellationToken cancellationToken) =>
         client.PublishAsync(
             new MqttPublishPacket { Topic = topic, Payload = new byte[] { 1 }, QualityOfService = MqttQualityOfService.AtLeastOnce },

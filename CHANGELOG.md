@@ -2,6 +2,16 @@
 
 ## 2.27.0 (unreleased)
 
+- Fixed a publish cancelled at the moment its exchange completed leaking a packet identifier and a
+  receive-maximum slot. On a persistent session, the completion bookkeeping that removes the finished
+  exchange (`OutboundCompletedAsync`) ran on the caller's cancellation token; if the caller cancelled
+  the publish just as the acknowledgement settled, that completion threw, so the code never marked the
+  exchange settled and the `finally` parked the identifier and the receive-maximum slot — for an entry
+  that had already been removed and could never be resumed. The identifier stayed reserved and the
+  send window shrank by one for the life of the connection (repeated, it exhausts the identifier space
+  and stalls publishing), self-healing only on reconnect. The completion of an already-acknowledged
+  exchange now runs on `CancellationToken.None`, so a late cancellation cannot abandon it.
+
 - Fixed the offline-queue flush double-sending a message the persistent session already held in
   flight. When a queued publish was flushed but the connection died mid-exchange, `RawMqttClient`
   raised `MqttPublishInFlightException` (the session now owns the message and redelivers it with DUP
