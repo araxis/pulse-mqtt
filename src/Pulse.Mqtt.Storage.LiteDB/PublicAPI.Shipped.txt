@@ -23,3 +23,5 @@ Pulse.Mqtt.Storage.LiteDB.LiteDbSessionStore.UpsertSubscriptionsAsync(System.Col
 Pulse.Mqtt.Storage.LiteDB.LiteDbStorageException
 Pulse.Mqtt.Storage.LiteDB.LiteDbStorageException.LiteDbStorageException(string! message) -> void
 Pulse.Mqtt.Storage.LiteDB.LiteDbStorageException.LiteDbStorageException(string! message, System.Exception! innerException) -> void
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.DateTimeOffset enqueuedAt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.PeekQueuedAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttQueuedPublish?>

@@ -23,3 +23,5 @@ Pulse.Mqtt.Storage.Sqlite.SqliteSessionStore.UpsertSubscriptionsAsync(System.Col
 Pulse.Mqtt.Storage.Sqlite.SqliteStorageException
 Pulse.Mqtt.Storage.Sqlite.SqliteStorageException.SqliteStorageException(string! message) -> void
 Pulse.Mqtt.Storage.Sqlite.SqliteStorageException.SqliteStorageException(string! message, System.Exception! innerException) -> void
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.DateTimeOffset enqueuedAt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.PeekQueuedAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttQueuedPublish?>

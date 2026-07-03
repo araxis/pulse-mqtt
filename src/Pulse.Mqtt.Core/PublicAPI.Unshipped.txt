@@ -1,16 +1,1 @@
 #nullable enable
-Pulse.Mqtt.Resilience.IMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.DateTimeOffset enqueuedAt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
-Pulse.Mqtt.Resilience.IMessageStore.PeekQueuedAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttQueuedPublish?>
-Pulse.Mqtt.Resilience.InMemoryMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.DateTimeOffset enqueuedAt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
-Pulse.Mqtt.Resilience.InMemoryMessageStore.PeekQueuedAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttQueuedPublish?>
-Pulse.Mqtt.Resilience.MqttQueuedPublish
-Pulse.Mqtt.Resilience.MqttQueuedPublish.EnqueuedAt.get -> System.DateTimeOffset?
-Pulse.Mqtt.Resilience.MqttQueuedPublish.EnqueuedAt.init -> void
-Pulse.Mqtt.Resilience.MqttQueuedPublish.MqttQueuedPublish(Pulse.Mqtt.Packets.MqttPublishPacket! Packet, System.DateTimeOffset? EnqueuedAt) -> void
-Pulse.Mqtt.Resilience.MqttQueuedPublish.Packet.get -> Pulse.Mqtt.Packets.MqttPublishPacket!
-Pulse.Mqtt.Resilience.MqttQueuedPublish.Packet.init -> void
-Pulse.Mqtt.Transport.IRedirectableTransportFactory
-Pulse.Mqtt.Transport.IRedirectableTransportFactory.WithServer(string! host, int? port) -> Pulse.Mqtt.Transport.IMqttTransportFactory!
-Pulse.Mqtt.Transport.MqttServerReference
-Pulse.Mqtt.Transport.TcpTransportFactory.WithServer(string! host, int? port) -> Pulse.Mqtt.Transport.IMqttTransportFactory!
-static Pulse.Mqtt.Transport.MqttServerReference.TryParse(string? reference, out string? host, out int? port) -> bool

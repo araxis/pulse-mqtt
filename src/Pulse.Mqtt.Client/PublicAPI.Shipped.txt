@@ -346,3 +346,7 @@ Pulse.Mqtt.Client.ResilientMqttClient.GetBrokerCapabilitiesSnapshot() -> Pulse.M
 Pulse.Mqtt.Client.ResilientMqttClient.GetProtocolFeatureSupport(Pulse.Mqtt.Protocol.MqttProtocolFeature feature) -> Pulse.Mqtt.Client.MqttBrokerFeatureSupport
 Pulse.Mqtt.Client.ResilientMqttClientOptions.WillProvider.get -> Pulse.Mqtt.Client.IMqttWillProvider?
 Pulse.Mqtt.Client.ResilientMqttClientOptions.WillProvider.init -> void
+Pulse.Mqtt.Client.ResilientMqttClientOptions.FollowServerRedirects.get -> bool
+Pulse.Mqtt.Client.ResilientMqttClientOptions.FollowServerRedirects.init -> void
+Pulse.Mqtt.Client.ResilientMqttClientOptions.MaxServerRedirects.get -> int
+Pulse.Mqtt.Client.ResilientMqttClientOptions.MaxServerRedirects.init -> void

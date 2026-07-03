@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.23.0 (unreleased)
+
 ## 2.22.0
 
 - Added a Blazor WebAssembly sample running the client in the browser over the WebSocket

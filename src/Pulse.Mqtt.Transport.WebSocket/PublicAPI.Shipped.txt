@@ -17,3 +17,4 @@ Pulse.Mqtt.Transport.WebSocketTransportOptions.SubProtocol.get -> string!
 Pulse.Mqtt.Transport.WebSocketTransportOptions.SubProtocol.init -> void
 Pulse.Mqtt.Transport.WebSocketTransportOptions.Uri.get -> System.Uri!
 Pulse.Mqtt.Transport.WebSocketTransportOptions.Uri.init -> void
+Pulse.Mqtt.Transport.WebSocketTransportFactory.WithServer(string! host, int? port) -> Pulse.Mqtt.Transport.IMqttTransportFactory!

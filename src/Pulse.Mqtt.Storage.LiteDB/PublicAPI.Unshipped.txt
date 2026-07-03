@@ -1,3 +1,1 @@
 #nullable enable
-Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.DateTimeOffset enqueuedAt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
-Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.PeekQueuedAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttQueuedPublish?>
