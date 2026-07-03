@@ -13,6 +13,7 @@ public sealed class MqttEndpoint : IAsyncDisposable
     private readonly ResilientMqttClient _client;
     private readonly IDisposable _route;
     private readonly EndpointSubscriptions _subscriptions;
+    private int _disposed;
 
     internal MqttEndpoint(
         ResilientMqttClient client,
@@ -49,6 +50,14 @@ public sealed class MqttEndpoint : IAsyncDisposable
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        // Idempotent: IAsyncDisposable may be disposed more than once (await using plus a container
+        // or explicit dispose). Without this guard a second dispose releases the subscription
+        // reference again, unsubscribing a shared filter that another live endpoint still holds.
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
         _route.Dispose();
 
         // Only release a subscription reference this endpoint actually took. A denied subscription
