@@ -713,9 +713,11 @@ public sealed class RawMqttClient : IAsyncDisposable
                     new MqttDisconnectPacket { ProtocolVersion = _protocolVersion },
                     cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is MqttException or ObjectDisposedException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // The connection is already gone; proceed with the teardown.
+                // The connection is already gone; proceed with the teardown. The exception type
+                // is the transport's choice (QuicException, SocketException, ...), so no filter
+                // can enumerate it. Only the caller's own cancellation still propagates.
             }
         }
 
@@ -1293,9 +1295,12 @@ public sealed class RawMqttClient : IAsyncDisposable
         {
             // Shutdown path.
         }
-        catch (Exception ex) when (ex is MqttException or ObjectDisposedException)
+        catch (Exception)
         {
-            // The connection failed mid-ping; the pump reports the fault to consumers.
+            // The connection failed mid-ping; the pump reports the fault to consumers. The
+            // exception type is the transport's choice (QuicException, SocketException, ...), so
+            // no filter can enumerate it — and anything escaping here faults the task that
+            // DisposeAsync awaits, making teardown of a dead client throw.
         }
     }
 }
