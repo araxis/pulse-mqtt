@@ -2,6 +2,16 @@
 
 ## 2.26.0 (unreleased)
 
+- Fixed an offline subscribe/unsubscribe being permanently lost when the connection dropped
+  mid-reconcile on a resumed session: the reconcile cleared the pending set before the broker
+  acknowledged, so an interrupted round-trip left the broker never told (and, since the broker
+  keeps resuming the session, never replayed). Each pending change is now removed only after the
+  broker acknowledges it, so an interrupted reconcile retries on the next connection-up.
+- Fixed a publish that raced the connection-up flush being stranded in the offline queue until
+  the next reconnect: it could enqueue after the flush's final scan but before the client marked
+  itself connected, seeing no live connection at both its check and its nudge. Connection-up now
+  drains the queue once more after publishing the live connection, closing the window.
+
 ## 2.25.0
 
 - Fixed the durable offline stores (`Pulse.Mqtt.Storage.Sqlite`, `Pulse.Mqtt.Storage.LiteDB`)

@@ -664,20 +664,45 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         List<string> toUnsubscribe;
         lock (_subscriptionGate)
         {
-            toSubscribe = sessionPresent ? [.. _pendingSubscribe.Values] : [];
-            toUnsubscribe = sessionPresent ? [.. _pendingUnsubscribe] : [];
-            _pendingSubscribe.Clear();
-            _pendingUnsubscribe.Clear();
+            // On a fresh session the lifecycle already replayed the full stored set, so the pending
+            // delta is moot — drop it and stop.
+            if (!sessionPresent)
+            {
+                _pendingSubscribe.Clear();
+                _pendingUnsubscribe.Clear();
+                return;
+            }
+
+            // On a resumed session the broker is missing exactly this delta. Snapshot it but LEAVE
+            // it pending: each entry is removed only after the broker acknowledges it, so a
+            // connection dropped mid-reconcile retries on the next connection-up instead of losing
+            // the change — the broker keeps resuming the session, so the lifecycle never replays it.
+            toSubscribe = [.. _pendingSubscribe.Values];
+            toUnsubscribe = [.. _pendingUnsubscribe];
         }
 
         if (toSubscribe.Count > 0)
         {
             await raw.SubscribeAsync(toSubscribe, cancellationToken).ConfigureAwait(false);
+            lock (_subscriptionGate)
+            {
+                foreach (var filter in toSubscribe)
+                {
+                    _pendingSubscribe.Remove(filter.Topic);
+                }
+            }
         }
 
         if (toUnsubscribe.Count > 0)
         {
             await raw.UnsubscribeAsync(toUnsubscribe, cancellationToken).ConfigureAwait(false);
+            lock (_subscriptionGate)
+            {
+                foreach (var topic in toUnsubscribe)
+                {
+                    _pendingUnsubscribe.Remove(topic);
+                }
+            }
         }
     }
 
@@ -1521,6 +1546,25 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 }
 
                 _raw = raw;
+
+                // A publish that raced the connection-up flush could have enqueued after that
+                // flush's final queue scan but before _raw was published just above — seeing no
+                // live connection at BOTH its initial check and its post-enqueue nudge, so it was
+                // stranded until the next reconnect. Drain once more now that _raw is set; every
+                // publish arriving from here on observes _raw and is caught by its own nudge, so
+                // this closes the window. Best-effort: the message is safely queued if it fails.
+                try
+                {
+                    await FlushQueuedGatedAsync(raw!, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    if (_options.Logger is { } flushLogger)
+                    {
+                        PulseMqttLog.QueuedPublishNudgeFailed(flushLogger, _clientId, ex);
+                    }
+                }
+
                 Transition(
                     ConnectionState.Connected,
                     brokerCapabilities: MqttBrokerCapabilitiesSnapshot.From(connAck!, _options.Connect));

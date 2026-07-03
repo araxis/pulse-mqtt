@@ -59,6 +59,51 @@ public sealed class OfflineSubscriptionReconcileTests
         Encoding.UTF8.GetString(routed.Message.Payload.Span).ShouldBe("resumed");
     }
 
+    [Fact]
+    public async Task An_offline_subscription_survives_a_connection_dropped_mid_reconcile()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var topic = $"offline/{Guid.NewGuid():N}";
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket
+            {
+                ClientId = "offsub-drop",
+                KeepAliveSeconds = 0,
+                CleanStart = false,
+                SessionExpiryInterval = 300,
+            },
+            Backoff = new BackoffOptions { BaseDelay = TimeSpan.FromMilliseconds(1), MaxDelay = TimeSpan.FromMilliseconds(5) },
+        });
+
+        // Subscribe while offline (never connected): recorded as a pending delta.
+        var template = MqttRouteTemplate.Parse(topic);
+        await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], timeout.Token);
+
+        await client.ConnectAsync(timeout.Token);
+
+        // Connection 1 resumes the session, so the reconcile sends the pending SUBSCRIBE — but the
+        // broker drops the connection after reading it and before the SUBACK.
+        var broker1 = await factory.NextBrokerAsync(timeout.Token);
+        await broker1.AcceptConnectionAsync(timeout.Token, sessionPresent: true);
+        var reconcile1 = (await broker1.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        reconcile1.TopicFilters.ShouldContain(f => f.Topic == topic);
+        await broker1.DisposeAsync(); // dropped before the SUBACK — the reconcile round-trip fails
+
+        // Connection 2 also resumes the session (so the lifecycle does not replay the stored set).
+        // Before the fix the pending delta was cleared up front, so the broker never heard the
+        // subscription again; after the fix the un-acked entry is still pending and re-sent here.
+        var broker2 = await factory.NextBrokerAsync(timeout.Token);
+        await broker2.AcceptConnectionAsync(timeout.Token, sessionPresent: true);
+        var reconcile2 = (await broker2.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        reconcile2.TopicFilters.ShouldContain(f => f.Topic == topic);
+
+        await broker2.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = reconcile2.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] },
+            timeout.Token);
+    }
+
     private static async Task WaitForStateAsync(ResilientMqttClient client, Func<ConnectionState, bool> predicate, CancellationToken cancellationToken)
     {
         while (!predicate(client.State))
