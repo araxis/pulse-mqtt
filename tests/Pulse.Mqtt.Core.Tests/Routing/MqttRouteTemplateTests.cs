@@ -89,4 +89,40 @@ public sealed class MqttRouteTemplateTests
     {
         Should.Throw<ArgumentException>(() => MqttRouteTemplate.Parse(template));
     }
+
+    [Fact]
+    public void Shared_subscription_templates_match_the_delivered_topic()
+    {
+        // The broker delivers to a '$share/<group>/<filter>' subscriber with the topic alone —
+        // the '$share/<group>/' prefix belongs in the SUBSCRIBE filter only.
+        var template = MqttRouteTemplate.Parse("$share/workers/jobs/{id:int}");
+
+        template.TopicFilter.ShouldBe("$share/workers/jobs/+");
+        template.TryMatch("jobs/42", out var values).ShouldBeTrue();
+        values["id"].ShouldBe("42");
+
+        template.TryMatch("$share/workers/jobs/42", out _).ShouldBeFalse();
+        template.TryMatch("jobs/not-a-number", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Shared_subscription_templates_support_wildcards()
+    {
+        var template = MqttRouteTemplate.Parse("$share/g/alerts/#");
+
+        template.TopicFilter.ShouldBe("$share/g/alerts/#");
+        template.TryMatch("alerts/plant/line1", out _).ShouldBeTrue();
+        template.TryMatch("$SYS/alerts/x", out _).ShouldBeFalse(); // still no $-topics via wildcards
+    }
+
+    [Theory]
+    [InlineData("$share")]           // no group, no topic
+    [InlineData("$share/g")]         // no topic
+    [InlineData("$share//x")]        // empty group
+    [InlineData("$share/{g}/x")]     // parameter as group
+    [InlineData("$share/g+h/x")]     // wildcard in group
+    public void Rejects_malformed_shared_subscription_templates(string template)
+    {
+        Should.Throw<ArgumentException>(() => MqttRouteTemplate.Parse(template));
+    }
 }

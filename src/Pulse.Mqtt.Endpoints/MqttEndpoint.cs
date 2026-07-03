@@ -6,19 +6,34 @@ namespace Pulse.Mqtt.Endpoints;
 /// <summary>
 /// One mapped endpoint: the broker subscription plus the local route created by <c>MapMqtt</c>.
 /// Await <see cref="Subscribed"/> where startup must fail fast on a denied subscription; dispose
-/// to unregister the route and unsubscribe the filter.
+/// to unregister the route and release the filter (unsubscribing when no other endpoint uses it).
 /// </summary>
 public sealed class MqttEndpoint : IAsyncDisposable
 {
     private readonly ResilientMqttClient _client;
     private readonly IDisposable _route;
+    private readonly EndpointSubscriptions _subscriptions;
 
-    internal MqttEndpoint(ResilientMqttClient client, MqttRouteTemplate template, IDisposable route, Task subscribed)
+    internal MqttEndpoint(
+        ResilientMqttClient client,
+        MqttRouteTemplate template,
+        IDisposable route,
+        EndpointSubscriptions subscriptions,
+        Task subscribed)
     {
         _client = client;
         _route = route;
+        _subscriptions = subscriptions;
         Template = template;
         Subscribed = subscribed;
+
+        // Awaiting Subscribed is documented as optional, so a denial must not surface as an
+        // UnobservedTaskException at finalization; observing here leaves awaiters unaffected.
+        _ = subscribed.ContinueWith(
+            static task => _ = task.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     /// <summary>The endpoint's route template.</summary>
@@ -37,7 +52,7 @@ public sealed class MqttEndpoint : IAsyncDisposable
         _route.Dispose();
         try
         {
-            await _client.UnsubscribeAsync([Template.TopicFilter], CancellationToken.None).ConfigureAwait(false);
+            await _subscriptions.ReleaseAsync(_client, Template.TopicFilter).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is MqttException or InvalidOperationException or ObjectDisposedException)
         {

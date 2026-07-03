@@ -565,6 +565,23 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         }
 
         var segments = template.Split('/');
+
+        if (segments[0] == "$share")
+        {
+            if (segments.Length < 3)
+            {
+                error = "a shared subscription needs a group and a topic ('$share/<group>/<topic>')";
+                return false;
+            }
+
+            var group = segments[1];
+            if (group.Length == 0 || group.IndexOfAny(['+', '#', '{', '}']) >= 0)
+            {
+                error = "the shared subscription group must be a non-empty literal";
+                return false;
+            }
+        }
+
         for (var i = 0; i < segments.Length; i++)
         {
             var segment = segments[i];

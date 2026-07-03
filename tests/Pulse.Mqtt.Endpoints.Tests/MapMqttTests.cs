@@ -210,6 +210,105 @@ public sealed class MapMqttTests
         denied.Message.ShouldContain("NotAuthorized");
     }
 
+    [Fact]
+    public async Task Disposing_one_endpoint_keeps_a_shared_filter_alive()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await using var broker = new PulseMqttTestBroker();
+        await using var client = NewClient(broker);
+        await client.ConnectAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        // Distinct templates, one broker filter (alerts/+): disposing either endpoint must not
+        // starve the other.
+        var survivorSeen = new SemaphoreSlim(0);
+        var survivorCount = 0;
+        var survivor = client.MapMqtt("alerts/{level}", _ =>
+        {
+            Interlocked.Increment(ref survivorCount);
+            survivorSeen.Release();
+            return ValueTask.CompletedTask;
+        });
+        var disposed = client.MapMqtt("alerts/{severity}", _ => ValueTask.CompletedTask);
+        await survivor.Subscribed.WaitAsync(timeout.Token);
+        await disposed.Subscribed.WaitAsync(timeout.Token);
+
+        await using var publisher = NewClient(broker);
+        await publisher.ConnectAsync(timeout.Token);
+        await publisher.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+        await publisher.PublishAsync(
+            new MqttPublishPacket { Topic = "alerts/red", Payload = "x"u8.ToArray(), QualityOfService = MqttQualityOfService.AtLeastOnce }, timeout.Token);
+        await survivorSeen.WaitAsync(timeout.Token);
+
+        await disposed.DisposeAsync();
+
+        await publisher.PublishAsync(
+            new MqttPublishPacket { Topic = "alerts/orange", Payload = "y"u8.ToArray(), QualityOfService = MqttQualityOfService.AtLeastOnce }, timeout.Token);
+        await survivorSeen.WaitAsync(timeout.Token); // starved forever before the refcount fix
+
+        // The last endpoint's disposal still releases the broker subscription.
+        await survivor.DisposeAsync();
+        await publisher.PublishAsync(
+            new MqttPublishPacket { Topic = "alerts/black", Payload = "z"u8.ToArray(), QualityOfService = MqttQualityOfService.AtLeastOnce }, timeout.Token);
+        await Task.Delay(200, timeout.Token);
+
+        survivorCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_denied_subscription_does_not_raise_unobserved_exceptions()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+        {
+            SubAckFactory = context => context.DefaultSubAck with
+            {
+                ReasonCodes = [.. context.Subscribe.TopicFilters.Select(_ => MqttReasonCode.NotAuthorized)],
+            },
+        });
+        await using var client = NewClient(broker);
+        await client.ConnectAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var unobserved = 0;
+        EventHandler<UnobservedTaskExceptionEventArgs> handler = (_, args) =>
+        {
+            if (args.Exception.InnerExceptions.Any(inner => inner is MqttException m && m.Message.Contains("unobserved-secret")))
+            {
+                Interlocked.Increment(ref unobserved);
+            }
+        };
+        TaskScheduler.UnobservedTaskException += handler;
+        try
+        {
+            await MapAndAbandonDeniedEndpointAsync(client, timeout.Token);
+            for (var i = 0; i < 3; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+
+            unobserved.ShouldBe(0);
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= handler;
+        }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static async Task MapAndAbandonDeniedEndpointAsync(ResilientMqttClient client, CancellationToken token)
+    {
+        // Awaiting Subscribed is documented as optional: fault the task without ever observing
+        // it, then abandon the endpoint so finalization would surface an unobserved exception.
+        var endpoint = client.MapMqtt("unobserved-secret/{area}", _ => ValueTask.CompletedTask);
+        while (!endpoint.Subscribed.IsFaulted)
+        {
+            token.ThrowIfCancellationRequested();
+            await Task.Delay(10, token);
+        }
+    }
+
     private static void WaitForDisposal(List<ScopeWitness> witnesses, CancellationToken token)
     {
         while (true)
