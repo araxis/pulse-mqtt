@@ -6,7 +6,7 @@ namespace Pulse.Mqtt.Resilience;
 public sealed class InMemoryMessageStore : IMessageStore
 {
     private readonly OfflineQueueOptions _options;
-    private readonly Queue<MqttPublishPacket> _queue = new();
+    private readonly Queue<MqttQueuedPublish> _queue = new();
     private readonly SemaphoreSlim _space;
     private readonly object _gate = new();
     private long _dropped;
@@ -37,9 +37,16 @@ public sealed class InMemoryMessageStore : IMessageStore
     public long DroppedCount => Interlocked.Read(ref _dropped);
 
     /// <inheritdoc />
-    public async ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
+    public ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken) =>
+        EnqueueCoreAsync(new MqttQueuedPublish(packet, EnqueuedAt: null), cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask EnqueueAsync(MqttPublishPacket packet, DateTimeOffset enqueuedAt, CancellationToken cancellationToken) =>
+        EnqueueCoreAsync(new MqttQueuedPublish(packet, enqueuedAt), cancellationToken);
+
+    private async ValueTask EnqueueCoreAsync(MqttQueuedPublish entry, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(packet);
+        ArgumentNullException.ThrowIfNull(entry.Packet);
 
         switch (_options.Overflow)
         {
@@ -62,7 +69,7 @@ public sealed class InMemoryMessageStore : IMessageStore
 
                 lock (_gate)
                 {
-                    _queue.Enqueue(packet);
+                    _queue.Enqueue(entry);
                 }
 
                 return;
@@ -72,7 +79,7 @@ public sealed class InMemoryMessageStore : IMessageStore
                 {
                     lock (_gate)
                     {
-                        _queue.Enqueue(packet);
+                        _queue.Enqueue(entry);
                     }
                 }
                 else
@@ -85,7 +92,7 @@ public sealed class InMemoryMessageStore : IMessageStore
                             _queue.Dequeue();
                         }
 
-                        _queue.Enqueue(packet);
+                        _queue.Enqueue(entry);
                     }
 
                     Interlocked.Increment(ref _dropped);
@@ -98,7 +105,7 @@ public sealed class InMemoryMessageStore : IMessageStore
                 {
                     lock (_gate)
                     {
-                        _queue.Enqueue(packet);
+                        _queue.Enqueue(entry);
                     }
                 }
                 else
@@ -117,7 +124,7 @@ public sealed class InMemoryMessageStore : IMessageStore
 
                 lock (_gate)
                 {
-                    _queue.Enqueue(packet);
+                    _queue.Enqueue(entry);
                 }
 
                 return;
@@ -129,6 +136,15 @@ public sealed class InMemoryMessageStore : IMessageStore
 
     /// <inheritdoc />
     public ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            return ValueTask.FromResult(_queue.TryPeek(out var head) ? head.Packet : null);
+        }
+    }
+
+    /// <inheritdoc />
+    public ValueTask<MqttQueuedPublish?> PeekQueuedAsync(CancellationToken cancellationToken)
     {
         lock (_gate)
         {
