@@ -74,7 +74,7 @@ public sealed class QuicTransport : IMqttTransport
 }
 
 /// <summary>Connects <see cref="QuicTransport"/> instances from <see cref="QuicTransportOptions"/>.</summary>
-public sealed class QuicTransportFactory : IMqttTransportFactory
+public sealed class QuicTransportFactory : IMqttTransportFactory, IRedirectableTransportFactory
 {
     private readonly QuicTransportOptions _options;
 
@@ -83,6 +83,14 @@ public sealed class QuicTransportFactory : IMqttTransportFactory
     {
         ArgumentNullException.ThrowIfNull(options);
         _options = options;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>An explicitly pinned <see cref="QuicTransportOptions.TlsTargetHost"/> stays pinned.</remarks>
+    public IMqttTransportFactory WithServer(string host, int? port)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(host);
+        return new QuicTransportFactory(_options with { Host = host, Port = port ?? _options.Port });
     }
 
     /// <summary>

@@ -9,3 +9,8 @@ Pulse.Mqtt.Resilience.MqttQueuedPublish.EnqueuedAt.init -> void
 Pulse.Mqtt.Resilience.MqttQueuedPublish.MqttQueuedPublish(Pulse.Mqtt.Packets.MqttPublishPacket! Packet, System.DateTimeOffset? EnqueuedAt) -> void
 Pulse.Mqtt.Resilience.MqttQueuedPublish.Packet.get -> Pulse.Mqtt.Packets.MqttPublishPacket!
 Pulse.Mqtt.Resilience.MqttQueuedPublish.Packet.init -> void
+Pulse.Mqtt.Transport.IRedirectableTransportFactory
+Pulse.Mqtt.Transport.IRedirectableTransportFactory.WithServer(string! host, int? port) -> Pulse.Mqtt.Transport.IMqttTransportFactory!
+Pulse.Mqtt.Transport.MqttServerReference
+Pulse.Mqtt.Transport.TcpTransportFactory.WithServer(string! host, int? port) -> Pulse.Mqtt.Transport.IMqttTransportFactory!
+static Pulse.Mqtt.Transport.MqttServerReference.TryParse(string? reference, out string? host, out int? port) -> bool
