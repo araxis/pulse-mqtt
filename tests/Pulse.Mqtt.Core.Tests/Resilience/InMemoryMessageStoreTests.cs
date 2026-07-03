@@ -1,3 +1,4 @@
+using System.Linq;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Resilience;
 using Shouldly;
@@ -57,6 +58,52 @@ public sealed class InMemoryMessageStoreTests
 
         store.Count.ShouldBe(2);
         (await store.PeekAsync(CancellationToken.None))!.Topic.ShouldBe("b"); // 'b' preserved, still to send
+    }
+
+    [Fact]
+    public async Task Drop_oldest_never_admits_more_than_capacity_under_concurrent_removal()
+    {
+        const int capacity = 2;
+        var store = NewStore(capacity, OverflowPolicy.DropOldest);
+
+        // Prime to full so enqueues take the evict path and removals free real slots.
+        for (var i = 0; i < capacity; i++)
+        {
+            await store.EnqueueAsync(Packet("seed"), CancellationToken.None);
+        }
+
+        var overflowObserved = 0;
+        using var run = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+        var enqueuers = Enumerable.Range(0, 4).Select(_ => Task.Run(async () =>
+        {
+            while (!run.IsCancellationRequested)
+            {
+                await store.EnqueueAsync(Packet("x"), CancellationToken.None);
+                var count = store.Count;
+                if (count > capacity)
+                {
+                    Interlocked.Exchange(ref overflowObserved, count);
+                }
+            }
+        })).ToArray();
+
+        var removers = Enumerable.Range(0, 4).Select(_ => Task.Run(async () =>
+        {
+            while (!run.IsCancellationRequested)
+            {
+                await store.RemoveHeadAsync(CancellationToken.None);
+            }
+        })).ToArray();
+
+        await Task.WhenAll(enqueuers.Concat(removers));
+
+        // The capacity bound must hold at all times. Before the fix, the DropOldest evict path decided
+        // "full" on a Wait(0) taken outside the lock, so a removal could free a slot between that check
+        // and the enqueue; the enqueue then added an entry without consuming the freed permit — leaking
+        // a permit so the queue admits more than Capacity entries and grows unbounded.
+        Volatile.Read(ref overflowObserved).ShouldBe(0);
+        store.Count.ShouldBeLessThanOrEqualTo(capacity);
     }
 
     [Fact]

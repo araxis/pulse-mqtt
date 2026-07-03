@@ -76,27 +76,27 @@ public sealed class InMemoryMessageStore : IMessageStore
                 return;
 
             case OverflowPolicy.DropOldest:
-                if (_space.Wait(0, cancellationToken))
+                cancellationToken.ThrowIfCancellationRequested();
+                lock (_gate)
                 {
-                    lock (_gate)
+                    // Decide evict-vs-take-slot atomically under the lock. Wait(0) is non-blocking, so
+                    // it is safe to call here, and because the removers release their permit under the
+                    // same lock, permit == 0 is exactly equivalent to "queue is full" at this instant.
+                    // Making the check outside the lock (as before) let a concurrent drain free a slot
+                    // between the check and the enqueue, so this branch enqueued without consuming the
+                    // freed permit — leaking a permit and admitting more than Capacity entries.
+                    if (_space.Wait(0))
                     {
                         _queue.Enqueue(entry with { Sequence = ++_nextSequence });
                     }
-                }
-                else
-                {
-                    // Evict the head and take its slot; the semaphore count is unchanged.
-                    lock (_gate)
+                    else
                     {
-                        if (_queue.Count > 0)
-                        {
-                            _queue.Dequeue();
-                        }
-
+                        // Full: evict the head and reuse its slot, leaving both the queue length and
+                        // the permit count unchanged.
+                        _queue.Dequeue();
                         _queue.Enqueue(entry with { Sequence = ++_nextSequence });
+                        Interlocked.Increment(ref _dropped);
                     }
-
-                    Interlocked.Increment(ref _dropped);
                 }
 
                 return;
@@ -164,9 +164,13 @@ public sealed class InMemoryMessageStore : IMessageStore
             }
 
             _queue.Dequeue();
+
+            // Release the permit under the same lock as the dequeue so the queue length and the
+            // permit count are never transiently inconsistent — the DropOldest enqueue path relies
+            // on permit == 0 meaning exactly "full" while it holds the lock.
+            _space.Release();
         }
 
-        _space.Release();
         return ValueTask.CompletedTask;
     }
 
@@ -186,25 +190,27 @@ public sealed class InMemoryMessageStore : IMessageStore
             }
 
             _queue.Dequeue();
+
+            // Release under the lock — see RemoveHeadAsync.
+            _space.Release();
         }
 
-        _space.Release();
         return ValueTask.CompletedTask;
     }
 
     /// <inheritdoc />
     public ValueTask ClearAsync(CancellationToken cancellationToken)
     {
-        int removed;
         lock (_gate)
         {
-            removed = _queue.Count;
+            var removed = _queue.Count;
             _queue.Clear();
-        }
 
-        if (removed > 0)
-        {
-            _space.Release(removed);
+            // Release under the lock — see RemoveHeadAsync.
+            if (removed > 0)
+            {
+                _space.Release(removed);
+            }
         }
 
         return ValueTask.CompletedTask;

@@ -2,6 +2,15 @@
 
 ## 2.27.0 (unreleased)
 
+- Fixed the in-memory offline queue leaking capacity under `OverflowPolicy.DropOldest`: the evict path
+  decided the queue was full using a `SemaphoreSlim.Wait(0)` taken *outside* the queue lock, then
+  evicted and enqueued under the lock. If a concurrent removal (e.g. the connection-up flush) freed a
+  slot in that window, the enqueue added an entry without consuming the freed permit — permanently
+  leaking a permit, so the queue admitted more than `Capacity` entries and grew unbounded (a milder
+  interleaving spuriously dropped a live message when a slot was actually free). The full-check and
+  the enqueue are now atomic under the lock, and the removers release their permit under the same lock
+  so the permit count and queue length are never transiently inconsistent.
+
 - Fixed `MqttEndpoint.DisposeAsync` (Pulse.Mqtt.Endpoints) not being idempotent: disposing the same
   endpoint twice released its shared-subscription reference twice, so when two endpoints shared one
   broker filter (e.g. `alerts/{level}` and `alerts/{severity}` both subscribing `alerts/+`) a
