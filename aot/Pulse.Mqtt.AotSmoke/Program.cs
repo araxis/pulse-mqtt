@@ -5,6 +5,7 @@ using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Resilience;
 using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Serialization.Json;
+using Pulse.Mqtt.Endpoints;
 using Pulse.Mqtt.Testing;
 
 // Exercises the full public stack — broker, resilient client, routing, typed messaging — so
@@ -34,6 +35,29 @@ using var route = client.RegisterRoute<SmokeReading>(template, (value, _, _) =>
 
 var outcome = await client.PublishAsync("smoke/1", new SmokeReading("aot", 1.0), MqttQualityOfService.AtLeastOnce, cancellationToken: timeout.Token);
 var reading = await received.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+// The endpoints layer must survive full AOT too: constrained template, typed route access.
+var mapped = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+await using (var endpoint = client.MapMqtt("smoke/{id:int}/mapped", context =>
+{
+    mapped.TrySetResult(context.Route.GetInt("id"));
+    return ValueTask.CompletedTask;
+}))
+{
+    await endpoint.Subscribed.WaitAsync(timeout.Token);
+    await client.PublishAsync(
+        new Pulse.Mqtt.Packets.MqttPublishPacket
+        {
+            Topic = "smoke/7/mapped",
+            Payload = "x"u8.ToArray(),
+            QualityOfService = MqttQualityOfService.AtLeastOnce,
+        },
+        timeout.Token);
+    if (await mapped.Task.WaitAsync(TimeSpan.FromSeconds(10)) != 7)
+    {
+        throw new InvalidOperationException("MapMqtt did not deliver the constrained route value.");
+    }
+}
 
 await client.DisconnectAsync(timeout.Token);
 Console.WriteLine($"Smoke passed: disposition={outcome.Disposition}, value={reading.Value}, state={client.State}");
