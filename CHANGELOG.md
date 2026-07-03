@@ -2,6 +2,9 @@
 
 ## 2.22.0 (unreleased)
 
+- `DuplexPipeTransport` disposal now completes its pipes asynchronously and tolerates already
+  completed or faulted pipes, matching the teardown behavior of the other transports.
+
 ## 2.21.0
 
 - Fixed the QUIC transport silently dropping quiet connections: msquic's default 30-second
