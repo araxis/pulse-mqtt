@@ -250,7 +250,7 @@ public sealed class MapMqttGeneratorTests
     [Fact]
     public void Templates_the_runtime_rejects_are_compile_errors()
     {
-        foreach (var template in new[] { "sensors/#/data", "rooms/a{b}c/x", "rooms/{a{b}/x" })
+        foreach (var template in new[] { "sensors/#/data", "rooms/a{b}c/x", "rooms/{a{b}/x", "$share/g", "$share/{g}/x" })
         {
             var (diagnostics, emitted) = Run($$"""
                 client.MapMqtt("{{template}}", (Reading reading) => { });
@@ -259,6 +259,17 @@ public sealed class MapMqttGeneratorTests
             diagnostics.ShouldHaveSingleItem($"template '{template}'").Id.ShouldBe("PMQE005");
             emitted.ShouldBeFalse();
         }
+    }
+
+    [Fact]
+    public void Shared_subscription_templates_generate_cleanly()
+    {
+        var (diagnostics, emitted) = Run("""
+            client.MapMqtt("$share/workers/jobs/{id:int}", (int id, Reading reading) => { });
+            """);
+
+        diagnostics.ShouldBeEmpty();
+        emitted.ShouldBeTrue();
     }
 
     [Fact]

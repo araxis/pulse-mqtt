@@ -20,6 +20,7 @@ public sealed class MqttRouteTemplate
     private readonly MqttRouteConstraint[] _constraints;
     private readonly string[] _parameterNames;
     private readonly MqttRouteConstraint[] _parameterConstraints;
+    private readonly int _matchStart;
 
     private MqttRouteTemplate(
         string template,
@@ -28,7 +29,8 @@ public sealed class MqttRouteTemplate
         SegmentKind[] kinds,
         MqttRouteConstraint[] constraints,
         string[] parameterNames,
-        MqttRouteConstraint[] parameterConstraints)
+        MqttRouteConstraint[] parameterConstraints,
+        int matchStart)
     {
         Template = template;
         TopicFilter = topicFilter;
@@ -37,6 +39,7 @@ public sealed class MqttRouteTemplate
         _constraints = constraints;
         _parameterNames = parameterNames;
         _parameterConstraints = parameterConstraints;
+        _matchStart = matchStart;
     }
 
     /// <summary>The original template text.</summary>
@@ -77,6 +80,30 @@ public sealed class MqttRouteTemplate
         var constraints = new MqttRouteConstraint[rawSegments.Length];
         var parameterNames = new List<string>();
         var parameterConstraints = new List<MqttRouteConstraint>();
+
+        // Shared subscriptions: the broker delivers to a '$share/<group>/<filter>' subscriber
+        // with the topic alone — no '$share/<group>/' prefix — so those two levels belong in
+        // the SUBSCRIBE filter but must be skipped when matching incoming topics.
+        var matchStart = 0;
+        if (rawSegments[0] == "$share")
+        {
+            if (rawSegments.Length < 3)
+            {
+                throw new ArgumentException(
+                    $"A shared subscription needs a group and a topic ('$share/<group>/<topic>'): '{template}'.",
+                    nameof(template));
+            }
+
+            var group = rawSegments[1];
+            if (group.Length == 0 || group.AsSpan().IndexOfAny("+#{}") >= 0)
+            {
+                throw new ArgumentException(
+                    $"The shared subscription group in '{template}' must be a non-empty literal.",
+                    nameof(template));
+            }
+
+            matchStart = 2;
+        }
 
         for (var i = 0; i < rawSegments.Length; i++)
         {
@@ -173,7 +200,8 @@ public sealed class MqttRouteTemplate
             kinds,
             constraints,
             [.. parameterNames],
-            [.. parameterConstraints]);
+            [.. parameterConstraints],
+            matchStart);
     }
 
     /// <summary>Attempts to match <paramref name="topic"/>, capturing parameter values on success.</summary>
@@ -183,7 +211,9 @@ public sealed class MqttRouteTemplate
         values = MqttRouteValues.Empty;
 
         // Wildcard/parameter templates must not match $-prefixed topics, mirroring filter rules.
-        if (topic.StartsWith('$') && _kinds[0] != SegmentKind.Literal)
+        // For a shared subscription the first matched level sits past the '$share/<group>/'
+        // prefix, which never appears in delivered topics.
+        if (topic.StartsWith('$') && _kinds[_matchStart] != SegmentKind.Literal)
         {
             return false;
         }
@@ -192,7 +222,7 @@ public sealed class MqttRouteTemplate
         var captureIndex = 0;
 
         ReadOnlySpan<char> remaining = topic;
-        for (var i = 0; i < _segments.Length; i++)
+        for (var i = _matchStart; i < _segments.Length; i++)
         {
             if (_kinds[i] == SegmentKind.MultiLevelWildcard)
             {

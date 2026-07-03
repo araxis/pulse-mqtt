@@ -81,21 +81,14 @@ public static class PulseMqttEndpointExtensions
             endpointOptions.RetainAsPublished,
             endpointOptions.RetainHandling);
 
-        return new MqttEndpoint(client, route, registration, SubscribeAsync(client, route, filter));
-    }
-
-    private static async Task SubscribeAsync(
-        ResilientMqttClient client,
-        MqttRouteTemplate route,
-        MqttTopicFilter filter)
-    {
-        // An empty result means the client was offline and queued the subscription for the next
-        // connection — the endpoint is live either way. A failure reason code is a denial.
-        var granted = await client.SubscribeAsync([filter], CancellationToken.None).ConfigureAwait(false);
-        if (granted.Count > 0 && (byte)granted[0] >= 0x80)
-        {
-            throw new MqttException($"The broker denied the subscription for '{route.Template}': {granted[0]}.");
-        }
+        // Subscriptions are reference-counted per client: distinct templates can share one
+        // filter, and only the last endpoint's disposal may unsubscribe it. An empty grant
+        // result means the client was offline and queued the subscription for the next
+        // connection — the endpoint is live either way; a failure reason code is a denial.
+        var subscriptions = EndpointSubscriptions.For(client);
+        return new MqttEndpoint(
+            client, route, registration, subscriptions,
+            subscriptions.SubscribeAsync(client, route, filter));
     }
 
     /// <summary>Runs each invocation in its own service scope when a provider is present.</summary>

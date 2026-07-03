@@ -2,6 +2,17 @@
 
 ## 2.25.0 (unreleased)
 
+- Fixed disposing a `MapMqtt` endpoint silently starving another endpoint on the same topic
+  filter (`a/{x}` and `a/{y}` both subscribe `a/+`): endpoint subscriptions are now
+  reference-counted per client, and the broker filter is released only with the last endpoint
+  using it.
+- Shared subscription route templates (`$share/<group>/...`) now dispatch: matching skips the
+  `$share/<group>/` prefix, which the broker never includes in delivered topics — previously
+  such routes subscribed successfully and then received nothing. Malformed `$share` templates
+  (missing group or topic, wildcard/parameter group) are rejected at parse time and by the
+  generator (`PMQE005`).
+- A denied `MapMqtt` subscription no longer surfaces as an `UnobservedTaskException` at
+  finalization when `Subscribed` is not awaited (awaiting still throws).
 - An adversarial audit of the `MapMqtt` generator closed every found gap in its "unbindable
   call sites are compile errors" contract: named/reordered arguments now bind by name instead
   of being misread positionally; templates the runtime parser rejects (`#` not last, literals
