@@ -207,6 +207,32 @@ public sealed class LiteDbMessageStoreTests
         Should.Throw<ArgumentOutOfRangeException>(() => new LiteDbMessageStore(database.Path, new OfflineQueueOptions { Capacity = 0 }));
     }
 
+    [Fact]
+    public async Task Enqueue_time_survives_the_round_trip()
+    {
+        using var database = new TempDatabase();
+        await using var store = new LiteDbMessageStore(database.Path, Unbounded);
+
+        var stamp = new DateTimeOffset(2026, 7, 3, 12, 0, 0, TimeSpan.Zero);
+        await store.EnqueueAsync(Publish("stamped"), stamp, CancellationToken.None);
+
+        var entry = (await store.PeekQueuedAsync(CancellationToken.None))!;
+        entry.Packet.Topic.ShouldBe("stamped");
+        entry.EnqueuedAt.ShouldBe(stamp);
+    }
+
+    [Fact]
+    public async Task Legacy_enqueue_yields_no_stamp()
+    {
+        using var database = new TempDatabase();
+        await using var store = new LiteDbMessageStore(database.Path, Unbounded);
+
+        await store.EnqueueAsync(Publish("legacy"), CancellationToken.None);
+
+        var entry = (await store.PeekQueuedAsync(CancellationToken.None))!;
+        entry.EnqueuedAt.ShouldBeNull();
+    }
+
     private static MqttPublishPacket Publish(string topic, string payload = "x", MqttQualityOfService qos = MqttQualityOfService.AtLeastOnce) => new()
     {
         Topic = topic,
