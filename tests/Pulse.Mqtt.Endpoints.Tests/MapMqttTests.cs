@@ -256,6 +256,58 @@ public sealed class MapMqttTests
     }
 
     [Fact]
+    public async Task Disposing_a_denied_endpoint_does_not_unsubscribe_a_granted_shared_filter()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        // Grant the first SUBSCRIBE (the survivor) and deny every later one (the denied endpoint).
+        var subscribeCount = 0;
+        await using var broker = new PulseMqttTestBroker(new PulseMqttTestBrokerOptions
+        {
+            SubAckFactory = context => Interlocked.Increment(ref subscribeCount) == 1
+                ? context.DefaultSubAck
+                : context.DefaultSubAck with
+                {
+                    ReasonCodes = [.. context.Subscribe.TopicFilters.Select(_ => MqttReasonCode.NotAuthorized)],
+                },
+        });
+        await using var client = NewClient(broker);
+        await client.ConnectAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        // Two distinct templates, one broker filter (alerts/+). The survivor is granted; a second
+        // endpoint on the same filter is denied and takes no reference. Disposing the denied
+        // endpoint must not release the survivor's reference and unsubscribe alerts/+.
+        var survivorSeen = new SemaphoreSlim(0);
+        var survivorCount = 0;
+        var survivor = client.MapMqtt("alerts/{level}", _ =>
+        {
+            Interlocked.Increment(ref survivorCount);
+            survivorSeen.Release();
+            return ValueTask.CompletedTask;
+        });
+        await survivor.Subscribed.WaitAsync(timeout.Token);
+
+        var denied = client.MapMqtt("alerts/{severity}", _ => ValueTask.CompletedTask);
+        await Should.ThrowAsync<MqttException>(() => denied.Subscribed.WaitAsync(timeout.Token));
+
+        await using var publisher = NewClient(broker);
+        await publisher.ConnectAsync(timeout.Token);
+        await publisher.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+        await publisher.PublishAsync(
+            new MqttPublishPacket { Topic = "alerts/red", Payload = "x"u8.ToArray(), QualityOfService = MqttQualityOfService.AtLeastOnce }, timeout.Token);
+        await survivorSeen.WaitAsync(timeout.Token);
+
+        await denied.DisposeAsync(); // must NOT unsubscribe alerts/+ — the denied endpoint holds no reference
+
+        await publisher.PublishAsync(
+            new MqttPublishPacket { Topic = "alerts/orange", Payload = "y"u8.ToArray(), QualityOfService = MqttQualityOfService.AtLeastOnce }, timeout.Token);
+        await survivorSeen.WaitAsync(timeout.Token); // starved forever before the fix
+
+        survivorCount.ShouldBe(2);
+        await survivor.DisposeAsync();
+    }
+
+    [Fact]
     public async Task A_denied_subscription_does_not_raise_unobserved_exceptions()
     {
         using var timeout = new CancellationTokenSource(SafetyTimeout);

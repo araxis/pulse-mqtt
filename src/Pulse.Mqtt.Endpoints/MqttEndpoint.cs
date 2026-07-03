@@ -50,6 +50,22 @@ public sealed class MqttEndpoint : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _route.Dispose();
+
+        // Only release a subscription reference this endpoint actually took. A denied subscription
+        // faults Subscribed and takes no reference (SubscribeAsync throws before the increment), so
+        // releasing here would decrement — and possibly unsubscribe — a filter another endpoint
+        // still holds. Awaiting Subscribed first also preserves gate ordering: the subscribe is
+        // enqueued on the shared gate before this release.
+        try
+        {
+            await Subscribed.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Denied (or otherwise never subscribed): no reference to release.
+            return;
+        }
+
         try
         {
             await _subscriptions.ReleaseAsync(_client, Template.TopicFilter).ConfigureAwait(false);

@@ -411,9 +411,14 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             {
                 await FlushQueuedGatedAsync(liveNow, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is MqttException or InvalidOperationException or ObjectDisposedException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // The connection died again; the next connection-up flush drains the queue.
+                // The connection died again while nudging the queue. The message the caller asked
+                // to publish is already enqueued (the outcome below is Queued), so a connection-death
+                // exception from this best-effort flush must not escape — and the type is the
+                // transport's choice (MqttException, IOException, SocketException, QuicException, ...),
+                // so it cannot be enumerated. The next connection-up flush drains the queue.
+                // Caller cancellation still propagates.
             }
         }
 
