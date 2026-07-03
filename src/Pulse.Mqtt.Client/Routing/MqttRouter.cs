@@ -10,10 +10,28 @@ namespace Pulse.Mqtt.Client;
 public delegate ValueTask MqttRouteHandler(MqttPublishPacket message, MqttRouteValues values, CancellationToken cancellationToken);
 
 /// <summary>
-/// Dispatches received messages to registered route templates. Each route has its own bounded
-/// queue and consumers, so a slow handler does not stall other routes (within its queue capacity).
-/// Handler failures surface through <see cref="HandlerFaulted"/> and never stop dispatch.
+/// Dispatches received messages to registered route templates. Handler and stream routes each have
+/// their own bounded queue and consumers, so a slow one does not stall other routes within its
+/// capacity, and a lossy overflow policy (<see cref="RouteOverflow.DropOldest"/> /
+/// <see cref="RouteOverflow.DropNewest"/>) isolates it entirely. Handler failures surface through
+/// <see cref="HandlerFaulted"/> and never stop dispatch.
 /// </summary>
+/// <remarks>
+/// Acknowledged route streams are the deliberate exception. They are lossless by construction — a
+/// message is not released until the consumer acknowledges it, so they forbid the drop policies —
+/// and they are delivered on the shared inbound sink so acknowledgement stays ordered against the
+/// connection. A stalled acknowledged consumer therefore applies backpressure to the <em>whole
+/// client</em> once its queue fills, not just to its own route: one MQTT connection multiplexes
+/// every topic over one byte stream, and a PUBLISH must be read and parsed before its route is even
+/// known, so there is no way to stop pulling one route's messages without stopping the socket. This
+/// is intrinsic to lossless delivery over a single connection, not a defect. Two things keep it from
+/// biting: size an acknowledged route's <see cref="MqttRouteOptions.Capacity"/> at or above the
+/// client's advertised Receive Maximum (the client defaults it to that) so the broker's in-flight
+/// window throttles before the queue fills; and a
+/// <c>pulse.mqtt.client.route.acknowledged.backpressure</c> metric fires whenever a full acknowledged
+/// route does block the sink. For true isolation between a latency-sensitive route and a slow
+/// manual-ack one, use separate clients so each has its own connection.
+/// </remarks>
 public sealed class MqttRouter : IAsyncDisposable
 {
     private readonly ChannelReader<MqttPublishPacket> _source;
@@ -447,7 +465,16 @@ public sealed class MqttRouter : IAsyncDisposable
             {
                 if (_overflow == RouteOverflow.Wait)
                 {
-                    await _channel.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false);
+                    // A non-blocking write while there is room keeps the sink flowing. Only when the
+                    // queue is full does the lossless contract force the sink to wait — record that
+                    // this route is applying backpressure to the whole client before blocking on it.
+                    if (!_channel.Writer.TryWrite(message))
+                    {
+                        PulseMqttDiagnostics.AcknowledgedRouteBackpressure.Add(
+                            1, new KeyValuePair<string, object?>("route", Template.Template));
+                        await _channel.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false);
+                    }
+
                     return;
                 }
 

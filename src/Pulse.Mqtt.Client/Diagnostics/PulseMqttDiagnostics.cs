@@ -31,6 +31,9 @@ public static class PulseMqttDiagnostics
     internal static Counter<long> MessagesReceived { get; } =
         Meter.CreateCounter<long>("pulse.mqtt.client.messages.received", description: "Application messages received.");
 
+    internal static Counter<long> AcknowledgedRouteBackpressure { get; } =
+        Meter.CreateCounter<long>("pulse.mqtt.client.route.acknowledged.backpressure", description: "Times a full acknowledged route blocked the shared inbound sink, tagged by route.");
+
     internal static Histogram<double> PublishDuration { get; } =
         Meter.CreateHistogram<double>("pulse.mqtt.client.publish.duration", unit: "s", description: "Time spent publishing, by disposition.");
 

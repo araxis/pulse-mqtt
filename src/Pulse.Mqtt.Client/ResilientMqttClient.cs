@@ -636,7 +636,18 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// broker filter separately with <see cref="SubscribeAsync"/>.
     /// </summary>
     public MqttAcknowledgedRouteStream OpenAcknowledgedRouteStream(MqttRouteTemplate template, MqttRouteOptions? options) =>
-        Router.OpenAcknowledgedRouteStream(template, options);
+        Router.OpenAcknowledgedRouteStream(
+            template,
+            options ?? new MqttRouteOptions { Capacity = DefaultAcknowledgedRouteCapacity(_options.Connect.ReceiveMaximum) });
+
+    // An acknowledged route is lossless, so a full queue blocks the shared inbound sink (see MqttRouter).
+    // Defaulting its capacity to the advertised Receive Maximum lets the broker's in-flight window
+    // throttle before the queue can fill: a compliant MQTT 5 broker never leaves more than that many
+    // QoS>0 messages unacknowledged, so no single route can exceed it and the sink never blocks in
+    // normal operation. With no Receive Maximum advertised the window is unbounded and no finite
+    // capacity is provably safe, so fall back to the route default.
+    internal static int DefaultAcknowledgedRouteCapacity(ushort? receiveMaximum) =>
+        receiveMaximum is { } max and > 0 ? max : new MqttRouteOptions().Capacity;
 
     /// <summary>
     /// Opens an <c>await foreach</c>-able stream for a local route template given as text where the
