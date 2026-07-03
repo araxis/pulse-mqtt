@@ -100,6 +100,44 @@ public sealed class ReconnectStrandedPublishTests
     }
 
     [Fact]
+    public async Task A_publish_racing_the_connection_up_flush_is_still_delivered()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var factory = new SequencedTransportFactory();
+        var store = new FlushWindowStore();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "flush-window", KeepAliveSeconds = 0, CleanStart = false, SessionExpiryInterval = 300 },
+            Backoff = new BackoffOptions { BaseDelay = TimeSpan.FromMilliseconds(1), MaxDelay = TimeSpan.FromMilliseconds(5) },
+            MessageStore = store,
+        });
+
+        // The store publishes M during the connection-up flush's final (empty) peek — i.e. after
+        // the flush has scanned the queue but before _raw is assigned. That publish sees no live
+        // connection at both its check and its nudge, so the connection-up flush is its only chance
+        // to be delivered. Before the fix M is stranded (State=Connected, store.Count=1, never sent).
+        PublishOutcome? raced = null;
+        store.OnFirstEmptyPeek = async () =>
+            raced = await client.PublishAsync(
+                new MqttPublishPacket { Topic = "chaos/window", Payload = Encoding.UTF8.GetBytes("42"), QualityOfService = MqttQualityOfService.AtLeastOnce },
+                timeout.Token);
+
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+
+        // The re-flush after _raw is set drains the raced publish to the broker.
+        var flushed = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttPublishPacket>();
+        flushed.Topic.ShouldBe("chaos/window");
+        Encoding.UTF8.GetString(flushed.Payload.Span).ShouldBe("42");
+        await broker.SendAsync(
+            new MqttPublishAckPacket { PacketType = MqttPacketType.PubAck, PacketIdentifier = flushed.PacketIdentifier!.Value },
+            timeout.Token);
+
+        raced!.Value.Disposition.ShouldBe(PublishDisposition.Queued);
+    }
+
+    [Fact]
     public async Task A_transport_failure_during_the_post_enqueue_flush_does_not_escape_the_publish()
     {
         using var timeout = new CancellationTokenSource(SafetyTimeout);
@@ -358,6 +396,48 @@ public sealed class ReconnectStrandedPublishTests
                 _events.Add(eventId.Id);
             }
         }
+    }
+
+    /// <summary>
+    /// Runs a callback exactly once, on the first PeekQueuedAsync that finds the queue empty — the
+    /// connection-up flush's final scan. The callback enqueues a publish precisely in the window
+    /// between that scan and the client's _raw assignment, so the raced publish lands with no live
+    /// connection visible to either its check or its nudge.
+    /// </summary>
+    private sealed class FlushWindowStore : IMessageStore
+    {
+        private readonly InMemoryMessageStore _inner = new(new OfflineQueueOptions());
+        private bool _fired;
+
+        public Func<Task>? OnFirstEmptyPeek { get; set; }
+
+        public int Count => _inner.Count;
+
+        public long DroppedCount => _inner.DroppedCount;
+
+        public ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken) =>
+            _inner.EnqueueAsync(packet, cancellationToken);
+
+        public ValueTask EnqueueAsync(MqttPublishPacket packet, DateTimeOffset enqueuedAt, CancellationToken cancellationToken) =>
+            _inner.EnqueueAsync(packet, enqueuedAt, cancellationToken);
+
+        public ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken) => _inner.PeekAsync(cancellationToken);
+
+        public async ValueTask<MqttQueuedPublish?> PeekQueuedAsync(CancellationToken cancellationToken)
+        {
+            var result = await _inner.PeekQueuedAsync(cancellationToken);
+            if (result is null && !_fired && OnFirstEmptyPeek is { } callback)
+            {
+                _fired = true;
+                await callback(); // enqueues the raced publish before this empty peek returns
+            }
+
+            return result;
+        }
+
+        public ValueTask RemoveHeadAsync(CancellationToken cancellationToken) => _inner.RemoveHeadAsync(cancellationToken);
+
+        public ValueTask ClearAsync(CancellationToken cancellationToken) => _inner.ClearAsync(cancellationToken);
     }
 
     /// <summary>
