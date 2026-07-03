@@ -31,6 +31,7 @@ public sealed class RawMqttClient : IAsyncDisposable
     private SemaphoreSlim? _sendQuota;
     private string?[]? _inboundAliasTopics;   // index = alias - 1; touched only by the pump
     private Dictionary<string, ushort>? _outboundAliases;   // touched only inside the send lock
+    private (string Topic, ushort Alias)? _pendingOutboundAlias;   // touched only inside the send lock
     private ushort _outboundAliasMaximum;
     private TaskCompletionSource? _reauthSignal;   // swapped with Interlocked; completed by the pump
     private MqttInFlightSession? _session;
@@ -254,8 +255,10 @@ public sealed class RawMqttClient : IAsyncDisposable
             if (_options.UseOutboundTopicAliases && connAck.TopicAliasMaximum is { } outboundAliasMaximum and > 0)
             {
                 _outboundAliases = new Dictionary<string, ushort>();
+                _pendingOutboundAlias = null;
                 _outboundAliasMaximum = outboundAliasMaximum;
                 connection.OutboundTransform = ApplyOutboundTopicAlias;
+                connection.OutboundFlushed = CommitOutboundTopicAlias;
             }
 
             // Acknowledgements complete their waiters on the receive loop itself; only packets
@@ -1193,6 +1196,12 @@ public sealed class RawMqttClient : IAsyncDisposable
     // the packet that establishes an alias reaches the broker before any packet that uses it.
     private MqttPacket ApplyOutboundTopicAlias(MqttPacket packet)
     {
+        // A newly assigned alias is not recorded in the table until its establishing packet is
+        // actually flushed (CommitOutboundTopicAlias). Clear any pending assignment on every send so a
+        // prior one that never reached the wire — e.g. rejected by the maximum-packet-size check — is
+        // never committed by a later, unrelated successful send.
+        _pendingOutboundAlias = null;
+
         if (packet is not MqttPublishPacket publish
             || publish.TopicAlias is not null
             || _outboundAliases is not { } aliases)
@@ -1208,11 +1217,28 @@ public sealed class RawMqttClient : IAsyncDisposable
         if (aliases.Count < _outboundAliasMaximum)
         {
             alias = (ushort)(aliases.Count + 1);
-            aliases[publish.Topic] = alias;
+
+            // Stage the assignment; it becomes established (and future publishes to this topic drop the
+            // topic name) only after the establishing packet below is confirmed on the wire. Recording
+            // it here — before MqttConnection's size check — would poison the topic: an oversized
+            // establishing publish would leave a dangling alias, and the next publish to the topic
+            // would send an empty topic name with an alias the broker never learned, a protocol error.
+            _pendingOutboundAlias = (publish.Topic, alias);
             return publish with { TopicAlias = alias };
         }
 
         return packet;
+    }
+
+    // Runs inside the send lock right after a packet is flushed. Commits an alias staged by
+    // ApplyOutboundTopicAlias now that its establishing publish has reached the wire.
+    private void CommitOutboundTopicAlias()
+    {
+        if (_pendingOutboundAlias is { } pending && _outboundAliases is { } aliases)
+        {
+            aliases[pending.Topic] = pending.Alias;
+            _pendingOutboundAlias = null;
+        }
     }
 
     // Runs on the pump. The specification makes inbound resolution mandatory once the client

@@ -65,6 +65,39 @@ public sealed class TopicAliasTests
         (await brokerB.ReadPacketAsync(timeoutB.Token)).ShouldBeOfType<MqttPublishPacket>().TopicAlias.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task A_topic_whose_first_publish_is_rejected_for_size_is_not_alias_poisoned()
+    {
+        var (clientTransport, serverTransport) = LoopbackTransport.CreatePair();
+        var broker = new ScriptedBroker(serverTransport);
+        var client = new RawMqttClient(
+            new FixedTransportFactory(clientTransport),
+            new RawMqttClientOptions { UseOutboundTopicAliases = true },
+            new FakeTimeProvider());
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var connectTask = client.ConnectAsync(new MqttConnectPacket { ClientId = "c" }, timeout.Token);
+        await broker.ReadPacketAsync(timeout.Token);
+        // The broker advertises both a topic-alias maximum and a small maximum packet size.
+        await broker.SendAsync(new MqttConnAckPacket { TopicAliasMaximum = 5, MaximumPacketSize = 64 }, timeout.Token);
+        await connectTask;
+
+        // The first publish to a new topic is oversized, so it is rejected before reaching the wire.
+        await Should.ThrowAsync<MqttPacketTooLargeException>(
+            () => client.PublishAsync(
+                new MqttPublishPacket { Topic = "plant/line1/temp", Payload = new byte[200] }, timeout.Token));
+
+        // A later small publish to the SAME topic must still send the full topic name and establish
+        // the alias. Before the fix the rejected publish had already recorded the alias, so this sent
+        // an empty topic name with an alias the broker never learned — a protocol error the broker
+        // would disconnect on.
+        await client.PublishAsync(
+            new MqttPublishPacket { Topic = "plant/line1/temp", Payload = new byte[] { 1 } }, timeout.Token);
+        var sent = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfType<MqttPublishPacket>();
+        sent.Topic.ShouldBe("plant/line1/temp");
+        sent.TopicAlias.ShouldBe((ushort)1);
+    }
+
     // ---- Inbound ----
 
     [Fact]
