@@ -37,3 +37,18 @@ static Pulse.Mqtt.Endpoints.HostMqttEndpointExtensions.MapMqtt<TPayload>(this Mi
 static Pulse.Mqtt.Endpoints.HostMqttEndpointExtensions.MapMqtt<TPayload>(this Microsoft.Extensions.Hosting.IHost! app, string! template, System.Func<TPayload, Pulse.Mqtt.Endpoints.MqttEndpointContext!, System.Threading.Tasks.ValueTask>! handler, Pulse.Mqtt.Endpoints.MqttEndpointOptions? options = null) -> Pulse.Mqtt.Endpoints.MqttEndpoint!
 static Pulse.Mqtt.Endpoints.PulseMqttEndpointExtensions.MapMqtt(this Pulse.Mqtt.Client.ResilientMqttClient! client, string! template, System.Func<Pulse.Mqtt.Endpoints.MqttEndpointContext!, System.Threading.Tasks.ValueTask>! handler, Pulse.Mqtt.Endpoints.MqttEndpointOptions? options = null, System.IServiceProvider? services = null) -> Pulse.Mqtt.Endpoints.MqttEndpoint!
 static Pulse.Mqtt.Endpoints.PulseMqttEndpointExtensions.MapMqtt<TPayload>(this Pulse.Mqtt.Client.ResilientMqttClient! client, string! template, System.Func<TPayload, Pulse.Mqtt.Endpoints.MqttEndpointContext!, System.Threading.Tasks.ValueTask>! handler, Pulse.Mqtt.Endpoints.MqttEndpointOptions? options = null, System.IServiceProvider? services = null) -> Pulse.Mqtt.Endpoints.MqttEndpoint!
+Pulse.Mqtt.Endpoints.FromPayloadAttribute
+Pulse.Mqtt.Endpoints.FromPayloadAttribute.FromPayloadAttribute() -> void
+Pulse.Mqtt.Endpoints.FromRouteAttribute
+Pulse.Mqtt.Endpoints.FromRouteAttribute.FromRouteAttribute() -> void
+Pulse.Mqtt.Endpoints.FromRouteAttribute.Name.get -> string?
+Pulse.Mqtt.Endpoints.FromRouteAttribute.Name.init -> void
+Pulse.Mqtt.Endpoints.FromServicesAttribute
+Pulse.Mqtt.Endpoints.FromServicesAttribute.FromServicesAttribute() -> void
+Pulse.Mqtt.Endpoints.GeneratedEndpointSupport
+Pulse.Mqtt.Endpoints.MapMqttDelegateExtensions
+static Pulse.Mqtt.Endpoints.GeneratedEndpointSupport.ResolveClient(Microsoft.Extensions.Hosting.IHost! app, string! clientName) -> Pulse.Mqtt.Client.ResilientMqttClient!
+static Pulse.Mqtt.Endpoints.GeneratedEndpointSupport.ResolveSingleClient(Microsoft.Extensions.Hosting.IHost! app) -> Pulse.Mqtt.Client.ResilientMqttClient!
+static Pulse.Mqtt.Endpoints.MapMqttDelegateExtensions.MapMqtt(this Microsoft.Extensions.Hosting.IHost! app, string! clientName, string! template, System.Delegate! handler, Pulse.Mqtt.Endpoints.MqttEndpointOptions? options = null) -> Pulse.Mqtt.Endpoints.MqttEndpoint!
+static Pulse.Mqtt.Endpoints.MapMqttDelegateExtensions.MapMqtt(this Microsoft.Extensions.Hosting.IHost! app, string! template, System.Delegate! handler, Pulse.Mqtt.Endpoints.MqttEndpointOptions? options = null) -> Pulse.Mqtt.Endpoints.MqttEndpoint!
+static Pulse.Mqtt.Endpoints.MapMqttDelegateExtensions.MapMqtt(this Pulse.Mqtt.Client.ResilientMqttClient! client, string! template, System.Delegate! handler, Pulse.Mqtt.Endpoints.MqttEndpointOptions? options = null, System.IServiceProvider? services = null) -> Pulse.Mqtt.Endpoints.MqttEndpoint!
