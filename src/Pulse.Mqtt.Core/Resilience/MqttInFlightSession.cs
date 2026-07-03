@@ -82,6 +82,20 @@ public sealed class MqttInFlightSession
         }
     }
 
+    /// <summary>
+    /// Whether an outbound exchange currently holds <paramref name="packetIdentifier"/>. Used by
+    /// identifier allocation: renting an identifier a session entry still holds would make
+    /// <see cref="OutboundSentAsync"/>'s update-in-place silently replace — and lose — that
+    /// entry's message.
+    /// </summary>
+    public bool ContainsOutbound(ushort packetIdentifier)
+    {
+        lock (_gate)
+        {
+            return _outbound.Exists(entry => entry.Packet.PacketIdentifier == packetIdentifier);
+        }
+    }
+
     /// <summary>Records an outbound QoS 1/2 PUBLISH the moment it is handed to the wire.</summary>
     public ValueTask OutboundSentAsync(MqttPublishPacket packet, MqttInFlightStage stage, CancellationToken cancellationToken)
     {

@@ -1,1 +1,2 @@
 #nullable enable
+Pulse.Mqtt.Resilience.MqttInFlightSession.ContainsOutbound(ushort packetIdentifier) -> bool
