@@ -87,3 +87,7 @@ Pulse.Mqtt.DependencyInjection.ServiceCollectionExtensions
 static Pulse.Mqtt.DependencyInjection.ServiceCollectionExtensions.AddPulseMqttClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, System.Action<Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions!>! configure) -> Pulse.Mqtt.DependencyInjection.PulseMqttBuilder!
 Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.ConnectWithHost.get -> bool
 Pulse.Mqtt.DependencyInjection.PulseMqttClientOptions.ConnectWithHost.set -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientRegistration
+Pulse.Mqtt.DependencyInjection.PulseMqttClientRegistration.Name.get -> string!
+Pulse.Mqtt.DependencyInjection.PulseMqttClientRegistration.Name.init -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientRegistration.PulseMqttClientRegistration(string! Name) -> void

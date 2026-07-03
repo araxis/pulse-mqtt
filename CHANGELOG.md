@@ -1,6 +1,8 @@
 # Changelog
 
-## 2.24.0 (unreleased)
+## 2.25.0 (unreleased)
+
+## 2.24.0
 
 - `Pulse.Mqtt.Endpoints` now ships a source generator: `MapMqtt` accepts Minimal-API-style
   handler signatures — `(int deviceId, Reading reading, IDeviceStore store, CancellationToken ct)`

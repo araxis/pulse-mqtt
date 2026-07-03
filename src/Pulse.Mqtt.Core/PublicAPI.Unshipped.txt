@@ -1,8 +1,1 @@
 #nullable enable
-Pulse.Mqtt.Routing.MqttRouteConstraint
-Pulse.Mqtt.Routing.MqttRouteConstraint.Bool = 4 -> Pulse.Mqtt.Routing.MqttRouteConstraint
-Pulse.Mqtt.Routing.MqttRouteConstraint.Guid = 3 -> Pulse.Mqtt.Routing.MqttRouteConstraint
-Pulse.Mqtt.Routing.MqttRouteConstraint.Int = 1 -> Pulse.Mqtt.Routing.MqttRouteConstraint
-Pulse.Mqtt.Routing.MqttRouteConstraint.Long = 2 -> Pulse.Mqtt.Routing.MqttRouteConstraint
-Pulse.Mqtt.Routing.MqttRouteConstraint.None = 0 -> Pulse.Mqtt.Routing.MqttRouteConstraint
-Pulse.Mqtt.Routing.MqttRouteTemplate.ParameterConstraints.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Routing.MqttRouteConstraint>!
