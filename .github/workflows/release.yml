@@ -82,8 +82,13 @@ jobs:
           fi
 
           echo "Shipped content changed since $previous:"
-          [ -n "$changed" ] && echo "$changed"
-          [ -n "$build_props_changed" ] && echo "Directory.Build.props:" && echo "$build_props_changed"
+          if [ -n "$changed" ]; then
+            echo "$changed"
+          fi
+          if [ -n "$build_props_changed" ]; then
+            echo "Directory.Build.props:"
+            echo "$build_props_changed"
+          fi
 
       # System.Net.Quic needs the msquic native library; without it the QUIC transport tests
       # would be skipped instead of run.
