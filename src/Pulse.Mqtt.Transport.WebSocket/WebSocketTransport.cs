@@ -10,6 +10,8 @@ namespace Pulse.Mqtt.Transport;
 /// </summary>
 public sealed class WebSocketTransport : IMqttTransport
 {
+    private static readonly TimeSpan GracefulCloseTimeout = TimeSpan.FromSeconds(2);
+
     private readonly WebSocket _socket;
     private readonly Pipe _input = new();
     private readonly Pipe _output = new();
@@ -40,7 +42,22 @@ public sealed class WebSocketTransport : IMqttTransport
         }
 
         _disposed = true;
+
+        // Completing the writer lets the send pump drain whatever was flushed just before disposal
+        // — including a graceful MQTT DISCONNECT — and then run the WebSocket close handshake while
+        // the socket is still open. Wait for that before cancelling, so those final bytes are not
+        // discarded (cancelling first makes the pump's ReadAsync throw before it drains). A dead
+        // peer cannot hang disposal: the drain is bounded, after which cancellation forces teardown.
         _output.Writer.Complete();
+        try
+        {
+            await _sendPump.WaitAsync(GracefulCloseTimeout).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Drain timed out or the pump faulted; fall through to force teardown.
+        }
+
         await _lifetime.CancelAsync().ConfigureAwait(false);
 
         try

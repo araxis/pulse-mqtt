@@ -48,6 +48,29 @@ public sealed class WebSocketTransportTests
     }
 
     [Fact]
+    public async Task Bytes_flushed_just_before_disposal_reach_the_peer()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var (listener, uri) = StartListener();
+        using var ownedListener = listener;
+
+        var acceptTask = AcceptWebSocketAsync(listener);
+        var factory = new WebSocketTransportFactory(new WebSocketTransportOptions { Uri = uri });
+        var transport = await factory.ConnectAsync(timeout.Token);
+        using var server = await acceptTask.WaitAsync(timeout.Token);
+
+        // A graceful MQTT shutdown flushes the DISCONNECT (a PINGREQ stand-in here) and disposes
+        // straight after. The buffered send pump must drain those bytes and run the close handshake
+        // before disposal cancels it — otherwise the peer loses the bytes and sees an abrupt close.
+        MqttPingCodec.WriteRequest(transport.Output);
+        await transport.Output.FlushAsync(timeout.Token);
+        await transport.DisposeAsync();
+
+        var received = await ReceiveFrameAsync(server, timeout.Token);
+        received.ShouldBe(new byte[] { 0xC0, 0x00 });
+    }
+
+    [Fact]
     public async Task The_raw_client_handshakes_over_a_websocket()
     {
         using var timeout = new CancellationTokenSource(SafetyTimeout);

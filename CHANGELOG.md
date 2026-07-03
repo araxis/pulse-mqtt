@@ -2,6 +2,12 @@
 
 ## 2.26.0 (unreleased)
 
+- Fixed the WebSocket transport dropping bytes flushed just before disposal — the graceful MQTT
+  DISCONNECT was lost and the peer saw an abrupt close instead of the close handshake. Disposal
+  cancelled the transport before its buffered send pump drained, unlike the TCP and QUIC
+  transports. Disposal now drains the send pump (flushing the final bytes and closing the socket
+  gracefully) before cancelling, bounded by a short timeout so a dead peer cannot hang it.
+
 - Fixed request/response being permanently disabled after a transient failure: the shared
   response route was memoized with `??=` and never reset, so if the very first `RequestAsync`/
   `RequestStreamAsync` setup faulted (a transient session-store error, or the first caller's
