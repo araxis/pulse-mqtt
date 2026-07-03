@@ -18,6 +18,16 @@
   the whole dispatch loop. Both methods now validate the source options before opening the stream
   (as `ToStateSourceBlock` already did), so an invalid capacity throws without registering anything.
 
+- Fixed the JSON and MessagePack serializers violating the `IMqttSerializer` contract on bad inbound
+  payloads — deserialization failures are documented to surface as `MqttException`, and the request/
+  response paths rely on that for uniform `catch (MqttException)` handling. `JsonMqttSerializer` let a
+  raw `System.Text.Json.JsonException` escape for an empty (e.g. a zero-byte retained-message clear)
+  or malformed payload; it now wraps that in `MqttException` like the Protobuf serializer already did.
+  `MessagePackMqttSerializer` returned `null` for a valid MessagePack nil payload (`0xC0`) — which
+  raises no serialization error — leaking null into a non-nullable typed handler; it now applies the
+  same `is T` type guard the JSON and Protobuf serializers use, throwing `MqttException` instead.
+  Adds a `Pulse.Mqtt.Serialization.Json.Tests` project (the JSON serializer previously had none).
+
 ## 2.26.0
 
 - Fixed disposing an acknowledged route stream tearing down the whole client connection: if the

@@ -72,4 +72,16 @@ public sealed class MessagePackMqttSerializerTests
         var error = Should.Throw<MqttException>(() => serializer.Deserialize<TelemetryReading>(garbage));
         error.Message.ShouldContain(nameof(TelemetryReading));
     }
+
+    [Fact]
+    public void Deserializing_a_nil_payload_throws_a_clear_mqtt_exception()
+    {
+        var serializer = NewSerializer();
+        var nil = new byte[] { 0xC0 }; // valid MessagePack nil: deserializes to null, not a parse error
+
+        // Before the fix this returned null (nil is valid MessagePack, so no
+        // MessagePackSerializationException was thrown), leaking null into a non-nullable typed handler.
+        var error = Should.Throw<MqttException>(() => serializer.Deserialize<TelemetryReading>(nil));
+        error.Message.ShouldContain(nameof(TelemetryReading));
+    }
 }

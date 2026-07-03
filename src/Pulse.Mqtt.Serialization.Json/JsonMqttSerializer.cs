@@ -36,9 +36,19 @@ public sealed class JsonMqttSerializer : IMqttSerializer
     /// <inheritdoc />
     public T Deserialize<T>(ReadOnlyMemory<byte> payload)
     {
-        var result = JsonSerializer.Deserialize(payload.Span, typeof(T), _context);
-        return result is T typed
-            ? typed
-            : throw new MqttException($"The payload did not deserialize to {typeof(T).Name}.");
+        try
+        {
+            var result = JsonSerializer.Deserialize(payload.Span, typeof(T), _context);
+            return result is T typed
+                ? typed
+                : throw new MqttException($"The payload did not deserialize to {typeof(T).Name}.");
+        }
+        catch (JsonException ex)
+        {
+            // An empty or malformed payload (e.g. a zero-byte retained-message clear) makes
+            // System.Text.Json throw JsonException. Surface it as the MqttException the
+            // IMqttSerializer contract documents, matching the MessagePack and Protobuf serializers.
+            throw new MqttException($"The payload did not deserialize to {typeof(T).Name}.", ex);
+        }
     }
 }
