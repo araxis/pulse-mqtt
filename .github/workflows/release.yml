@@ -21,6 +21,8 @@ jobs:
       id-token: write   # request the OIDC token for NuGet trusted publishing
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # the no-op-release guard diffs the tag against the previous one
 
       - uses: actions/setup-dotnet@v5
         with:
@@ -40,6 +42,36 @@ jobs:
             echo "VERSION=${prefix}-preview.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
             echo "STABLE=false" >> "$GITHUB_ENV"
           fi
+
+      - name: Guard against a no-op release
+        if: env.STABLE == 'true'
+        # Every package ships one lockstep version, so a stable tag republishes all of them. Refuse a
+        # tag that changes no shipped content since the previous tag — code, dependency versions, or
+        # the packed README — because it would republish byte-identical packages under a new version
+        # (as 2.20.0 did). Version bumps and PublicAPI ledger promotions are release bookkeeping, not
+        # shipped changes, so they do not count. Put [republish] in the tag message to override.
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          if [ -z "$previous" ]; then
+            echo "No earlier tag to compare against; allowing the release."
+            exit 0
+          fi
+
+          if git tag -l --format='%(contents)' "$GITHUB_REF_NAME" | grep -q '\[republish\]'; then
+            echo "Tag message opts into a republish; skipping the no-op guard."
+            exit 0
+          fi
+
+          changed=$(git diff --name-only "$previous" HEAD -- src Directory.Packages.props README.md \
+            | grep -vE 'PublicAPI\.(Shipped|Unshipped)\.txt$' || true)
+          if [ -z "$changed" ]; then
+            echo "::error::No shipped content changed since $previous — this would republish identical packages under $GITHUB_REF_NAME."
+            echo "::error::Release only when code, dependency versions, or the README changed. Add [republish] to the tag message to override."
+            exit 1
+          fi
+
+          echo "Shipped content changed since $previous:"
+          echo "$changed"
 
       # System.Net.Quic needs the msquic native library; without it the QUIC transport tests
       # would be skipped instead of run.
