@@ -388,7 +388,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             return new PublishOutcome(PublishDisposition.DroppedOffline);
         }
 
-        await _messageStore.EnqueueAsync(packet, cancellationToken).ConfigureAwait(false);
+        await _messageStore.EnqueueAsync(packet, _time.GetUtcNow(), cancellationToken).ConfigureAwait(false);
         return new PublishOutcome(PublishDisposition.Queued);
     }
 
@@ -1581,8 +1581,35 @@ public sealed class ResilientMqttClient : IAsyncDisposable
 
     private async Task FlushQueuedAsync(RawMqttClient raw, CancellationToken cancellationToken)
     {
-        while (await _messageStore.PeekAsync(cancellationToken).ConfigureAwait(false) is { } queued)
+        while (await _messageStore.PeekQueuedAsync(cancellationToken).ConfigureAwait(false) is { } entry)
         {
+            var queued = entry.Packet;
+
+            // MQTT 5 message expiry counts the time spent waiting: a message that outlived its
+            // expiry in the offline queue must not be delivered at all, and one still alive goes
+            // out with the wait subtracted from its remaining interval (rounded up, so a message
+            // that has not expired never leaves with zero).
+            if (queued.MessageExpiryInterval is { } expirySeconds && entry.EnqueuedAt is { } enqueuedAt)
+            {
+                var remaining = TimeSpan.FromSeconds(expirySeconds) - (_time.GetUtcNow() - enqueuedAt);
+                if (remaining <= TimeSpan.Zero)
+                {
+                    if (_options.Logger is { } expiryLogger)
+                    {
+                        PulseMqttLog.QueuedPublishExpired(expiryLogger, _clientId, queued.Topic, expirySeconds);
+                    }
+
+                    PulseMqttDiagnostics.MessagesPublished.Add(
+                        1,
+                        new KeyValuePair<string, object?>("client.id", _clientId),
+                        new KeyValuePair<string, object?>("disposition", "DroppedExpired"));
+                    await _messageStore.RemoveHeadAsync(cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                queued = queued with { MessageExpiryInterval = (uint)Math.Ceiling(remaining.TotalSeconds) };
+            }
+
             try
             {
                 await raw.PublishAsync(queued, cancellationToken).ConfigureAwait(false);

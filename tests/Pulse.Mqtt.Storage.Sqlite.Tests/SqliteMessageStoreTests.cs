@@ -213,6 +213,81 @@ public sealed class SqliteMessageStoreTests
         Should.Throw<ArgumentOutOfRangeException>(() => new SqliteMessageStore(database.Path, new OfflineQueueOptions { Capacity = 0 }));
     }
 
+    [Fact]
+    public async Task Enqueue_time_survives_the_round_trip()
+    {
+        using var database = new TempDatabase();
+        await using var store = new SqliteMessageStore(database.Path, Unbounded);
+
+        var stamp = new DateTimeOffset(2026, 7, 3, 12, 0, 0, TimeSpan.Zero);
+        await store.EnqueueAsync(Publish("stamped"), stamp, CancellationToken.None);
+
+        var entry = (await store.PeekQueuedAsync(CancellationToken.None))!;
+        entry.Packet.Topic.ShouldBe("stamped");
+        entry.EnqueuedAt.ShouldBe(stamp);
+    }
+
+    [Fact]
+    public async Task Legacy_enqueue_yields_no_stamp()
+    {
+        using var database = new TempDatabase();
+        await using var store = new SqliteMessageStore(database.Path, Unbounded);
+
+        await store.EnqueueAsync(Publish("legacy"), CancellationToken.None);
+
+        var entry = (await store.PeekQueuedAsync(CancellationToken.None))!;
+        entry.EnqueuedAt.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_database_created_before_queue_time_tracking_migrates_in_place()
+    {
+        using var database = new TempDatabase();
+
+        // Harvest a valid packet blob through a scratch store, then rebuild the database with
+        // the pre-2.22.0 schema (no EnqueuedAt column) around that blob.
+        byte[] blob;
+        using (var scratch = new TempDatabase())
+        {
+            await using (var seeder = new SqliteMessageStore(scratch.Path, Unbounded))
+            {
+                await seeder.EnqueueAsync(Publish("old-row"), CancellationToken.None);
+            }
+
+            await using var seedConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={scratch.Path}");
+            seedConnection.Open();
+            using var select = seedConnection.CreateCommand();
+            select.CommandText = "SELECT Packet FROM Queue LIMIT 1;";
+            blob = (byte[])select.ExecuteScalar()!;
+        }
+
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={database.Path}"))
+        {
+            connection.Open();
+            using var create = connection.CreateCommand();
+            create.CommandText =
+                "CREATE TABLE Queue (Seq INTEGER PRIMARY KEY AUTOINCREMENT, Version INTEGER NOT NULL, Packet BLOB NOT NULL);";
+            create.ExecuteNonQuery();
+            using var insert = connection.CreateCommand();
+            insert.CommandText = "INSERT INTO Queue (Version, Packet) VALUES ($v, $p);";
+            insert.Parameters.AddWithValue("$v", (long)(int)MqttProtocolVersion.V500);
+            insert.Parameters.AddWithValue("$p", blob);
+            insert.ExecuteNonQuery();
+        }
+
+        await using var store = new SqliteMessageStore(database.Path, Unbounded);
+        store.Count.ShouldBe(1);
+
+        // The old row flushes without expiry accounting; new rows are stamped.
+        var oldEntry = (await store.PeekQueuedAsync(CancellationToken.None))!;
+        oldEntry.Packet.Topic.ShouldBe("old-row");
+        oldEntry.EnqueuedAt.ShouldBeNull();
+
+        await store.EnqueueAsync(Publish("new-row"), DateTimeOffset.UnixEpoch, CancellationToken.None);
+        await store.RemoveHeadAsync(CancellationToken.None);
+        (await store.PeekQueuedAsync(CancellationToken.None))!.EnqueuedAt.ShouldBe(DateTimeOffset.UnixEpoch);
+    }
+
     private static MqttPublishPacket Publish(string topic, string payload = "x", MqttQualityOfService qos = MqttQualityOfService.AtLeastOnce) => new()
     {
         Topic = topic,

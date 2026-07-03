@@ -39,4 +39,8 @@ internal static partial class PulseMqttLog
     [LoggerMessage(EventId = 8, Level = LogLevel.Warning,
         Message = "MQTT client {ClientId} discarded {Count} in-flight publish(es): the broker did not preserve the session")]
     public static partial void InFlightDiscarded(ILogger logger, string clientId, int count);
+
+    [LoggerMessage(EventId = 9, Level = LogLevel.Information,
+        Message = "MQTT client {ClientId} dropped a queued publish to {Topic}: its {ExpirySeconds}s message expiry elapsed while offline")]
+    public static partial void QueuedPublishExpired(ILogger logger, string clientId, string topic, uint expirySeconds);
 }

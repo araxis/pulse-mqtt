@@ -77,14 +77,21 @@ public sealed class LiteDbMessageStore : IMessageStore, IAsyncDisposable, IDispo
     public long DroppedCount => Interlocked.Read(ref _dropped);
 
     /// <inheritdoc />
-    public async ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
+    public ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken) =>
+        EnqueueCoreAsync(packet, enqueuedAt: null, cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask EnqueueAsync(MqttPublishPacket packet, DateTimeOffset enqueuedAt, CancellationToken cancellationToken) =>
+        EnqueueCoreAsync(packet, enqueuedAt, cancellationToken);
+
+    private async ValueTask EnqueueCoreAsync(MqttPublishPacket packet, DateTimeOffset? enqueuedAt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(packet);
 
         switch (_options.Overflow)
         {
             case OverflowPolicy.Block:
-                await EnqueueBlockingAsync(packet, cancellationToken).ConfigureAwait(false);
+                await EnqueueBlockingAsync(packet, enqueuedAt, cancellationToken).ConfigureAwait(false);
                 return;
 
             case OverflowPolicy.DropNewest:
@@ -96,7 +103,7 @@ public sealed class LiteDbMessageStore : IMessageStore, IAsyncDisposable, IDispo
                         return;
                     }
 
-                    Insert(Queue(database), packet);
+                    Insert(Queue(database), packet, enqueuedAt);
                     _count++;
                 }, cancellationToken).ConfigureAwait(false);
                 return;
@@ -108,12 +115,12 @@ public sealed class LiteDbMessageStore : IMessageStore, IAsyncDisposable, IDispo
                     if (_count >= _options.Capacity)
                     {
                         DeleteHead(queue);
-                        Insert(queue, packet);
+                        Insert(queue, packet, enqueuedAt);
                         Interlocked.Increment(ref _dropped);
                     }
                     else
                     {
-                        Insert(queue, packet);
+                        Insert(queue, packet, enqueuedAt);
                         _count++;
                     }
                 }, cancellationToken).ConfigureAwait(false);
@@ -128,7 +135,7 @@ public sealed class LiteDbMessageStore : IMessageStore, IAsyncDisposable, IDispo
                         return true;
                     }
 
-                    Insert(Queue(database), packet);
+                    Insert(Queue(database), packet, enqueuedAt);
                     _count++;
                     return false;
                 }, cancellationToken).ConfigureAwait(false);
@@ -146,17 +153,26 @@ public sealed class LiteDbMessageStore : IMessageStore, IAsyncDisposable, IDispo
     }
 
     /// <inheritdoc />
-    public ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken) =>
+    public async ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken) =>
+        (await PeekQueuedAsync(cancellationToken).ConfigureAwait(false))?.Packet;
+
+    /// <inheritdoc />
+    public ValueTask<MqttQueuedPublish?> PeekQueuedAsync(CancellationToken cancellationToken) =>
         _store.RunAsync(database =>
         {
             var head = Head(Queue(database));
             if (head is null)
             {
-                return null;
+                return (MqttQueuedPublish?)null;
             }
 
             var version = (MqttProtocolVersion)head["Version"].AsInt32;
-            return PacketBlob.Decode(head["Packet"].AsBinary, version);
+            var packet = PacketBlob.Decode(head["Packet"].AsBinary, version);
+            // Rows written before queue-time tracking have no stamp and flush without expiry accounting.
+            DateTimeOffset? enqueuedAt = head.TryGetValue("EnqueuedAt", out var stamp) && stamp.IsInt64
+                ? DateTimeOffset.FromUnixTimeMilliseconds(stamp.AsInt64)
+                : null;
+            return new MqttQueuedPublish(packet, enqueuedAt);
         }, cancellationToken);
 
     /// <inheritdoc />
@@ -188,7 +204,7 @@ public sealed class LiteDbMessageStore : IMessageStore, IAsyncDisposable, IDispo
     /// <inheritdoc />
     public ValueTask DisposeAsync() => _store.DisposeAsync();
 
-    private async ValueTask EnqueueBlockingAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
+    private async ValueTask EnqueueBlockingAsync(MqttPublishPacket packet, DateTimeOffset? enqueuedAt, CancellationToken cancellationToken)
     {
         if (!_space!.Wait(0, cancellationToken))
         {
@@ -211,7 +227,7 @@ public sealed class LiteDbMessageStore : IMessageStore, IAsyncDisposable, IDispo
         {
             await _store.RunAsync(database =>
             {
-                Insert(Queue(database), packet);
+                Insert(Queue(database), packet, enqueuedAt);
                 _count++;
             }, cancellationToken).ConfigureAwait(false);
         }
@@ -246,15 +262,21 @@ public sealed class LiteDbMessageStore : IMessageStore, IAsyncDisposable, IDispo
         return ids.Length;
     }
 
-    private static void Insert(ILiteCollection<BsonDocument> queue, MqttPublishPacket packet)
+    private static void Insert(ILiteCollection<BsonDocument> queue, MqttPublishPacket packet, DateTimeOffset? enqueuedAt)
     {
         var id = NextId(queue);
-        queue.Insert(new BsonDocument
+        var document = new BsonDocument
         {
             ["_id"] = id,
             ["Version"] = (int)packet.ProtocolVersion,
             ["Packet"] = PacketBlob.Encode(packet),
-        });
+        };
+        if (enqueuedAt is { } at)
+        {
+            document["EnqueuedAt"] = at.ToUnixTimeMilliseconds();
+        }
+
+        queue.Insert(document);
     }
 
     private static long NextId(ILiteCollection<BsonDocument> queue)

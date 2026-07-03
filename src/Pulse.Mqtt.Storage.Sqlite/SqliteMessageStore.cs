@@ -20,7 +20,7 @@ namespace Pulse.Mqtt.Storage.Sqlite;
 public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDisposable
 {
     private const string Schema =
-        "CREATE TABLE IF NOT EXISTS Queue (Seq INTEGER PRIMARY KEY AUTOINCREMENT, Version INTEGER NOT NULL, Packet BLOB NOT NULL);";
+        "CREATE TABLE IF NOT EXISTS Queue (Seq INTEGER PRIMARY KEY AUTOINCREMENT, Version INTEGER NOT NULL, Packet BLOB NOT NULL, EnqueuedAt INTEGER NULL);";
 
     private readonly OfflineQueueOptions _options;
     private readonly SqliteStore _store;
@@ -42,6 +42,15 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
 
         try
         {
+            // Databases created before queue-time tracking lack the EnqueuedAt column; their
+            // existing rows keep a NULL stamp and flush without expiry accounting.
+            if (_store.ExecuteScalarLong("SELECT COUNT(*) FROM pragma_table_info('Queue') WHERE name = 'EnqueuedAt';") == 0)
+            {
+                using var migrate = _store.CreateCommand();
+                migrate.CommandText = "ALTER TABLE Queue ADD COLUMN EnqueuedAt INTEGER NULL;";
+                migrate.ExecuteNonQuery();
+            }
+
             // A capacity lowered between runs can leave more rows than fit; shed the oldest so the
             // count never exceeds capacity and the admission bookkeeping stays sound.
             var trimmed = TrimToCapacity(options.Capacity);
@@ -70,14 +79,21 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
     public long DroppedCount => Interlocked.Read(ref _dropped);
 
     /// <inheritdoc />
-    public async ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
+    public ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken) =>
+        EnqueueCoreAsync(packet, enqueuedAt: null, cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask EnqueueAsync(MqttPublishPacket packet, DateTimeOffset enqueuedAt, CancellationToken cancellationToken) =>
+        EnqueueCoreAsync(packet, enqueuedAt, cancellationToken);
+
+    private async ValueTask EnqueueCoreAsync(MqttPublishPacket packet, DateTimeOffset? enqueuedAt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(packet);
 
         switch (_options.Overflow)
         {
             case OverflowPolicy.Block:
-                await EnqueueBlockingAsync(packet, cancellationToken).ConfigureAwait(false);
+                await EnqueueBlockingAsync(packet, enqueuedAt, cancellationToken).ConfigureAwait(false);
                 return;
 
             case OverflowPolicy.DropNewest:
@@ -89,7 +105,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
                         return;
                     }
 
-                    Insert(connection, transaction: null, packet);
+                    Insert(connection, transaction: null, packet, enqueuedAt);
                     _count++;
                 }, cancellationToken).ConfigureAwait(false);
                 return;
@@ -102,13 +118,13 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
                         // Evict the head and take its slot; the count is unchanged.
                         using var transaction = connection.BeginTransaction();
                         DeleteHead(connection, transaction);
-                        Insert(connection, transaction, packet);
+                        Insert(connection, transaction, packet, enqueuedAt);
                         transaction.Commit();
                         Interlocked.Increment(ref _dropped);
                     }
                     else
                     {
-                        Insert(connection, transaction: null, packet);
+                        Insert(connection, transaction: null, packet, enqueuedAt);
                         _count++;
                     }
                 }, cancellationToken).ConfigureAwait(false);
@@ -123,7 +139,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
                         return true;
                     }
 
-                    Insert(connection, transaction: null, packet);
+                    Insert(connection, transaction: null, packet, enqueuedAt);
                     _count++;
                     return false;
                 }, cancellationToken).ConfigureAwait(false);
@@ -141,19 +157,27 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
     }
 
     /// <inheritdoc />
-    public ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken) =>
+    public async ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken) =>
+        (await PeekQueuedAsync(cancellationToken).ConfigureAwait(false))?.Packet;
+
+    /// <inheritdoc />
+    public ValueTask<MqttQueuedPublish?> PeekQueuedAsync(CancellationToken cancellationToken) =>
         _store.RunAsync(connection =>
         {
             using var command = connection.CreateCommand();
-            command.CommandText = "SELECT Version, Packet FROM Queue ORDER BY Seq LIMIT 1;";
+            command.CommandText = "SELECT Version, Packet, EnqueuedAt FROM Queue ORDER BY Seq LIMIT 1;";
             using var reader = command.ExecuteReader();
             if (!reader.Read())
             {
-                return null;
+                return (MqttQueuedPublish?)null;
             }
 
             var version = (MqttProtocolVersion)(int)reader.GetInt64(0);
-            return PacketBlob.Decode(reader.GetFieldValue<byte[]>(1), version);
+            var packet = PacketBlob.Decode(reader.GetFieldValue<byte[]>(1), version);
+            DateTimeOffset? enqueuedAt = reader.IsDBNull(2)
+                ? null
+                : DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(2));
+            return new MqttQueuedPublish(packet, enqueuedAt);
         }, cancellationToken);
 
     /// <inheritdoc />
@@ -189,7 +213,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
     /// <inheritdoc />
     public ValueTask DisposeAsync() => _store.DisposeAsync();
 
-    private async ValueTask EnqueueBlockingAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
+    private async ValueTask EnqueueBlockingAsync(MqttPublishPacket packet, DateTimeOffset? enqueuedAt, CancellationToken cancellationToken)
     {
         // SemaphoreSlim.WaitAsync(token) builds an internal linked CancellationTokenSource on the
         // supplied token for every contended wait; a long-lived caller token driving a high-volume
@@ -216,7 +240,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
         {
             await _store.RunAsync(connection =>
             {
-                Insert(connection, transaction: null, packet);
+                Insert(connection, transaction: null, packet, enqueuedAt);
                 _count++;
             }, cancellationToken).ConfigureAwait(false);
         }
@@ -243,11 +267,11 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
         return command.ExecuteNonQuery();
     }
 
-    private static void Insert(SqliteConnection connection, SqliteTransaction? transaction, MqttPublishPacket packet)
+    private static void Insert(SqliteConnection connection, SqliteTransaction? transaction, MqttPublishPacket packet, DateTimeOffset? enqueuedAt)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "INSERT INTO Queue (Version, Packet) VALUES ($version, $packet);";
+        command.CommandText = "INSERT INTO Queue (Version, Packet, EnqueuedAt) VALUES ($version, $packet, $enqueuedAt);";
         var version = command.CreateParameter();
         version.ParameterName = "$version";
         version.Value = (long)(int)packet.ProtocolVersion;
@@ -256,6 +280,10 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
         blob.ParameterName = "$packet";
         blob.Value = PacketBlob.Encode(packet);
         command.Parameters.Add(blob);
+        var stamp = command.CreateParameter();
+        stamp.ParameterName = "$enqueuedAt";
+        stamp.Value = enqueuedAt is { } at ? at.ToUnixTimeMilliseconds() : DBNull.Value;
+        command.Parameters.Add(stamp);
         command.ExecuteNonQuery();
     }
 

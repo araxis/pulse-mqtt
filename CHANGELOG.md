@@ -2,6 +2,12 @@
 
 ## 2.22.0 (unreleased)
 
+- The offline queue now honors MQTT 5 message expiry across the offline wait: expired messages
+  are dropped instead of delivered stale (logged, with a `DroppedExpired` metric disposition),
+  and surviving messages go out with the queue time subtracted from their remaining expiry.
+  `IMessageStore` gains defaulted `EnqueueAsync(packet, enqueuedAt, ...)` and `PeekQueuedAsync`
+  members; the in-memory, SQLite, and LiteDB stores track the stamp, and existing SQLite
+  databases migrate in place.
 - `DuplexPipeTransport` disposal now completes its pipes asynchronously and tolerates already
   completed or faulted pipes, matching the teardown behavior of the other transports.
 

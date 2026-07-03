@@ -21,8 +21,27 @@ public interface IMessageStore
     /// </summary>
     ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Queues a publish stamped with when it entered the queue, so message expiry can be
+    /// honored across the offline wait. The default implementation forwards to
+    /// <see cref="EnqueueAsync(MqttPublishPacket, CancellationToken)"/> and loses the stamp,
+    /// which disables expiry accounting for stores that do not override it.
+    /// </summary>
+    ValueTask EnqueueAsync(MqttPublishPacket packet, DateTimeOffset enqueuedAt, CancellationToken cancellationToken) =>
+        EnqueueAsync(packet, cancellationToken);
+
     /// <summary>Returns the oldest queued publish without removing it, or <see langword="null"/> when empty.</summary>
     ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the oldest queued publish with its enqueue time, or <see langword="null"/> when
+    /// empty. The default implementation wraps <see cref="PeekAsync"/> with an unknown enqueue
+    /// time, which disables expiry accounting for stores that do not override it.
+    /// </summary>
+    async ValueTask<MqttQueuedPublish?> PeekQueuedAsync(CancellationToken cancellationToken) =>
+        await PeekAsync(cancellationToken).ConfigureAwait(false) is { } head
+            ? new MqttQueuedPublish(head, EnqueuedAt: null)
+            : null;
 
     /// <summary>Removes the oldest queued publish after it was successfully flushed.</summary>
     ValueTask RemoveHeadAsync(CancellationToken cancellationToken);
