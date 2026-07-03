@@ -46,6 +46,17 @@ public interface IMessageStore
     /// <summary>Removes the oldest queued publish after it was successfully flushed.</summary>
     ValueTask RemoveHeadAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Removes the specific entry a flush peeked (identified by <see cref="MqttQueuedPublish.Sequence"/>),
+    /// after it was sent — even if the queue head has since changed, for example because a
+    /// <see cref="OverflowPolicy.DropOldest"/> enqueue evicted the entry being flushed. Removing
+    /// "the head" instead would drop a different, unsent message. The default implementation
+    /// forwards to <see cref="RemoveHeadAsync"/>, which is only safe when no concurrent eviction
+    /// can occur; the built-in stores override it to remove by identity.
+    /// </summary>
+    ValueTask RemoveAsync(MqttQueuedPublish entry, CancellationToken cancellationToken) =>
+        RemoveHeadAsync(cancellationToken);
+
     /// <summary>Removes all queued publishes.</summary>
     ValueTask ClearAsync(CancellationToken cancellationToken);
 }

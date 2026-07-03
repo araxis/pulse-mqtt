@@ -165,7 +165,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
         _store.RunAsync(connection =>
         {
             using var command = connection.CreateCommand();
-            command.CommandText = "SELECT Version, Packet, EnqueuedAt FROM Queue ORDER BY Seq LIMIT 1;";
+            command.CommandText = "SELECT Version, Packet, EnqueuedAt, Seq FROM Queue ORDER BY Seq LIMIT 1;";
             using var reader = command.ExecuteReader();
             if (!reader.Read())
             {
@@ -177,7 +177,7 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
             DateTimeOffset? enqueuedAt = reader.IsDBNull(2)
                 ? null
                 : DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(2));
-            return new MqttQueuedPublish(packet, enqueuedAt);
+            return new MqttQueuedPublish(packet, enqueuedAt) { Sequence = reader.GetInt64(3) };
         }, cancellationToken);
 
     /// <inheritdoc />
@@ -192,6 +192,29 @@ public sealed class SqliteMessageStore : IMessageStore, IAsyncDisposable, IDispo
                 _space?.Release();
             }
         }, cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask RemoveAsync(MqttQueuedPublish entry, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return _store.RunAsync(connection =>
+        {
+            // Delete the specific flushed row by its Seq. If a DropOldest enqueue already evicted it,
+            // the row is gone and this affects nothing — the current head (a different, unsent
+            // message) is left in place instead of being wrongly removed.
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM Queue WHERE Seq = $seq;";
+            var seq = command.CreateParameter();
+            seq.ParameterName = "$seq";
+            seq.Value = entry.Sequence;
+            command.Parameters.Add(seq);
+            if (command.ExecuteNonQuery() > 0)
+            {
+                _count--;
+                _space?.Release();
+            }
+        }, cancellationToken);
+    }
 
     /// <inheritdoc />
     public ValueTask ClearAsync(CancellationToken cancellationToken) =>

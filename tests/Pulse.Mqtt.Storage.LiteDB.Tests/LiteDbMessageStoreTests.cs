@@ -79,6 +79,28 @@ public sealed class LiteDbMessageStoreTests
     }
 
     [Fact]
+    public async Task Removing_a_flushed_entry_evicted_mid_flush_leaves_the_unsent_message()
+    {
+        using var database = new TempDatabase();
+        await using var store = new LiteDbMessageStore(database.Path, new OfflineQueueOptions { Capacity = 2, Overflow = OverflowPolicy.DropOldest });
+
+        // The flush races a DropOldest eviction: peek the head, a concurrent enqueue evicts it, then
+        // the flush removes what it peeked by identity — not "the current head", which is now a
+        // different, unsent message.
+        await store.EnqueueAsync(new MqttPublishPacket { Topic = "a" }, CancellationToken.None);
+        await store.EnqueueAsync(new MqttPublishPacket { Topic = "b" }, CancellationToken.None); // full: [a, b]
+
+        var peeked = await store.PeekQueuedAsync(CancellationToken.None);
+        peeked!.Packet.Topic.ShouldBe("a");
+
+        await store.EnqueueAsync(new MqttPublishPacket { Topic = "c" }, CancellationToken.None); // evicts a: [b, c]
+        await store.RemoveAsync(peeked, CancellationToken.None);                                 // remove 'a' (gone) — a no-op
+
+        store.Count.ShouldBe(2);
+        (await store.PeekAsync(CancellationToken.None))!.Topic.ShouldBe("b");
+    }
+
+    [Fact]
     public async Task A_peeked_but_not_removed_publish_is_resent_after_a_crash()
     {
         using var database = new TempDatabase();

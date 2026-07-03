@@ -1772,7 +1772,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                         1,
                         new KeyValuePair<string, object?>("client.id", _clientId),
                         new KeyValuePair<string, object?>("disposition", "DroppedExpired"));
-                    await _messageStore.RemoveHeadAsync(cancellationToken).ConfigureAwait(false);
+                    await _messageStore.RemoveAsync(entry, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
 
@@ -1798,7 +1798,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                     new KeyValuePair<string, object?>("disposition", "DroppedTooLarge"));
             }
 
-            await _messageStore.RemoveHeadAsync(cancellationToken).ConfigureAwait(false);
+            await _messageStore.RemoveAsync(entry, cancellationToken).ConfigureAwait(false);
         }
     }
 

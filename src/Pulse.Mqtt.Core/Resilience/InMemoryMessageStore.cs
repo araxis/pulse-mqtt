@@ -10,6 +10,7 @@ public sealed class InMemoryMessageStore : IMessageStore
     private readonly SemaphoreSlim _space;
     private readonly object _gate = new();
     private long _dropped;
+    private long _nextSequence;
 
     /// <summary>Creates a store with the given bounds and overflow policy.</summary>
     public InMemoryMessageStore(OfflineQueueOptions options)
@@ -69,7 +70,7 @@ public sealed class InMemoryMessageStore : IMessageStore
 
                 lock (_gate)
                 {
-                    _queue.Enqueue(entry);
+                    _queue.Enqueue(entry with { Sequence = ++_nextSequence });
                 }
 
                 return;
@@ -79,7 +80,7 @@ public sealed class InMemoryMessageStore : IMessageStore
                 {
                     lock (_gate)
                     {
-                        _queue.Enqueue(entry);
+                        _queue.Enqueue(entry with { Sequence = ++_nextSequence });
                     }
                 }
                 else
@@ -92,7 +93,7 @@ public sealed class InMemoryMessageStore : IMessageStore
                             _queue.Dequeue();
                         }
 
-                        _queue.Enqueue(entry);
+                        _queue.Enqueue(entry with { Sequence = ++_nextSequence });
                     }
 
                     Interlocked.Increment(ref _dropped);
@@ -105,7 +106,7 @@ public sealed class InMemoryMessageStore : IMessageStore
                 {
                     lock (_gate)
                     {
-                        _queue.Enqueue(entry);
+                        _queue.Enqueue(entry with { Sequence = ++_nextSequence });
                     }
                 }
                 else
@@ -124,7 +125,7 @@ public sealed class InMemoryMessageStore : IMessageStore
 
                 lock (_gate)
                 {
-                    _queue.Enqueue(entry);
+                    _queue.Enqueue(entry with { Sequence = ++_nextSequence });
                 }
 
                 return;
@@ -158,6 +159,28 @@ public sealed class InMemoryMessageStore : IMessageStore
         lock (_gate)
         {
             if (_queue.Count == 0)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            _queue.Dequeue();
+        }
+
+        _space.Release();
+        return ValueTask.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public ValueTask RemoveAsync(MqttQueuedPublish entry, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        lock (_gate)
+        {
+            // Only remove the flushed entry if it is still the head. A DropOldest enqueue can evict
+            // the head (the entry being flushed) between the peek and here; the peeked entry is then
+            // already gone and the current head is a different, unsent message that must stay. Since
+            // eviction only removes from the head, a peeked entry is either still the head or gone.
+            if (!_queue.TryPeek(out var head) || head.Sequence != entry.Sequence)
             {
                 return ValueTask.CompletedTask;
             }

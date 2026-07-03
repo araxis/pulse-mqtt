@@ -2,6 +2,13 @@
 
 ## 2.26.0 (unreleased)
 
+- Fixed the offline-queue flush dropping an unsent message under `OverflowPolicy.DropOldest`: the
+  flush peeked the head, sent it, then removed "the head" — but a concurrent `DropOldest` enqueue
+  could evict that head mid-send, so the removal deleted a different, still-unsent message. The
+  flush now removes the specific entry it sent by identity (`MqttQueuedPublish.Sequence` /
+  `IMessageStore.RemoveAsync`); if that entry was already evicted the removal is a no-op, leaving
+  the unsent message queued. Fixed across the in-memory, SQLite, and LiteDB stores.
+
 - Fixed an offline subscribe/unsubscribe being permanently lost when the connection dropped
   mid-reconcile on a resumed session: the reconcile cleared the pending set before the broker
   acknowledged, so an interrupted round-trip left the broker never told (and, since the broker
