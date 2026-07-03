@@ -1835,6 +1835,15 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                     new KeyValuePair<string, object?>("client.id", _clientId),
                     new KeyValuePair<string, object?>("disposition", "DroppedTooLarge"));
             }
+            catch (MqttPublishInFlightException)
+            {
+                // The connection died mid-exchange while a persistent session was tracking this
+                // publish: the session now holds it and redelivers it with DUP on resume. It must be
+                // removed from the queue below — leaving it would re-publish it under a fresh
+                // identifier on the next connection-up flush while the session redelivers the original,
+                // a double-send that breaks QoS 2 exactly-once. Mirrors PublishCoreAsync, which returns
+                // InFlight without queueing for the same reason.
+            }
 
             await _messageStore.RemoveAsync(entry, cancellationToken).ConfigureAwait(false);
         }
