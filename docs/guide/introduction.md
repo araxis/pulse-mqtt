@@ -59,8 +59,8 @@ These hold everywhere in the codebase:
 - **Time is injected.** Every timeout and delay goes through `TimeProvider`, so tests run with
   a fake clock and never sleep.
 - **Allocation is a budget.** Publish encoding allocates nothing; the wire path is spans and
-  pipelines end to end. The [benchmarks](/Benchmark-vs-MQTTnet) are published, including the
-  scenarios where the competition wins a metric.
+  pipelines end to end. The [benchmarks](/Benchmark-vs-MQTTnet) are published in full —
+  including the scenarios where Pulse does not come out ahead.
 
 ## Where to go next
 

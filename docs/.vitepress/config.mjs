@@ -113,9 +113,8 @@ export default defineConfig({
           items: [
             { text: 'Road to 1.0', link: '/road-to-1.0' },
             { text: 'Benchmark suite', link: '/Benchmark-Suite' },
-            { text: 'MQTTnet comparison', link: '/Benchmark-vs-MQTTnet' },
+            { text: 'Benchmark comparison', link: '/Benchmark-vs-MQTTnet' },
             { text: 'Development plan', link: '/NG-MQTT-Client-Development-Plan' },
-            { text: 'Competitive research', link: '/Competitive-Research-MQTT-Clients' },
             { text: 'Resilience design', link: '/Phase-04-Resilience-Detailed-Design' },
           ],
         },

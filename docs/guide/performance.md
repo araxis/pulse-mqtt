@@ -1,15 +1,16 @@
 # Performance
 
 Performance claims here are measured, repeatable, and published — including the scenarios
-where the competition wins a metric. Hardware for all numbers below: Intel i7-12700H,
+where Pulse does not come out ahead. Hardware for all numbers below: Intel i7-12700H,
 Windows 11, .NET 10, workstation GC.
 
-## Head to head with MQTTnet
+## How it compares
 
-Both libraries driving their user-facing clients against the same real Mosquitto broker,
-identical payloads, topics, and QoS, with the broker's inflight cap removed so the clients are
+For a familiar reference point, the numbers below put Pulse.Mqtt next to MQTTnet 5.1 — both
+libraries driving their user-facing clients against the same real Mosquitto broker, with
+identical payloads, topics, and QoS, and the broker's inflight cap removed so the clients are
 measured rather than the cap. Full methodology, tables, and the honest caveats:
-[the MQTTnet comparison](/Benchmark-vs-MQTTnet).
+[the benchmark comparison](/Benchmark-vs-MQTTnet).
 
 | Metric | Pulse.Mqtt | MQTTnet 5.1 |
 | --- | --- | --- |
@@ -59,6 +60,6 @@ project scenario for scenario:
 # Micro-benchmarks (no infrastructure):
 dotnet run -c Release --project bench/Pulse.Mqtt.Benchmarks -- --filter * --job short
 
-# Head-to-head (requires Docker for Mosquitto):
+# Comparison against MQTTnet (requires Docker for Mosquitto):
 dotnet run -c Release --project bench/Pulse.Mqtt.ComparisonBenchmarks
 ```
