@@ -18,6 +18,7 @@
     <Project Path="src/Pulse.Mqtt.Core/Pulse.Mqtt.Core.csproj" />
     <Project Path="src/Pulse.Mqtt.Dataflow/Pulse.Mqtt.Dataflow.csproj" />
     <Project Path="src/Pulse.Mqtt.DependencyInjection/Pulse.Mqtt.DependencyInjection.csproj" />
+    <Project Path="src/Pulse.Mqtt.Endpoints/Pulse.Mqtt.Endpoints.csproj" />
     <Project Path="src/Pulse.Mqtt.Resilience.Polly/Pulse.Mqtt.Resilience.Polly.csproj" />
     <Project Path="src/Pulse.Mqtt.Serialization.Json/Pulse.Mqtt.Serialization.Json.csproj" />
     <Project Path="src/Pulse.Mqtt.Serialization.MessagePack/Pulse.Mqtt.Serialization.MessagePack.csproj" />
@@ -34,6 +35,7 @@
     <Project Path="tests/Pulse.Mqtt.Core.Tests/Pulse.Mqtt.Core.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Dataflow.Tests/Pulse.Mqtt.Dataflow.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.DependencyInjection.Tests/Pulse.Mqtt.DependencyInjection.Tests.csproj" />
+    <Project Path="tests/Pulse.Mqtt.Endpoints.Tests/Pulse.Mqtt.Endpoints.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.IntegrationTests/Pulse.Mqtt.IntegrationTests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Serialization.MessagePack.Tests/Pulse.Mqtt.Serialization.MessagePack.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Serialization.Protobuf.Tests/Pulse.Mqtt.Serialization.Protobuf.Tests.csproj" />

@@ -1,0 +1,7 @@
+# MapMqtt deliberately mirrors ASP.NET Core's Map* overload family: the same method name across
+# nameless/named and generic/non-generic forms, each with optional trailing parameters. RS0026
+# exists to keep such shapes from painting an API into a corner, but the Minimal-API surface is
+# the point of this package — ASP.NET Core disables the rule for its own Map* family for the
+# same reason. Scoped to this project only; every other package keeps the rule.
+[*.cs]
+dotnet_diagnostic.RS0026.severity = none
