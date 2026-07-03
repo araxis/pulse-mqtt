@@ -38,6 +38,11 @@ jobs:
         # soak harness (Category=Soak) is operational and run on demand, not on every push.
         run: dotnet test -c Release --no-build --logger "console;verbosity=minimal" --filter "Category!=BrokerMatrix&Category!=Soak"
 
+      - name: Publish the Blazor WASM sample (trim gate)
+        # The publish runs the IL trimmer over the whole Pulse stack in a browser app; a new trim
+        # warning here means a library change broke trimming for WASM consumers.
+        run: dotnet publish samples/Pulse.Mqtt.BlazorWasmSample -c Release --no-restore -o wasm-publish
+
       - name: Pack
         run: dotnet pack -c Release --no-build -o packages
 

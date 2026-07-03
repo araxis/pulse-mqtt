@@ -1,0 +1,51 @@
+@page "/"
+
+<h1>Pulse.Mqtt in the browser</h1>
+
+<p>
+    MQTT over the browser's WebSocket, straight from WebAssembly — the same resilient client,
+    reconnect loop, and bounded queues as everywhere else.
+</p>
+
+<form @onsubmit="ConnectAsync" @onsubmit:preventDefault>
+    <input aria-label="Broker WebSocket URL" @bind="BrokerUrl" placeholder="ws://host:8083/mqtt" disabled="@IsRunning" />
+    <input aria-label="Topic filter" @bind="TopicFilter" placeholder="topic/#" disabled="@IsRunning" />
+    @if (IsRunning)
+    {
+        <button type="button" @onclick="DisconnectAsync">Disconnect</button>
+    }
+    else
+    {
+        <button type="submit">Connect</button>
+    }
+</form>
+
+<p class="row">
+    Connection: <span class="state" data-state="@State">@State</span>
+</p>
+
+@if (Error is { } error)
+{
+    <p class="error" role="alert">@error</p>
+}
+
+<form @onsubmit="PublishAsync" @onsubmit:preventDefault>
+    <input aria-label="Publish topic" @bind="PublishTopic" placeholder="publish topic" disabled="@(!IsConnected)" />
+    <input aria-label="Message" @bind="PublishText" placeholder="message" disabled="@(!IsConnected)" />
+    <button type="submit" disabled="@(!IsConnected)">Publish</button>
+</form>
+
+<h2>Received</h2>
+@if (Received.Count == 0)
+{
+    <p class="empty">Nothing yet — connect and publish to a matching topic.</p>
+}
+else
+{
+    <ul aria-live="polite">
+        @foreach (var message in Received)
+        {
+            <li @key="message.Sequence"><strong>@message.Topic</strong> — @message.Text</li>
+        }
+    </ul>
+}

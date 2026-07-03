@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+    <!-- The repo pins Microsoft.Extensions.* at the 9.x floor its packages ship with; the Blazor
+         10.x framework needs them at 10.x here, so this sample overrides locally. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" VersionOverride="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" VersionOverride="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" VersionOverride="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Options" VersionOverride="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Pulse.Mqtt.Core\Pulse.Mqtt.Core.csproj" />
+    <ProjectReference Include="..\..\src\Pulse.Mqtt.Client\Pulse.Mqtt.Client.csproj" />
+    <ProjectReference Include="..\..\src\Pulse.Mqtt.Transport.WebSocket\Pulse.Mqtt.Transport.WebSocket.csproj" />
+  </ItemGroup>
+
+</Project>

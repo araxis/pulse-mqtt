@@ -2,6 +2,9 @@
 
 ## 2.22.0 (unreleased)
 
+- Added a Blazor WebAssembly sample running the client in the browser over the WebSocket
+  transport, and a CI trim gate that publishes it so trimming regressions for WASM consumers
+  fail the build.
 - Added opt-in server-redirect following: with `FollowServerRedirects`, an MQTT 5
   `UseAnotherServer`/`ServerMoved` (in a DISCONNECT or CONNACK) re-targets the transport at the
   referenced server and reconnects there instead of faulting, bounded by `MaxServerRedirects`
