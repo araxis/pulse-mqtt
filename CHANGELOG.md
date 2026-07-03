@@ -10,6 +10,14 @@
   lifetime. `Route.DeliverAsync` now catches that exception (the route is simply gone), mirroring the
   acknowledged-route path, so disposing one route never disturbs the others.
 
+- Fixed `ToRouteSourceBlock` / `ToAcknowledgedRouteSourceBlock` (Pulse.Mqtt.Dataflow) leaking a route
+  registration when given an invalid `MqttDataflowSourceOptions.BoundedCapacity` (≤ 0): they opened
+  the route stream first, then the `MqttDataflowSource` constructor threw on the bad capacity before
+  starting the pump that owns the stream's disposal — so the stream was never disposed, the route
+  stayed registered for the client's lifetime, and its undrained bounded channel eventually blocked
+  the whole dispatch loop. Both methods now validate the source options before opening the stream
+  (as `ToStateSourceBlock` already did), so an invalid capacity throws without registering anything.
+
 ## 2.26.0
 
 - Fixed disposing an acknowledged route stream tearing down the whole client connection: if the
