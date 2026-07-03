@@ -84,12 +84,41 @@ handlers included.
 - Returns an `MqttEndpoint`: `Subscribed` completes when the broker granted (or queued) the
   subscription and faults if it was denied; disposing unregisters the route and unsubscribes.
 
-## Where this is going
+## Minimal-API-style handler signatures
 
-A source generator is planned on top of this runtime, lowering full Minimal-API-style handler
-signatures — `(int deviceId, Reading reading, IDeviceStore store, CancellationToken ct) => ...`
-— onto exactly these primitives at compile time, keeping the no-reflection, zero-AOT-warning
-guarantee. The context style above is the stable foundation it emits into.
+The package ships a source generator, so handlers can also be written the way `app.MapGet`
+handlers are — name the parameters you need, in any order:
+
+```csharp
+app.MapMqtt("sensors/{deviceId:int}/reading",
+    (int deviceId, Reading reading, IDeviceStore store, CancellationToken ct) =>
+        store.SaveAsync(deviceId, reading, ct));
+```
+
+The generator lowers every such call onto the context API above **at compile time**, using C#
+interceptors — there is no runtime binder and no reflection, so the zero-AOT-warning guarantee
+holds by construction (the AOT smoke binary maps one of these). A call site the generator
+cannot bind is a **compile error** (`PMQE001`–`PMQE006`), never a silent fallback.
+
+How parameters bind:
+
+| Parameter | Binds to |
+| --- | --- |
+| name matches a `{route}` parameter | the route value, typed by its constraint |
+| `CancellationToken` | the dispatch token |
+| `MqttEndpointContext` | the context itself |
+| `MqttPublishPacket` | the raw message |
+| first other complex type | the payload, via the configured serializer |
+| further complex types | services from the per-message scope |
+| `[FromRoute]`, `[FromPayload]`, `[FromServices]` | explicit override for any of the above |
+
+Handlers may return `void`, `Task`, or `ValueTask`. Route-bound parameters must use the
+matching constraint (`int deviceId` needs `{deviceId:int}`), so a non-conforming topic is
+rejected before the handler rather than failing inside it. The template must be a constant
+string — it is parsed at compile time.
+
+The explicit `MqttEndpointContext` overloads remain the stable foundation: they are what the
+generator emits into, and what to use when a handler is built dynamically.
 
 ## Related docs
 

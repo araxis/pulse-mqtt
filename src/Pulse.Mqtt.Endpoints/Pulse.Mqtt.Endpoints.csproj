@@ -20,4 +20,19 @@
     <ProjectReference Include="..\Pulse.Mqtt.DependencyInjection\Pulse.Mqtt.DependencyInjection.csproj" />
   </ItemGroup>
 
+  <!-- The MapMqtt source generator ships inside this package (analyzer asset + the props that
+       enable its interceptors namespace), so installing Pulse.Mqtt.Endpoints is all a consumer
+       needs for the Minimal-API-style handler signatures. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Pulse.Mqtt.Endpoints.Generator\Pulse.Mqtt.Endpoints.Generator.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\Pulse.Mqtt.Endpoints.Generator\bin\$(Configuration)\netstandard2.0\Pulse.Mqtt.Endpoints.Generator.dll"
+          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="buildTransitive\Pulse.Mqtt.Endpoints.props" Pack="true" PackagePath="buildTransitive" />
+    <None Include="buildTransitive\Pulse.Mqtt.Endpoints.props" Pack="true" PackagePath="build" />
+  </ItemGroup>
+
 </Project>

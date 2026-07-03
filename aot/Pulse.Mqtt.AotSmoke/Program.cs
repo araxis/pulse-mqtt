@@ -59,6 +59,30 @@ await using (var endpoint = client.MapMqtt("smoke/{id:int}/mapped", context =>
     }
 }
 
+// The generated Minimal-API-style shape must survive AOT as well: the interceptor lowers this
+// lambda at compile time, so there is nothing reflective left to trim away.
+var generated = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+await using (var generatedEndpoint = client.MapMqtt("smoke/{n:int}/generated", (int n, CancellationToken _) =>
+{
+    generated.TrySetResult(n);
+    return ValueTask.CompletedTask;
+}))
+{
+    await generatedEndpoint.Subscribed.WaitAsync(timeout.Token);
+    await client.PublishAsync(
+        new Pulse.Mqtt.Packets.MqttPublishPacket
+        {
+            Topic = "smoke/9/generated",
+            Payload = "x"u8.ToArray(),
+            QualityOfService = MqttQualityOfService.AtLeastOnce,
+        },
+        timeout.Token);
+    if (await generated.Task.WaitAsync(TimeSpan.FromSeconds(10)) != 9)
+    {
+        throw new InvalidOperationException("The generated MapMqtt endpoint did not deliver.");
+    }
+}
+
 await client.DisconnectAsync(timeout.Token);
 Console.WriteLine($"Smoke passed: disposition={outcome.Disposition}, value={reading.Value}, state={client.State}");
 

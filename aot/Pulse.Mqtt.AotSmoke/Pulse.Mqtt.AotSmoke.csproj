@@ -7,12 +7,14 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <PublishAot>true</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Pulse.Mqtt.Endpoints.Generated</InterceptorsNamespaces>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Core\Pulse.Mqtt.Core.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Client\Pulse.Mqtt.Client.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Endpoints\Pulse.Mqtt.Endpoints.csproj" />
+    <ProjectReference Include="..\..\src\Pulse.Mqtt.Endpoints.Generator\Pulse.Mqtt.Endpoints.Generator.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Testing\Pulse.Mqtt.Testing.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Serialization.Json\Pulse.Mqtt.Serialization.Json.csproj" />
   </ItemGroup>

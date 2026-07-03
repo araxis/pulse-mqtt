@@ -2,6 +2,13 @@
 
 ## 2.24.0 (unreleased)
 
+- `Pulse.Mqtt.Endpoints` now ships a source generator: `MapMqtt` accepts Minimal-API-style
+  handler signatures — `(int deviceId, Reading reading, IDeviceStore store, CancellationToken ct)`
+  — lowered onto the context runtime at compile time via C# interceptors. Route, payload,
+  service, token, context, and message parameters bind by the documented rules
+  (`[FromRoute]`/`[FromPayload]`/`[FromServices]` to override); unbindable call sites are
+  compile errors (`PMQE001`–`PMQE006`). No reflection; the AOT smoke covers the generated path.
+
 - Added `Pulse.Mqtt.Endpoints`: Minimal-API-style `MapMqtt` on the client (and an `app.MapMqtt`
   host helper) that subscribes and routes in one call, with typed route constraints
   (`{id:int}`, `{id:long}`, `{id:guid}`, `{flag:bool}`) and a service scope per message —

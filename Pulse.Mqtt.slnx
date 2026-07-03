@@ -19,6 +19,7 @@
     <Project Path="src/Pulse.Mqtt.Dataflow/Pulse.Mqtt.Dataflow.csproj" />
     <Project Path="src/Pulse.Mqtt.DependencyInjection/Pulse.Mqtt.DependencyInjection.csproj" />
     <Project Path="src/Pulse.Mqtt.Endpoints/Pulse.Mqtt.Endpoints.csproj" />
+    <Project Path="src/Pulse.Mqtt.Endpoints.Generator/Pulse.Mqtt.Endpoints.Generator.csproj" />
     <Project Path="src/Pulse.Mqtt.Resilience.Polly/Pulse.Mqtt.Resilience.Polly.csproj" />
     <Project Path="src/Pulse.Mqtt.Serialization.Json/Pulse.Mqtt.Serialization.Json.csproj" />
     <Project Path="src/Pulse.Mqtt.Serialization.MessagePack/Pulse.Mqtt.Serialization.MessagePack.csproj" />

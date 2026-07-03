@@ -1,0 +1,11 @@
+<Project>
+
+  <!-- The MapMqtt source generator emits C# interceptors into this namespace; consuming
+       projects must list it for the compiler to honor them. Appending preserves any
+       namespaces the project already enables. -->
+  <PropertyGroup>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Pulse.Mqtt.Endpoints.Generated</InterceptorsNamespaces>
+    <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);Pulse.Mqtt.Endpoints.Generated</InterceptorsPreviewNamespaces>
+  </PropertyGroup>
+
+</Project>
