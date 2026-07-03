@@ -1,1 +1,5 @@
 #nullable enable
+Pulse.Mqtt.DependencyInjection.PulseMqttClientRegistration
+Pulse.Mqtt.DependencyInjection.PulseMqttClientRegistration.Name.get -> string!
+Pulse.Mqtt.DependencyInjection.PulseMqttClientRegistration.Name.init -> void
+Pulse.Mqtt.DependencyInjection.PulseMqttClientRegistration.PulseMqttClientRegistration(string! Name) -> void
