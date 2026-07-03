@@ -24,10 +24,18 @@ public sealed class DuplexPipeTransport : IMqttTransport
     public PipeWriter Output { get; }
 
     /// <inheritdoc />
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        Input.Complete();
-        Output.Complete();
-        return ValueTask.CompletedTask;
+        // Mirror the other transports: complete asynchronously (a stream-backed writer flushes
+        // without blocking) and treat completion faults as part of teardown, not as errors —
+        // the pipes may already be faulted or completed when a connection is torn down.
+        try
+        {
+            await Output.CompleteAsync().ConfigureAwait(false);
+            await Input.CompleteAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException or ArgumentException)
+        {
+        }
     }
 }
