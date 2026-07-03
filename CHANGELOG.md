@@ -2,6 +2,14 @@
 
 ## 2.27.0 (unreleased)
 
+- Fixed disposing a full handler/stream route tearing down the entire router: if a non-acknowledged
+  route's queue was full (default `RouteOverflow.Wait`) so the shared dispatch loop was blocked
+  writing to it, disposing that route's stream completed its channel and the pending write's
+  `ChannelClosedException` escaped into the dispatch loop, where the source-fault handler swallowed it
+  and completed *every* route's channel — silently stopping all inbound routing for the router's
+  lifetime. `Route.DeliverAsync` now catches that exception (the route is simply gone), mirroring the
+  acknowledged-route path, so disposing one route never disturbs the others.
+
 ## 2.26.0
 
 - Fixed disposing an acknowledged route stream tearing down the whole client connection: if the
