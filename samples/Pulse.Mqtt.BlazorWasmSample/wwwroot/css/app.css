@@ -1,0 +1,65 @@
+:root {
+    color-scheme: light dark;
+    font-family: system-ui, sans-serif;
+}
+
+body {
+    margin: 0;
+    padding: 1.5rem;
+    max-width: 42rem;
+    margin-inline: auto;
+}
+
+h1 {
+    font-size: 1.4rem;
+}
+
+form,
+.row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-block: 0.5rem;
+}
+
+input {
+    flex: 1;
+    min-width: 12rem;
+    padding: 0.4rem 0.6rem;
+}
+
+button {
+    padding: 0.4rem 0.9rem;
+}
+
+.state {
+    font-weight: 600;
+}
+
+.state[data-state="Connected"] {
+    color: #1a7f37;
+}
+
+.state[data-state="Faulted"] {
+    color: #cf222e;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+li {
+    padding: 0.3rem 0;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+    font-variant-numeric: tabular-nums;
+}
+
+.error {
+    color: #cf222e;
+}
+
+.empty {
+    opacity: 0.6;
+}

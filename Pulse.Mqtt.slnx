@@ -8,6 +8,7 @@
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/Pulse.Mqtt.AspNetCoreSample/Pulse.Mqtt.AspNetCoreSample.csproj" />
+    <Project Path="samples/Pulse.Mqtt.BlazorWasmSample/Pulse.Mqtt.BlazorWasmSample.csproj" />
     <Project Path="samples/Pulse.Mqtt.Sample/Pulse.Mqtt.Sample.csproj" />
     <Project Path="samples/Pulse.Mqtt.WorkerSample/Pulse.Mqtt.WorkerSample.csproj" />
   </Folder>
