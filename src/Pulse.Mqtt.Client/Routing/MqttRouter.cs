@@ -441,15 +441,24 @@ public sealed class MqttRouter : IAsyncDisposable
 
         public ChannelReader<MqttAcknowledgedRoutedMessage> Reader => _channel.Reader;
 
-        public ValueTask DeliverAsync(MqttAcknowledgedRoutedMessage message, CancellationToken cancellationToken)
+        public async ValueTask DeliverAsync(MqttAcknowledgedRoutedMessage message, CancellationToken cancellationToken)
         {
-            if (_overflow == RouteOverflow.Wait)
+            try
             {
-                return _channel.Writer.WriteAsync(message, cancellationToken);
-            }
+                if (_overflow == RouteOverflow.Wait)
+                {
+                    await _channel.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
 
-            _channel.Writer.TryWrite(message);
-            return ValueTask.CompletedTask;
+                _channel.Writer.TryWrite(message);
+            }
+            catch (ChannelClosedException)
+            {
+                // The stream was disposed while this lossless delivery was pending on the shared
+                // inbound sink. Treat the route as gone — this exception must never escape into the
+                // sink, where it would fault the read loop and tear down the whole connection.
+            }
         }
 
         public void CompleteChannel() => _channel.Writer.TryComplete();

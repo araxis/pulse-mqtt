@@ -261,6 +261,47 @@ public sealed class MqttRouterTests
     }
 
     [Fact]
+    public async Task Disposing_a_blocked_acknowledged_stream_does_not_fault_the_connection()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "router-ack-dispose", KeepAliveSeconds = 0 },
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var template = MqttRouteTemplate.Parse("sensors/{id}");
+        var stream = client.OpenAcknowledgedRouteStream(template, new MqttRouteOptions { Capacity = 1, Overflow = RouteOverflow.Wait });
+        var subscribeTask = client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, timeout.Token);
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        await broker.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] }, timeout.Token);
+        await subscribeTask;
+
+        // Fill the Capacity-1 stream (left unread), then a second message blocks the shared inbound
+        // sink on the lossless delivery.
+        await broker.SendAsync(
+            new MqttPublishPacket { Topic = "sensors/9", QualityOfService = MqttQualityOfService.AtLeastOnce, PacketIdentifier = 42 }, timeout.Token);
+        await broker.SendAsync(
+            new MqttPublishPacket { Topic = "sensors/9", QualityOfService = MqttQualityOfService.AtLeastOnce, PacketIdentifier = 43 }, timeout.Token);
+        await Task.Delay(150, timeout.Token); // let the sink fill the channel and block on the second
+
+        // Disposing the stream completes its channel; the pending delivery's ChannelClosedException
+        // must not escape into the sink and fault the connection. Before the fix the client dropped
+        // the connection and reconnected.
+        await stream.DisposeAsync();
+        await Task.Delay(250, timeout.Token);
+
+        client.State.ShouldBe(Pulse.Mqtt.Resilience.ConnectionState.Connected);
+        factory.ConnectionsHandedOut.ShouldBe(1, "disposing an acknowledged stream must not reconnect the client");
+    }
+
+    [Fact]
     public async Task Acknowledged_route_stream_rejects_lossy_overflow()
     {
         var (source, router) = NewRouter();
