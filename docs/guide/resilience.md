@@ -118,6 +118,16 @@ Choosing an overflow policy:
 The queue is in-memory by default; a durable store that survives restarts is one interface
 away — [Extending](./extending#custom-message-store).
 
+### Message expiry while queued
+
+A publish with an MQTT 5 `MessageExpiryInterval` keeps expiring while it waits in the queue.
+On flush, a message that outlived its expiry is dropped instead of delivered stale — logged,
+and counted under the `DroppedExpired` metric disposition — and a surviving message goes out
+with the time it waited subtracted from its remaining interval, exactly as a broker would
+forward it. Messages without an expiry are unaffected. Custom `IMessageStore` implementations
+opt in by overriding `EnqueueAsync(packet, enqueuedAt, ...)` and `PeekQueuedAsync`; without the
+override, messages flush as before, with no expiry accounting.
+
 ## In-flight redelivery on session resume
 
 With a **persistent session** — `CleanStart = false` and a broker that preserves the session —
