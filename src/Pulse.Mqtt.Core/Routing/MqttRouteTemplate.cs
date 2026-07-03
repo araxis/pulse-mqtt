@@ -17,15 +17,26 @@ public sealed class MqttRouteTemplate
 
     private readonly string[] _segments;
     private readonly SegmentKind[] _kinds;
+    private readonly MqttRouteConstraint[] _constraints;
     private readonly string[] _parameterNames;
+    private readonly MqttRouteConstraint[] _parameterConstraints;
 
-    private MqttRouteTemplate(string template, string topicFilter, string[] segments, SegmentKind[] kinds, string[] parameterNames)
+    private MqttRouteTemplate(
+        string template,
+        string topicFilter,
+        string[] segments,
+        SegmentKind[] kinds,
+        MqttRouteConstraint[] constraints,
+        string[] parameterNames,
+        MqttRouteConstraint[] parameterConstraints)
     {
         Template = template;
         TopicFilter = topicFilter;
         _segments = segments;
         _kinds = kinds;
+        _constraints = constraints;
         _parameterNames = parameterNames;
+        _parameterConstraints = parameterConstraints;
     }
 
     /// <summary>The original template text.</summary>
@@ -36,6 +47,9 @@ public sealed class MqttRouteTemplate
 
     /// <summary>The parameter names in template order.</summary>
     public IReadOnlyList<string> ParameterNames => _parameterNames;
+
+    /// <summary>The constraint of each parameter, aligned with <see cref="ParameterNames"/>.</summary>
+    public IReadOnlyList<MqttRouteConstraint> ParameterConstraints => _parameterConstraints;
 
     /// <summary>Creates a broker subscription filter from this route template.</summary>
     public global::Pulse.Mqtt.MqttTopicFilter ToTopicFilter(
@@ -60,7 +74,9 @@ public sealed class MqttRouteTemplate
         var rawSegments = template.Split('/');
         var segments = new string[rawSegments.Length];
         var kinds = new SegmentKind[rawSegments.Length];
+        var constraints = new MqttRouteConstraint[rawSegments.Length];
         var parameterNames = new List<string>();
+        var parameterConstraints = new List<MqttRouteConstraint>();
 
         for (var i = 0; i < rawSegments.Length; i++)
         {
@@ -87,8 +103,31 @@ public sealed class MqttRouteTemplate
 
             if (segment.StartsWith('{') && segment.EndsWith('}') && segment.Length > 2)
             {
-                var name = segment[1..^1];
-                if (name.Contains('{') || name.Contains('}'))
+                var body = segment[1..^1];
+                if (body.Contains('{') || body.Contains('}'))
+                {
+                    throw new ArgumentException($"Malformed parameter segment '{segment}' in '{template}'.", nameof(template));
+                }
+
+                var name = body;
+                var constraint = MqttRouteConstraint.None;
+                var colon = body.IndexOf(':');
+                if (colon >= 0)
+                {
+                    name = body[..colon];
+                    constraint = body[(colon + 1)..] switch
+                    {
+                        "int" => MqttRouteConstraint.Int,
+                        "long" => MqttRouteConstraint.Long,
+                        "guid" => MqttRouteConstraint.Guid,
+                        "bool" => MqttRouteConstraint.Bool,
+                        var unknown => throw new ArgumentException(
+                            $"Unknown route constraint '{unknown}' in '{template}'. Supported: int, long, guid, bool.",
+                            nameof(template)),
+                    };
+                }
+
+                if (name.Length == 0)
                 {
                     throw new ArgumentException($"Malformed parameter segment '{segment}' in '{template}'.", nameof(template));
                 }
@@ -99,8 +138,10 @@ public sealed class MqttRouteTemplate
                 }
 
                 parameterNames.Add(name);
+                parameterConstraints.Add(constraint);
                 kinds[i] = SegmentKind.Parameter;
                 segments[i] = name;
+                constraints[i] = constraint;
                 continue;
             }
 
@@ -125,7 +166,14 @@ public sealed class MqttRouteTemplate
             };
         }
 
-        return new MqttRouteTemplate(template, string.Join('/', filterSegments), segments, kinds, [.. parameterNames]);
+        return new MqttRouteTemplate(
+            template,
+            string.Join('/', filterSegments),
+            segments,
+            kinds,
+            constraints,
+            [.. parameterNames],
+            [.. parameterConstraints]);
     }
 
     /// <summary>Attempts to match <paramref name="topic"/>, capturing parameter values on success.</summary>
@@ -163,6 +211,11 @@ public sealed class MqttRouteTemplate
                 case SegmentKind.Literal when !segment.SequenceEqual(_segments[i]):
                     return false;
                 case SegmentKind.Parameter:
+                    if (!SatisfiesConstraint(segment, _constraints[i]))
+                    {
+                        return false;
+                    }
+
                     captured![captureIndex++] = segment.ToString();
                     break;
             }
@@ -204,4 +257,15 @@ public sealed class MqttRouteTemplate
             return true;
         }
     }
+
+    private static bool SatisfiesConstraint(ReadOnlySpan<char> segment, MqttRouteConstraint constraint) =>
+        constraint switch
+        {
+            MqttRouteConstraint.None => true,
+            MqttRouteConstraint.Int => int.TryParse(segment, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out _),
+            MqttRouteConstraint.Long => long.TryParse(segment, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out _),
+            MqttRouteConstraint.Guid => Guid.TryParse(segment, out _),
+            MqttRouteConstraint.Bool => bool.TryParse(segment, out _),
+            _ => false,
+        };
 }
