@@ -1,0 +1,98 @@
+# Endpoints package
+
+Package: `Pulse.Mqtt.Endpoints`
+
+Minimal-API-style endpoints for MQTT: one `MapMqtt` call subscribes a route template's filter
+and registers its handler, with typed route constraints and a service scope per message —
+the same mental model as `app.MapGet`, aimed at topics instead of URLs.
+
+## Install
+
+```shell
+dotnet add package Pulse.Mqtt.Endpoints
+```
+
+## Map on the client
+
+The core surface lives on `ResilientMqttClient` and needs no hosting at all:
+
+```csharp
+await using var endpoint = client.MapMqtt("sensors/{deviceId:int}/temp", ctx =>
+{
+    var id = ctx.Route.GetInt("deviceId");     // typed: the constraint guaranteed it parses
+    var text = Encoding.UTF8.GetString(ctx.Message.Payload.Span);
+    Console.WriteLine($"{id}: {text}");
+    return ValueTask.CompletedTask;
+});
+
+await endpoint.Subscribed;                     // optional: fail fast on a denied subscription
+```
+
+The typed overload deserializes the payload with the client's configured serializer, exactly
+like `RegisterRoute<T>`:
+
+```csharp
+client.MapMqtt<Reading>("sensors/{deviceId:int}/reading", (reading, ctx) =>
+    Store.SaveAsync(ctx.Route.GetInt("deviceId"), reading, ctx.CancellationToken));
+```
+
+## Map on the host
+
+`app.MapMqtt(...)` is a thin helper over the client surface: it resolves the registered client
+and flows the host's services in, so every invocation gets **its own service scope** — scoped
+services behave exactly as they do in an ASP.NET Core request:
+
+```csharp
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddPulseMqttClient("telemetry", o => { o.Host = "broker"; o.ClientId = "svc-1"; });
+builder.Services.AddScoped<IDeviceStore, DeviceStore>();
+
+var app = builder.Build();
+
+app.MapMqtt<Reading>("sensors/{deviceId:int}/reading", (reading, ctx) =>
+    ctx.Services.GetRequiredService<IDeviceStore>().SaveAsync(ctx.Route.GetInt("deviceId"), reading, ctx.CancellationToken));
+
+await app.RunAsync();
+```
+
+With one registered client the name is inferred; with several, name it:
+`app.MapMqtt("telemetry", template, handler)`.
+
+## Route constraints
+
+`{name:constraint}` restricts what a parameter level matches — a non-conforming topic never
+reaches the handler. The set is closed and every check is a culture-invariant `TryParse`, so
+matching stays reflection-free and Native-AOT-clean:
+
+| Constraint | Matches | Typed accessor |
+| --- | --- | --- |
+| `{id:int}` | invariant `int` | `ctx.Route.GetInt("id")` |
+| `{id:long}` | invariant `long` | `ctx.Route.GetLong("id")` |
+| `{id:guid}` | `Guid` | `ctx.Route.GetGuid("id")` |
+| `{flag:bool}` | `true` / `false` | `ctx.Route.GetBool("flag")` |
+| `{name}` | any single level | `ctx.Route.GetString("name")` |
+
+Constraints work everywhere templates do — `RegisterRoute`, `OpenRouteStream`, and request
+handlers included.
+
+## What one map call does
+
+- Parses the template and registers the local route (`RegisterRoute` underneath — dispatch,
+  bounded queues, and fault isolation are the existing machinery, unchanged).
+- Subscribes the matching filter with the options you pass (`QualityOfService` defaults to
+  at-least-once). Offline, the subscription is queued and applied on the next connection.
+- Returns an `MqttEndpoint`: `Subscribed` completes when the broker granted (or queued) the
+  subscription and faults if it was denied; disposing unregisters the route and unsubscribes.
+
+## Where this is going
+
+A source generator is planned on top of this runtime, lowering full Minimal-API-style handler
+signatures — `(int deviceId, Reading reading, IDeviceStore store, CancellationToken ct) => ...`
+— onto exactly these primitives at compile time, keeping the no-reflection, zero-AOT-warning
+guarantee. The context style above is the stable foundation it emits into.
+
+## Related docs
+
+- [Routing](/guide/routing) — the dispatch model underneath
+- [Typed messaging](/guide/typed-messaging) — serializers for payload binding
+- [Dependency injection](/packages/dependency-injection) — registering named clients

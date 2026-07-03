@@ -2,6 +2,13 @@
 
 ## 2.24.0 (unreleased)
 
+- Added `Pulse.Mqtt.Endpoints`: Minimal-API-style `MapMqtt` on the client (and an `app.MapMqtt`
+  host helper) that subscribes and routes in one call, with typed route constraints
+  (`{id:int}`, `{id:long}`, `{id:guid}`, `{flag:bool}`) and a service scope per message —
+  reflection-free and Native-AOT-clean, covered by the AOT smoke binary.
+- Route templates across the client now accept `{name:constraint}`; a non-conforming topic
+  level no longer matches the route.
+
 ## 2.23.0
 
 - Added a package icon: a dark hexagon with a green pulse trace, shown on nuget.org and in the

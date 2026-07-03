@@ -11,6 +11,7 @@ For package-specific setup, see [Package docs](/packages/). For a task-oriented 
 | `Pulse.Mqtt.Client` | `ResilientMqttClient`: supervision, topic routing, typed messaging, request/response, diagnostics | Core, `Microsoft.Extensions.Logging.Abstractions` |
 | [`Pulse.Mqtt.Dataflow`](/packages/dataflow) | `ISourceBlock<T>` adapters for messages, routes, acknowledged routes, and state transitions | Client |
 | [`Pulse.Mqtt.DependencyInjection`](/packages/dependency-injection) | `AddPulseMqttClient`, named clients, options binding, hosted lifecycle, health checks | Client + `Microsoft.Extensions.*` abstractions |
+| [`Pulse.Mqtt.Endpoints`](/packages/endpoints) | Minimal-API-style `MapMqtt` endpoints with route constraints and per-message scopes | Client, DependencyInjection |
 | [`Pulse.Mqtt.Serialization.Json`](/packages/serialization-json) | Source-generated `System.Text.Json` serializer | Client |
 | [`Pulse.Mqtt.Serialization.MessagePack`](/packages/serialization-messagepack) | MessagePack serializer (compact binary, source-generated resolvers) | Core, `MessagePack` |
 | [`Pulse.Mqtt.Serialization.Protobuf`](/packages/serialization-protobuf) | Protocol Buffers serializer (compact binary, explicit parser registry) | Core, Protobuf runtime |

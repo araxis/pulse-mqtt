@@ -5,6 +5,7 @@ import { defineConfig } from 'vitepress'
 const addOnPackages = [
   { text: 'Overview', link: '/packages/' },
   { text: 'Dependency injection', link: '/packages/dependency-injection' },
+  { text: 'Endpoints', link: '/packages/endpoints' },
   { text: 'Dataflow', link: '/packages/dataflow' },
   { text: 'SQLite storage', link: '/packages/storage-sqlite' },
   { text: 'LiteDB storage', link: '/packages/storage-litedb' },

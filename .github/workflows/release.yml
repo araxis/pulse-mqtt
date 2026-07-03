@@ -144,6 +144,7 @@ jobs:
               Pulse.Mqtt.Client \
               Pulse.Mqtt.Dataflow \
               Pulse.Mqtt.DependencyInjection \
+              Pulse.Mqtt.Endpoints \
               Pulse.Mqtt.Serialization.Json \
               Pulse.Mqtt.Serialization.MessagePack \
               Pulse.Mqtt.Serialization.Protobuf \
