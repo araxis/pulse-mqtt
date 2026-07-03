@@ -66,6 +66,36 @@ public static class PulseMqttEndpointExtensions
         return Complete(client, route, registration, options);
     }
 
+    /// <summary>
+    /// Maps a request/reply endpoint: each matching request is deserialized to
+    /// <typeparamref name="TRequest"/>, handled, and the returned <typeparamref name="TResponse"/>
+    /// serialized and published to the request's response topic with its correlation data echoed —
+    /// the Minimal-API model where the handler's return value is the response. Requests without a
+    /// response topic are ignored. When <paramref name="services"/> is given, every invocation runs
+    /// in its own service scope. A handler exception sends no reply; the requester's timeout governs.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No serializer is configured.</exception>
+    public static MqttEndpoint MapMqttRequest<TRequest, TResponse>(
+        this ResilientMqttClient client,
+        string template,
+        Func<TRequest, MqttEndpointContext, ValueTask<TResponse>> handler,
+        MqttEndpointOptions? options = null,
+        IServiceProvider? services = null)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(handler);
+
+        var route = MqttRouteTemplate.Parse(template);
+        var invoker = new ScopedInvoker(services);
+        var registration = client.RegisterRequestHandler<TRequest, TResponse>(
+            route,
+            (request, routed, token) => invoker.InvokeAsync(
+                context => handler(request, context), routed.Message, routed.Values, token),
+            (options ?? Defaults).Route);
+
+        return Complete(client, route, registration, options);
+    }
+
     private static readonly MqttEndpointOptions Defaults = new();
 
     private static MqttEndpoint Complete(
@@ -112,6 +142,24 @@ public static class PulseMqttEndpointExtensions
             await using (scope.ConfigureAwait(false))
             {
                 await handler(new MqttEndpointContext(message, values, scope.ServiceProvider, cancellationToken)).ConfigureAwait(false);
+            }
+        }
+
+        public async ValueTask<TResponse> InvokeAsync<TResponse>(
+            Func<MqttEndpointContext, ValueTask<TResponse>> handler,
+            MqttPublishPacket message,
+            MqttRouteValues values,
+            CancellationToken cancellationToken)
+        {
+            if (_scopes is null)
+            {
+                return await handler(new MqttEndpointContext(message, values, services, cancellationToken)).ConfigureAwait(false);
+            }
+
+            var scope = _scopes.CreateAsyncScope();
+            await using (scope.ConfigureAwait(false))
+            {
+                return await handler(new MqttEndpointContext(message, values, scope.ServiceProvider, cancellationToken)).ConfigureAwait(false);
             }
         }
     }

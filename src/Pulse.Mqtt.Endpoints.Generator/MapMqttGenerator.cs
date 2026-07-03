@@ -50,7 +50,7 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
 
     private static readonly DiagnosticDescriptor ReturnTypeUnsupported = new(
         "PMQE006", "Handler return type unsupported",
-        "The MapMqtt handler must return void, Task, or ValueTask; '{0}' is not supported",
+        "The MapMqtt handler must return void, Task, or ValueTask; '{0}' is not supported — to reply with a value, map it with MapMqttRequest",
         "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
 
     private static readonly DiagnosticDescriptor ServicesNotPassed = new(
@@ -78,12 +78,23 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         "MapMqtt with a delegate handler cannot be generated behind a conditional access (?.) — call it on a non-null receiver",
         "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor RequestMustReturn = new(
+        "PMQE012", "Request handler must return the reply",
+        "The MapMqttRequest handler's return value is the reply — it must return TResponse, Task<TResponse>, or ValueTask<TResponse>; '{0}' is not supported. For a handler with no reply, map it with MapMqtt.",
+        "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor RequestNeedsPayload = new(
+        "PMQE013", "Request handler needs a request parameter",
+        "The MapMqttRequest handler must take the deserialized request as a parameter (a complex type, or one marked [FromPayload])",
+        "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
+
     private static readonly Dictionary<string, DiagnosticDescriptor> Descriptors =
         new DiagnosticDescriptor[]
         {
             TemplateNotConstant, HandlerNotLambda, ParameterNotBindable, RouteTypeMismatch,
             TemplateInvalid, ReturnTypeUnsupported, ServicesNotPassed, StaticFormUnsupported,
             ParameterShapeUnsupported, TypeNotEmittable, ConditionalAccessUnsupported,
+            RequestMustReturn, RequestNeedsPayload,
         }.ToDictionary(descriptor => descriptor.Id);
 
     /// <inheritdoc />
@@ -93,8 +104,8 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
             .CreateSyntaxProvider(
                 static (node, _) => node is InvocationExpressionSyntax
                 {
-                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "MapMqtt" }
-                        or MemberBindingExpressionSyntax { Name.Identifier.ValueText: "MapMqtt" },
+                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "MapMqtt" or "MapMqttRequest" }
+                        or MemberBindingExpressionSyntax { Name.Identifier.ValueText: "MapMqtt" or "MapMqttRequest" },
                     ArgumentList.Arguments.Count: >= 2,
                 },
                 static (syntaxContext, token) => Analyze(syntaxContext, token))
@@ -255,22 +266,78 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
             return Fail(context, invocation, receiver, diagnostics, token);
         }
 
-        var returnKind = lambda.ReturnType.ToDisplayString() switch
+        var isRequest = definition.Name == "MapMqttRequest";
+        string returnKind;
+        var responseType = string.Empty;
+        if (isRequest)
         {
-            "void" => "void",
-            "System.Threading.Tasks.Task" => "Task",
-            "System.Threading.Tasks.ValueTask" => "ValueTask",
-            var other => other,
-        };
-        if (returnKind is not ("void" or "Task" or "ValueTask"))
+            // The return value is the reply: TResponse, Task<TResponse>, or ValueTask<TResponse>.
+            ITypeSymbol? response = null;
+            var wrapper = "Sync";
+            if (lambda.ReturnType is INamedTypeSymbol { IsGenericType: true } generic)
+            {
+                switch (generic.ConstructedFrom.ToDisplayString())
+                {
+                    case "System.Threading.Tasks.Task<TResult>":
+                        wrapper = "Task";
+                        response = generic.TypeArguments[0];
+                        break;
+                    case "System.Threading.Tasks.ValueTask<TResult>":
+                        wrapper = "ValueTask";
+                        response = generic.TypeArguments[0];
+                        break;
+                }
+            }
+
+            if (response is null)
+            {
+                var display = lambda.ReturnType.ToDisplayString();
+                if (display is "void" or "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask")
+                {
+                    diagnostics.Add(DiagnosticInfo.Create(RequestMustReturn, handlerArgument.GetLocation(), display));
+                    return Fail(context, invocation, receiver, diagnostics, token);
+                }
+
+                response = lambda.ReturnType;
+            }
+
+            if (!IsEmittable(response, out var responseReason))
+            {
+                diagnostics.Add(DiagnosticInfo.Create(TypeNotEmittable, handlerArgument.GetLocation(), response.ToDisplayString(), responseReason));
+                return Fail(context, invocation, receiver, diagnostics, token);
+            }
+
+            returnKind = wrapper;
+            responseType = response.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        }
+        else
         {
-            diagnostics.Add(DiagnosticInfo.Create(ReturnTypeUnsupported, handlerArgument.GetLocation(), returnKind));
-            return Fail(context, invocation, receiver, diagnostics, token);
+            returnKind = lambda.ReturnType.ToDisplayString() switch
+            {
+                "void" => "void",
+                "System.Threading.Tasks.Task" => "Task",
+                "System.Threading.Tasks.ValueTask" => "ValueTask",
+                var other => other,
+            };
+            if (returnKind is not ("void" or "Task" or "ValueTask"))
+            {
+                diagnostics.Add(DiagnosticInfo.Create(ReturnTypeUnsupported, handlerArgument.GetLocation(), returnKind));
+                return Fail(context, invocation, receiver, diagnostics, token);
+            }
         }
 
         var parameters = ClassifyParameters(lambda, routeParameters, handlerArgument, diagnostics);
         if (parameters is null)
         {
+            return Fail(context, invocation, receiver, diagnostics, token);
+        }
+
+        // A request handler must bind the deserialized request: the runtime deserializes to
+        // TRequest before the handler runs, so a call site with no payload parameter has no
+        // TRequest to name.
+        if (isRequest && !parameters.Any(p => p.Binding == Binding.Payload))
+        {
+            diagnostics.Add(DiagnosticInfo.Create(RequestNeedsPayload, handlerArgument.GetLocation()));
             return Fail(context, invocation, receiver, diagnostics, token);
         }
 
@@ -297,7 +364,9 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
             return null;
         }
 
-        var emission = EmitInterceptorBody(receiver, lambda, parameters, returnKind);
+        var emission = isRequest
+            ? EmitRequestInterceptorBody(receiver, lambda, parameters, returnKind, responseType)
+            : EmitInterceptorBody(receiver, lambda, parameters, returnKind);
         return new Site(location.Data, location.Version, receiver, emission, diagnostics.ToImmutable());
     }
 
@@ -670,6 +739,55 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         var mapCall = payload is null
             ? $"global::Pulse.Mqtt.Endpoints.PulseMqttEndpointExtensions.MapMqtt(client, template, {lambdaText}, options, services)"
             : $"global::Pulse.Mqtt.Endpoints.PulseMqttEndpointExtensions.MapMqtt<{payload.Type}>(client, template, {lambdaText}, options, services)";
+
+        var resolve = receiver switch
+        {
+            Receiver.Client => string.Empty,
+            Receiver.HostSingle => "        var client = global::Pulse.Mqtt.Endpoints.GeneratedEndpointSupport.ResolveSingleClient(app);\n        var services = (global::System.IServiceProvider?)app.Services;\n",
+            Receiver.HostNamed => "        var client = global::Pulse.Mqtt.Endpoints.GeneratedEndpointSupport.ResolveClient(app, clientName);\n        var services = (global::System.IServiceProvider?)app.Services;\n",
+            _ => throw new InvalidOperationException(),
+        };
+
+        return $"        var typed = ({delegateType})handler;\n{resolve}        return {mapCall};";
+    }
+
+    // The request family: the handler's return value is the reply, so the lowered lambda hands
+    // it to MapMqttRequest<TRequest, TResponse> — normalizing Task<T> and plain T returns into
+    // the runtime's ValueTask<T> shape.
+    private static string EmitRequestInterceptorBody(
+        Receiver receiver,
+        IMethodSymbol lambda,
+        List<Parameter> parameters,
+        string returnKind,
+        string responseType)
+    {
+        var payload = parameters.First(p => p.Binding == Binding.Payload);
+        var valueTaskType = $"global::System.Threading.Tasks.ValueTask<{responseType}>";
+        var returnType = returnKind switch
+        {
+            "Task" => $"global::System.Threading.Tasks.Task<{responseType}>",
+            "ValueTask" => valueTaskType,
+            _ => responseType,
+        };
+        var types = parameters.Select(p => p.Type).Append(returnType);
+        var delegateType = $"global::System.Func<{string.Join(", ", types)}>";
+
+        var arguments = string.Join(", ", parameters.Select(p => p.Binding switch
+        {
+            Binding.Route => $"context.Route.{p.RouteAccessor}",
+            Binding.Payload => "payload",
+            Binding.Service => $"global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<{p.Type}>(context.Services)",
+            Binding.Context => "context",
+            Binding.Message => "context.Message",
+            Binding.Token => "context.CancellationToken",
+            _ => throw new InvalidOperationException(),
+        }));
+
+        var call = $"typed({arguments})";
+        var body = returnKind == "ValueTask" ? call : $"new {valueTaskType}({call})";
+        var mapCall =
+            $"global::Pulse.Mqtt.Endpoints.PulseMqttEndpointExtensions.MapMqttRequest<{payload.Type}, {responseType}>" +
+            $"(client, template, (payload, context) => {body}, options, services)";
 
         var resolve = receiver switch
         {
