@@ -34,6 +34,42 @@ internal static class GeneratorVerifier
         return ([.. diagnostics.OrderBy(d => d.Id)], emitted);
     }
 
+    /// <summary>
+    /// Runs the generator over two consecutive compilations sharing one driver, so incremental
+    /// caching between runs behaves as it does in the IDE: the caller tree is unchanged, the
+    /// other tree is swapped. Returns each run's diagnostics.
+    /// </summary>
+    public static (ImmutableArray<Diagnostic> First, ImmutableArray<Diagnostic> Second) RunTwice(
+        string callerSource,
+        string firstOtherSource,
+        string secondOtherSource)
+    {
+        var caller = CSharpSyntaxTree.ParseText(callerSource, CSharpParseOptions.Default, path: "Caller.cs");
+        var firstOther = CSharpSyntaxTree.ParseText(firstOtherSource, CSharpParseOptions.Default, path: "Other.cs");
+        var compilation = CSharpCompilation.Create(
+            "GeneratorTests",
+            [caller, firstOther],
+            GetReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        compilation.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ShouldBeEmpty();
+
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(new MapMqttGenerator());
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out var first);
+
+        var secondOther = CSharpSyntaxTree.ParseText(secondOtherSource, CSharpParseOptions.Default, path: "Other.cs");
+        var updated = compilation.ReplaceSyntaxTree(firstOther, secondOther);
+
+        updated.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ShouldBeEmpty();
+
+        driver.RunGeneratorsAndUpdateCompilation(updated, out _, out var second);
+        return (first, second);
+    }
+
     private static IEnumerable<MetadataReference> GetReferences()
     {
         var assemblies = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?

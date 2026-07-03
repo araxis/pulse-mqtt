@@ -2,6 +2,16 @@
 
 ## 2.25.0 (unreleased)
 
+- An adversarial audit of the `MapMqtt` generator closed every found gap in its "unbindable
+  call sites are compile errors" contract: named/reordered arguments now bind by name instead
+  of being misread positionally; templates the runtime parser rejects (`#` not last, literals
+  mixed with braces) are `PMQE005` instead of a startup throw; lambdas with `ref`/`out`/`in`,
+  `params`, or default values are `PMQE009` instead of an `InvalidCastException` at map time;
+  type parameters and private/file-local handler parameter types are `PMQE010` instead of
+  uncompilable generated code; `client?.MapMqtt(...)` is `PMQE011` instead of silently hitting
+  the runtime fallback throw; passing an explicit `null` for `services` no longer bypasses
+  `PMQE007`; and diagnostics no longer go stale in incremental builds when a type in another
+  file changes.
 - The `MapMqtt` generator now refuses two call shapes that previously compiled and threw at
   runtime: a service-bound handler parameter on a client call that passes no `services`
   provider (`PMQE007`), and the static invocation form

@@ -63,6 +63,29 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         "MapMqtt with a delegate handler cannot be generated for the static invocation form — call it as an extension method (client.MapMqtt(...) or app.MapMqtt(...))",
         "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor ParameterShapeUnsupported = new(
+        "PMQE009", "Handler parameter shape unsupported",
+        "Handler parameter '{0}' has {1}, which the generated binding cannot invoke — MapMqtt handler parameters must be plain by-value parameters",
+        "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor TypeNotEmittable = new(
+        "PMQE010", "Handler parameter type unusable in generated code",
+        "Handler parameter type '{0}' cannot be used in generated code: {1}",
+        "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor ConditionalAccessUnsupported = new(
+        "PMQE011", "MapMqtt cannot be conditionally accessed",
+        "MapMqtt with a delegate handler cannot be generated behind a conditional access (?.) — call it on a non-null receiver",
+        "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    private static readonly Dictionary<string, DiagnosticDescriptor> Descriptors =
+        new DiagnosticDescriptor[]
+        {
+            TemplateNotConstant, HandlerNotLambda, ParameterNotBindable, RouteTypeMismatch,
+            TemplateInvalid, ReturnTypeUnsupported, ServicesNotPassed, StaticFormUnsupported,
+            ParameterShapeUnsupported, TypeNotEmittable, ConditionalAccessUnsupported,
+        }.ToDictionary(descriptor => descriptor.Id);
+
     /// <inheritdoc />
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -70,7 +93,8 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
             .CreateSyntaxProvider(
                 static (node, _) => node is InvocationExpressionSyntax
                 {
-                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "MapMqtt" },
+                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "MapMqtt" }
+                        or MemberBindingExpressionSyntax { Name.Identifier.ValueText: "MapMqtt" },
                     ArgumentList.Arguments.Count: >= 2,
                 },
                 static (syntaxContext, token) => Analyze(syntaxContext, token))
@@ -80,21 +104,66 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(sites.Collect(), static (productionContext, all) => Emit(productionContext, all));
     }
 
+    /// <summary>
+    /// A diagnostic captured as plain values so <see cref="Site"/> stays fully value-equatable
+    /// for incremental caching — holding <see cref="Diagnostic"/> instances would exclude them
+    /// from equality (stale diagnostics on replay) and root stale compilations via locations.
+    /// </summary>
+    private sealed record DiagnosticInfo(
+        string Id,
+        string FilePath,
+        int SpanStart,
+        int SpanLength,
+        int StartLine,
+        int StartCharacter,
+        int EndLine,
+        int EndCharacter,
+        string PackedArguments)
+    {
+        public static DiagnosticInfo Create(DiagnosticDescriptor descriptor, Location location, params object?[] arguments)
+        {
+            var lineSpan = location.GetLineSpan();
+            return new DiagnosticInfo(
+                descriptor.Id,
+                location.SourceTree?.FilePath ?? lineSpan.Path ?? string.Empty,
+                location.SourceSpan.Start,
+                location.SourceSpan.Length,
+                lineSpan.StartLinePosition.Line,
+                lineSpan.StartLinePosition.Character,
+                lineSpan.EndLinePosition.Line,
+                lineSpan.EndLinePosition.Character,
+                string.Join("\u0001", arguments.Select(argument => argument?.ToString() ?? string.Empty)));
+        }
+
+        public Diagnostic ToDiagnostic()
+        {
+            var location = Location.Create(
+                FilePath,
+                new TextSpan(SpanStart, SpanLength),
+                new LinePositionSpan(
+                    new LinePosition(StartLine, StartCharacter),
+                    new LinePosition(EndLine, EndCharacter)));
+            object[] arguments = PackedArguments.Length == 0 ? [] : PackedArguments.Split('\u0001');
+            return Diagnostic.Create(Descriptors[Id], location, arguments);
+        }
+    }
+
     private sealed record Site(
         string InterceptsData,
         int InterceptsVersion,
         Receiver Receiver,
         string Emission,
-        ImmutableArray<Diagnostic> Diagnostics)
+        ImmutableArray<DiagnosticInfo> Diagnostics)
     {
         public bool Equals(Site? other) =>
             other is not null
             && InterceptsData == other.InterceptsData
             && InterceptsVersion == other.InterceptsVersion
             && Receiver == other.Receiver
-            && Emission == other.Emission;
+            && Emission == other.Emission
+            && Diagnostics.SequenceEqual(other.Diagnostics);
 
-        public override int GetHashCode() => InterceptsData.GetHashCode();
+        public override int GetHashCode() => InterceptsData.GetHashCode() ^ Emission.GetHashCode() ^ Diagnostics.Length;
     }
 
     private enum Receiver
@@ -134,43 +203,55 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
             _ => definition.Parameters.Length == 5 ? Receiver.HostNamed : Receiver.HostSingle,
         };
 
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
 
-        // Every argument index below assumes the reduced form; the static invocation form shifts
+        // client?.MapMqtt(...) cannot be intercepted; without this check it would compile clean
+        // and hit the throwing fallback at runtime.
+        if (invocation.Expression is MemberBindingExpressionSyntax)
+        {
+            diagnostics.Add(DiagnosticInfo.Create(ConditionalAccessUnsupported, invocation.GetLocation()));
+            return Fail(context, invocation, receiver, diagnostics, token);
+        }
+
+        // Argument positions below assume the reduced form; the static invocation form shifts
         // them all by the receiver and cannot be intercepted with the emitted signatures, so it
         // is rejected honestly rather than misread.
         if (method.ReducedFrom is null)
         {
-            diagnostics.Add(Diagnostic.Create(StaticFormUnsupported, invocation.GetLocation()));
+            diagnostics.Add(DiagnosticInfo.Create(StaticFormUnsupported, invocation.GetLocation()));
             return Fail(context, invocation, receiver, diagnostics, token);
         }
 
         var arguments = invocation.ArgumentList.Arguments;
-        var templateArgument = receiver == Receiver.HostNamed ? arguments[1] : arguments[0];
-        var handlerArgument = receiver == Receiver.HostNamed ? arguments[2] : arguments[1];
+        var templateArgument = FindArgument(arguments, method, "template");
+        var handlerArgument = FindArgument(arguments, method, "handler");
+        if (templateArgument is null || handlerArgument is null)
+        {
+            return null;
+        }
 
         var templateValue = context.SemanticModel.GetConstantValue(templateArgument.Expression, token);
         if (templateValue.Value is not string template)
         {
-            diagnostics.Add(Diagnostic.Create(TemplateNotConstant, templateArgument.GetLocation()));
+            diagnostics.Add(DiagnosticInfo.Create(TemplateNotConstant, templateArgument.GetLocation()));
             return Fail(context, invocation, receiver, diagnostics, token);
         }
 
         if (handlerArgument.Expression is not (ParenthesizedLambdaExpressionSyntax or SimpleLambdaExpressionSyntax))
         {
-            diagnostics.Add(Diagnostic.Create(HandlerNotLambda, handlerArgument.GetLocation()));
+            diagnostics.Add(DiagnosticInfo.Create(HandlerNotLambda, handlerArgument.GetLocation()));
             return Fail(context, invocation, receiver, diagnostics, token);
         }
 
         if (context.SemanticModel.GetSymbolInfo(handlerArgument.Expression, token).Symbol is not IMethodSymbol lambda)
         {
-            diagnostics.Add(Diagnostic.Create(HandlerNotLambda, handlerArgument.GetLocation()));
+            diagnostics.Add(DiagnosticInfo.Create(HandlerNotLambda, handlerArgument.GetLocation()));
             return Fail(context, invocation, receiver, diagnostics, token);
         }
 
         if (!TryParseTemplate(template, out var routeParameters, out var parseError))
         {
-            diagnostics.Add(Diagnostic.Create(TemplateInvalid, templateArgument.GetLocation(), parseError));
+            diagnostics.Add(DiagnosticInfo.Create(TemplateInvalid, templateArgument.GetLocation(), parseError));
             return Fail(context, invocation, receiver, diagnostics, token);
         }
 
@@ -183,7 +264,7 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         };
         if (returnKind is not ("void" or "Task" or "ValueTask"))
         {
-            diagnostics.Add(Diagnostic.Create(ReturnTypeUnsupported, handlerArgument.GetLocation(), returnKind));
+            diagnostics.Add(DiagnosticInfo.Create(ReturnTypeUnsupported, handlerArgument.GetLocation(), returnKind));
             return Fail(context, invocation, receiver, diagnostics, token);
         }
 
@@ -194,16 +275,18 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         }
 
         // On the bare client nothing supplies a container implicitly: a service-bound parameter
-        // with the services argument omitted at the call site is a guaranteed throw on the first
-        // delivery, so it is refused here instead. Host receivers always flow app.Services.
+        // with the services argument omitted (or passed as a null constant) is a guaranteed
+        // throw on the first delivery, so it is refused here instead. Host receivers always
+        // flow app.Services.
         if (receiver == Receiver.Client && parameters.Any(p => p.Binding == Binding.Service))
         {
-            var servicesProvided = arguments.Count >= 4
-                || arguments.Any(a => a.NameColon?.Name.Identifier.ValueText == "services");
+            var servicesArgument = FindArgument(arguments, method, "services");
+            var servicesProvided = servicesArgument is not null
+                && !IsNullConstant(context.SemanticModel, servicesArgument.Expression, token);
             if (!servicesProvided)
             {
                 var first = parameters.First(p => p.Binding == Binding.Service);
-                diagnostics.Add(Diagnostic.Create(ServicesNotPassed, handlerArgument.GetLocation(), first.Name));
+                diagnostics.Add(DiagnosticInfo.Create(ServicesNotPassed, handlerArgument.GetLocation(), first.Name));
                 return Fail(context, invocation, receiver, diagnostics, token);
             }
         }
@@ -218,30 +301,96 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         return new Site(location.Data, location.Version, receiver, emission, diagnostics.ToImmutable());
     }
 
+    /// <summary>
+    /// Resolves the argument for a parameter by name, honoring named arguments in any order —
+    /// positional indexing alone misreads legal call sites such as
+    /// <c>MapMqtt(handler: ..., template: ...)</c>.
+    /// </summary>
+    private static ArgumentSyntax? FindArgument(
+        SeparatedSyntaxList<ArgumentSyntax> arguments,
+        IMethodSymbol method,
+        string parameterName)
+    {
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            var argument = arguments[i];
+            if (argument.NameColon is { } nameColon)
+            {
+                if (nameColon.Name.Identifier.ValueText == parameterName)
+                {
+                    return argument;
+                }
+            }
+            else if (i < method.Parameters.Length && method.Parameters[i].Name == parameterName)
+            {
+                return argument;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsNullConstant(
+        SemanticModel semanticModel,
+        ExpressionSyntax expression,
+        System.Threading.CancellationToken token)
+    {
+        var constant = semanticModel.GetConstantValue(expression, token);
+        return constant.HasValue && constant.Value is null;
+    }
+
     private static Site? Fail(
         GeneratorSyntaxContext context,
         InvocationExpressionSyntax invocation,
         Receiver receiver,
-        ImmutableArray<Diagnostic>.Builder diagnostics,
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics,
         System.Threading.CancellationToken token)
     {
+        // Diagnostics must survive even when the invocation has no interceptable location
+        // (conditional access, for one); an empty InterceptsData marks a diagnostics-only site.
         var location = context.SemanticModel.GetInterceptableLocation(invocation, token);
-        return location is null
-            ? null
-            : new Site(location.Data, location.Version, receiver, Emission: string.Empty, diagnostics.ToImmutable());
+        return new Site(
+            location?.Data ?? string.Empty,
+            location?.Version ?? 0,
+            receiver,
+            Emission: string.Empty,
+            diagnostics.ToImmutable());
     }
 
     private static List<Parameter>? ClassifyParameters(
         IMethodSymbol lambda,
         Dictionary<string, string> routeParameters,
         ArgumentSyntax handlerArgument,
-        ImmutableArray<Diagnostic>.Builder diagnostics)
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics)
     {
         var result = new List<Parameter>();
         var payloadSeen = false;
 
         foreach (var parameter in lambda.Parameters)
         {
+            // ref/out/in, params, and default values give the lambda a synthesized delegate
+            // type that the emitted Action<...>/Func<...> cast cannot invoke — refuse them
+            // here instead of throwing InvalidCastException at map time.
+            if (parameter.RefKind != RefKind.None || parameter.IsParams || parameter.HasExplicitDefaultValue)
+            {
+                var shape = parameter.RefKind switch
+                {
+                    RefKind.Ref => "a 'ref' modifier",
+                    RefKind.Out => "an 'out' modifier",
+                    RefKind.In => "an 'in' modifier",
+                    RefKind.RefReadOnlyParameter => "a 'ref readonly' modifier",
+                    _ => parameter.IsParams ? "a 'params' modifier" : "a default value",
+                };
+                diagnostics.Add(DiagnosticInfo.Create(ParameterShapeUnsupported, handlerArgument.GetLocation(), parameter.Name, shape));
+                return null;
+            }
+
+            if (!IsEmittable(parameter.Type, out var reason))
+            {
+                diagnostics.Add(DiagnosticInfo.Create(TypeNotEmittable, handlerArgument.GetLocation(), parameter.Type.ToDisplayString(), reason));
+                return null;
+            }
+
             var type = parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var attributes = parameter.GetAttributes();
             var fromRoute = attributes.FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == $"{EndpointsNamespace}.FromRouteAttribute");
@@ -258,7 +407,7 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
             {
                 if (payloadSeen)
                 {
-                    diagnostics.Add(Diagnostic.Create(ParameterNotBindable, handlerArgument.GetLocation(), parameter.Name, "only one parameter can bind the payload"));
+                    diagnostics.Add(DiagnosticInfo.Create(ParameterNotBindable, handlerArgument.GetLocation(), parameter.Name, "only one parameter can bind the payload"));
                     return null;
                 }
 
@@ -272,14 +421,14 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
             {
                 if (!routeParameters.TryGetValue(routeName, out var constraint))
                 {
-                    diagnostics.Add(Diagnostic.Create(ParameterNotBindable, handlerArgument.GetLocation(), parameter.Name, $"the template has no route parameter named '{routeName}'"));
+                    diagnostics.Add(DiagnosticInfo.Create(ParameterNotBindable, handlerArgument.GetLocation(), parameter.Name, $"the template has no route parameter named '{routeName}'"));
                     return null;
                 }
 
                 var accessor = RouteAccessorFor(parameter.Type, constraint, routeName);
                 if (accessor is null)
                 {
-                    diagnostics.Add(Diagnostic.Create(
+                    diagnostics.Add(DiagnosticInfo.Create(
                         RouteTypeMismatch, handlerArgument.GetLocation(),
                         parameter.Name, parameter.Type.ToDisplayString(), routeName, ConstraintFor(parameter.Type) ?? "?"));
                     return null;
@@ -304,7 +453,7 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
 
             if (parameter.Type.IsValueType || parameter.Type.SpecialType == SpecialType.System_String)
             {
-                diagnostics.Add(Diagnostic.Create(
+                diagnostics.Add(DiagnosticInfo.Create(
                     ParameterNotBindable, handlerArgument.GetLocation(), parameter.Name,
                     "simple types bind only to route parameters; no route parameter has this name"));
                 return null;
@@ -323,6 +472,49 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Whether the type can be named from the generated interceptor file: the interceptor is a
+    /// non-generic <c>file</c> class in the consumer's assembly, so type parameters and types
+    /// less accessible than <c>internal</c> would make the emitted code fail to compile.
+    /// </summary>
+    private static bool IsEmittable(ITypeSymbol type, out string reason)
+    {
+        reason = string.Empty;
+        switch (type)
+        {
+            case ITypeParameterSymbol:
+                reason = "it is a type parameter, and the generated interceptor is not generic";
+                return false;
+
+            case IArrayTypeSymbol array:
+                return IsEmittable(array.ElementType, out reason);
+
+            case INamedTypeSymbol named:
+                for (var current = named; current is not null; current = current.ContainingType)
+                {
+                    if (current.IsFileLocal
+                        || current.DeclaredAccessibility is Accessibility.Private or Accessibility.Protected or Accessibility.ProtectedAndInternal)
+                    {
+                        reason = "it is not accessible from generated code (private, protected, or file-local)";
+                        return false;
+                    }
+                }
+
+                foreach (var argument in named.TypeArguments)
+                {
+                    if (!IsEmittable(argument, out reason))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+
+            default:
+                return true;
+        }
     }
 
     private static string? RouteAccessorFor(ITypeSymbol type, string constraint, string routeName)
@@ -356,15 +548,52 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         _ => null,
     };
 
+    /// <summary>
+    /// Mirrors <c>MqttRouteTemplate.Parse</c> exactly — every template rejected there must be
+    /// rejected here (PMQE005), or the emitted MapMqtt call throws at startup instead of
+    /// failing the build.
+    /// </summary>
     private static bool TryParseTemplate(string template, out Dictionary<string, string> parameters, out string error)
     {
         parameters = new Dictionary<string, string>(StringComparer.Ordinal);
         error = string.Empty;
-        foreach (var segment in template.Split('/'))
+
+        if (template.Length == 0)
         {
+            error = "the template is empty";
+            return false;
+        }
+
+        var segments = template.Split('/');
+        for (var i = 0; i < segments.Length; i++)
+        {
+            var segment = segments[i];
+
+            if (segment == "#")
+            {
+                if (i != segments.Length - 1)
+                {
+                    error = "'#' is only valid as the last level";
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (segment == "+")
+            {
+                continue;
+            }
+
             if (segment.Length > 2 && segment[0] == '{' && segment[segment.Length - 1] == '}')
             {
                 var body = segment.Substring(1, segment.Length - 2);
+                if (body.IndexOf('{') >= 0 || body.IndexOf('}') >= 0)
+                {
+                    error = $"segment '{segment}' is malformed";
+                    return false;
+                }
+
                 var colon = body.IndexOf(':');
                 var name = colon >= 0 ? body.Substring(0, colon) : body;
                 var constraint = colon >= 0 ? body.Substring(colon + 1) : "";
@@ -381,6 +610,13 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
                 }
 
                 parameters.Add(name, constraint);
+                continue;
+            }
+
+            if (segment.IndexOf('{') >= 0 || segment.IndexOf('}') >= 0 || segment.IndexOf('+') >= 0 || segment.IndexOf('#') >= 0)
+            {
+                error = $"segment '{segment}' mixes literals with wildcard or parameter syntax";
+                return false;
             }
         }
 
@@ -450,10 +686,10 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
     {
         foreach (var diagnostic in sites.SelectMany(site => site.Diagnostics))
         {
-            context.ReportDiagnostic(diagnostic);
+            context.ReportDiagnostic(diagnostic.ToDiagnostic());
         }
 
-        var valid = sites.Where(site => site.Emission.Length > 0).ToList();
+        var valid = sites.Where(site => site.Emission.Length > 0 && site.InterceptsData.Length > 0).ToList();
         if (valid.Count == 0)
         {
             return;

@@ -113,7 +113,7 @@ client.MapMqtt("sensors/{deviceId:int}/reading",
 The generator lowers every such call onto the context API above **at compile time**, using C#
 interceptors — there is no runtime binder and no reflection, so the zero-AOT-warning guarantee
 holds by construction (the AOT smoke binary maps one of these). A call site the generator
-cannot bind is a **compile error** (`PMQE001`–`PMQE008`), never a silent fallback. That
+cannot bind is a **compile error** (`PMQE001`–`PMQE011`), never a silent fallback. That
 includes forgetting the provider: a service parameter on a client call that passes no
 `services` argument is refused at compile time (`PMQE007`) instead of throwing on the first
 delivery.
