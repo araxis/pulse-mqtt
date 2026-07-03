@@ -22,11 +22,11 @@ features:
   - title: Swappable everywhere
     details: Reconnect policy, retry classification, session store, offline store, serializer, transport, lifecycle hooks — each one is a small interface with a solid default. Replacing any of them is one line.
   - title: Fast and allocation-light
-    details: Span-based codec with zero-allocation publish encoding, single-write framing, pipelines end to end, bounded queues everywhere. Beats MQTTnet on throughput, allocations, and connect latency.
+    details: Span-based codec with zero-allocation publish encoding, single-write framing, pipelines end to end, bounded queues everywhere. Throughput, allocations, and connect latency are measured, and the numbers are published.
   - title: Topic routing built in
     details: Route templates like sensors/{deviceId}/temp dispatch messages to handlers with captured parameters, per-route bounded queues, and fault isolation. Streams when you prefer await foreach.
   - title: Typed messaging and RPC
     details: Publish and consume objects through a pluggable serializer, with source-generated JSON included. Request/response over MQTT 5 response topics and correlation data, both caller and responder.
   - title: Honest engineering
-    details: 300+ deterministic tests plus integration tests against real Mosquitto, fuzz-hardened decoding, verified Native AOT, and published benchmarks including the scenarios the competition wins.
+    details: 600+ deterministic tests plus a conformance suite against real brokers, fuzz-hardened decoding, verified Native AOT, and benchmarks published in full — wins and losses alike.
 ---

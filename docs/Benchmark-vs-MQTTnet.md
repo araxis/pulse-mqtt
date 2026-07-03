@@ -1,8 +1,10 @@
-# Pulse.Mqtt vs MQTTnet
+# Benchmark comparison
 
-Head-to-head measurements of Pulse.Mqtt and MQTTnet 5.1.0 against a real Mosquitto broker.
-The harness lives in `bench/Pulse.Mqtt.ComparisonBenchmarks` and reproduces every number below
-with `dotnet run -c Release --project bench/Pulse.Mqtt.ComparisonBenchmarks` (requires Docker).
+Side-by-side measurements of Pulse.Mqtt against MQTTnet 5.1.0 — the established, widely used
+.NET MQTT client — as a familiar reference point for the numbers, run against a real Mosquitto
+broker. The harness lives in `bench/Pulse.Mqtt.ComparisonBenchmarks` and reproduces every number
+below with `dotnet run -c Release --project bench/Pulse.Mqtt.ComparisonBenchmarks` (requires
+Docker).
 
 ## Environment
 
