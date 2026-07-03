@@ -2,6 +2,17 @@
 
 ## 2.27.0 (unreleased)
 
+- Fixed the offline-queue flush double-sending a message the persistent session already held in
+  flight. When a queued publish was flushed but the connection died mid-exchange, `RawMqttClient`
+  raised `MqttPublishInFlightException` (the session now owns the message and redelivers it with DUP
+  on resume) — but `FlushQueuedAsync` only caught `MqttPacketTooLargeException`, so that exception
+  escaped and skipped removing the entry from the queue. The message then lived in both the session
+  and the offline queue, and on the next resume the session redelivered the original while the flush
+  re-published the queued copy under a fresh packet identifier — two deliveries the broker's QoS 2
+  dedup could not collapse (a duplicate for QoS 1). The flush now catches `MqttPublishInFlightException`
+  and removes the entry, leaving redelivery to the session, exactly as the online publish path already
+  did (`PublishCoreAsync` returns `InFlight` without queueing for the same reason).
+
 - Fixed a CONNACK-level server redirect (`ServerMoved` / `UseAnotherServer`) that could not be
   followed reconnecting to the same server forever instead of faulting. When the broker rejected the
   CONNACK with a redirect but the redirect was not followable — redirect-following is off (the

@@ -88,6 +88,53 @@ public sealed class SessionRedeliveryTests
     }
 
     [Fact]
+    public async Task A_flushed_publish_left_in_flight_is_removed_from_the_offline_queue()
+    {
+        var store = new InMemoryMessageStore(new OfflineQueueOptions { Capacity = 8 });
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "flush-inflight", KeepAliveSeconds = 0, CleanStart = false, SessionExpiryInterval = 300 },
+            Backoff = new BackoffOptions { BaseDelay = TimeSpan.FromMilliseconds(1), MaxDelay = TimeSpan.FromMilliseconds(5) },
+            MessageStore = store,
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        var broker1 = await factory.NextBrokerAsync(timeout.Token);
+        await broker1.AcceptConnectionAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        // Drop the live connection; the client starts reconnecting.
+        await broker1.DisposeAsync();
+        while (factory.ConnectionsHandedOut < 2)
+        {
+            await Task.Delay(5, timeout.Token);
+        }
+
+        // A QoS 2 publish while offline lands in the durable queue.
+        _ = client.PublishAsync(
+            new MqttPublishPacket { Topic = "q", Payload = new byte[] { 1 }, QualityOfService = MqttQualityOfService.ExactlyOnce },
+            timeout.Token);
+        await WaitForAsync(() => store.Count == 1, timeout.Token);
+
+        // Resume the session: the connection-up flush publishes the queued message, which the client
+        // now awaits (QoS 2 exchange in flight).
+        var broker2 = await factory.NextBrokerAsync(timeout.Token);
+        await broker2.AcceptConnectionAsync(timeout.Token, sessionPresent: true);
+        (await broker2.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttPublishPacket>().Topic.ShouldBe("q");
+
+        // The connection dies before the PUBREC: the publish is now tracked by the session, which will
+        // redeliver it with DUP on the next resume. It must therefore be removed from the offline
+        // queue — otherwise the next connection-up flush would re-publish it under a fresh identifier
+        // while the session redelivers the original, double-sending it (a QoS 2 exactly-once
+        // violation). Before the fix the MqttPublishInFlightException escaped the flush and skipped the
+        // removal, so the entry stayed queued and store.Count never returned to zero.
+        await broker2.DisposeAsync();
+        await WaitForAsync(() => store.Count == 0, timeout.Token);
+    }
+
+    [Fact]
     public async Task A_qos2_publish_dropped_after_pubrec_redelivers_only_the_pubrel()
     {
         var factory = new SequencedTransportFactory();
@@ -386,6 +433,14 @@ public sealed class SessionRedeliveryTests
     private static async Task WaitForStateAsync(ResilientMqttClient client, ConnectionState state, CancellationToken cancellationToken)
     {
         while (client.State != state)
+        {
+            await Task.Delay(1, cancellationToken);
+        }
+    }
+
+    private static async Task WaitForAsync(Func<bool> predicate, CancellationToken cancellationToken)
+    {
+        while (!predicate())
         {
             await Task.Delay(1, cancellationToken);
         }
