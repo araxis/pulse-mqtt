@@ -113,7 +113,7 @@ client.MapMqtt("sensors/{deviceId:int}/reading",
 The generator lowers every such call onto the context API above **at compile time**, using C#
 interceptors — there is no runtime binder and no reflection, so the zero-AOT-warning guarantee
 holds by construction (the AOT smoke binary maps one of these). A call site the generator
-cannot bind is a **compile error** (`PMQE001`–`PMQE011`), never a silent fallback. That
+cannot bind is a **compile error** (`PMQE001`–`PMQE013`), never a silent fallback. That
 includes forgetting the provider: a service parameter on a client call that passes no
 `services` argument is refused at compile time (`PMQE007`) instead of throwing on the first
 delivery.
@@ -137,6 +137,34 @@ string — it is parsed at compile time.
 
 The explicit `MqttEndpointContext` overloads remain the stable foundation: they are what the
 generator emits into, and what to use when a handler is built dynamically.
+
+## Request/reply
+
+`MapMqttRequest` is the Minimal-API model for MQTT 5 request/response: **the handler's return
+value is the reply**, serialized and published to the request's response topic with its
+correlation data echoed. Handlers return `TResponse`, `Task<TResponse>`, or
+`ValueTask<TResponse>` — a request handler that returns nothing is a compile error (`PMQE012`),
+just as a plain `MapMqtt` handler that returns a value is (`PMQE006`).
+
+```csharp
+// The responder — same binding rules as MapMqtt; requires a serializer:
+app.MapMqttRequest("devices/{deviceId:int}/status",
+    (int deviceId, StatusQuery query, IDeviceStore store, CancellationToken ct) =>
+        store.GetStatusAsync(deviceId, query, ct));
+
+// The requester — the HttpClient analog, already part of the client:
+var report = await client.RequestAsync<StatusQuery, StatusReport>("devices/42/status", query);
+```
+
+The same shape works on the bare client (`client.MapMqttRequest(...)`, with `services:` for
+per-message scopes), and the explicit overload is
+`client.MapMqttRequest<TRequest, TResponse>(template, (request, ctx) => ...)`. The request
+payload parameter is required (`PMQE013`) — it is what the runtime deserializes the request
+into.
+
+Error semantics mirror a lost HTTP request: a handler exception sends **no reply** (it is
+logged through the route's fault isolation) and the requester's timeout governs; requests
+arriving without a response topic are ignored.
 
 ## Related docs
 

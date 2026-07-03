@@ -39,6 +39,41 @@ public static class MapMqttDelegateExtensions
         MqttEndpointOptions? options = null) =>
         throw GeneratorMissing();
 
+    /// <summary>
+    /// Maps a Minimal-API-style request/reply handler on the client: the return value is the
+    /// reply. Lowered at compile time.
+    /// </summary>
+    public static MqttEndpoint MapMqttRequest(
+        this ResilientMqttClient client,
+        string template,
+        Delegate handler,
+        MqttEndpointOptions? options = null,
+        IServiceProvider? services = null) =>
+        throw GeneratorMissing();
+
+    /// <summary>
+    /// Maps a Minimal-API-style request/reply handler on the app's single client: the return
+    /// value is the reply. Lowered at compile time.
+    /// </summary>
+    public static MqttEndpoint MapMqttRequest(
+        this IHost app,
+        string template,
+        Delegate handler,
+        MqttEndpointOptions? options = null) =>
+        throw GeneratorMissing();
+
+    /// <summary>
+    /// Maps a Minimal-API-style request/reply handler on the named client: the return value is
+    /// the reply. Lowered at compile time.
+    /// </summary>
+    public static MqttEndpoint MapMqttRequest(
+        this IHost app,
+        string clientName,
+        string template,
+        Delegate handler,
+        MqttEndpointOptions? options = null) =>
+        throw GeneratorMissing();
+
     private static InvalidOperationException GeneratorMissing() =>
         new("This MapMqtt overload is lowered at compile time by the Pulse.Mqtt.Endpoints source " +
             "generator, which did not run. Build with the Pulse.Mqtt.Endpoints NuGet package (it " +

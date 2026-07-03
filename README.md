@@ -129,7 +129,13 @@ app.MapMqtt("sensors/{deviceId:int}/reading",
     (int deviceId, Reading reading, IDeviceStore store, CancellationToken ct) =>
         store.SaveAsync(deviceId, reading, ct));
 
-// A call site that cannot be bound is a compile error (PMQE001–PMQE011), never a runtime surprise.
+// Request/reply: the return value IS the reply — published to the request's response topic
+// with correlation data echoed. client.RequestAsync<TReq, TRes>(...) is the caller side.
+app.MapMqttRequest("devices/{deviceId:int}/status",
+    (int deviceId, StatusQuery query, IDeviceStore store, CancellationToken ct) =>
+        store.GetStatusAsync(deviceId, query, ct));
+
+// A call site that cannot be bound is a compile error (PMQE001–PMQE013), never a runtime surprise.
 ```
 
 ### Typed messaging

@@ -44,4 +44,20 @@ public static class HostMqttEndpointExtensions
         MqttEndpointOptions? options = null) =>
         GeneratedEndpointSupport.ResolveClient(app, clientName).MapMqtt(template, handler, options, app.Services);
 
+    /// <summary>Maps a request/reply endpoint on the app's single registered Pulse MQTT client.</summary>
+    public static MqttEndpoint MapMqttRequest<TRequest, TResponse>(
+        this IHost app,
+        string template,
+        Func<TRequest, MqttEndpointContext, ValueTask<TResponse>> handler,
+        MqttEndpointOptions? options = null) =>
+        GeneratedEndpointSupport.ResolveSingleClient(app).MapMqttRequest(template, handler, options, app.Services);
+
+    /// <summary>Maps a request/reply endpoint on the named Pulse MQTT client.</summary>
+    public static MqttEndpoint MapMqttRequest<TRequest, TResponse>(
+        this IHost app,
+        string clientName,
+        string template,
+        Func<TRequest, MqttEndpointContext, ValueTask<TResponse>> handler,
+        MqttEndpointOptions? options = null) =>
+        GeneratedEndpointSupport.ResolveClient(app, clientName).MapMqttRequest(template, handler, options, app.Services);
 }

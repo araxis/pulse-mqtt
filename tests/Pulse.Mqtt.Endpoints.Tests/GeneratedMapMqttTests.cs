@@ -120,6 +120,31 @@ public sealed class GeneratedMapMqttTests
         level.ShouldBe("red");
     }
 
+    [Fact]
+    public async Task Request_handlers_reply_with_their_return_value()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await using var broker = new PulseMqttTestBroker();
+        await using var responder = NewClient(broker, withSerializer: true);
+        await responder.ConnectAsync(timeout.Token);
+        await responder.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        // Route + request + sync return, all bound by the generator; the return value is the reply.
+        await using var endpoint = responder.MapMqttRequest(
+            "sensors/{deviceId:int}/calibrate",
+            (int deviceId, Reading reading) => reading with { Value = reading.Value + deviceId });
+        await endpoint.Subscribed.WaitAsync(timeout.Token);
+
+        await using var requester = NewClient(broker, withSerializer: true);
+        await requester.ConnectAsync(timeout.Token);
+        await requester.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var reply = await requester.RequestAsync<Reading, Reading>(
+            "sensors/8/calibrate", new Reading("dht22", 20.0), cancellationToken: timeout.Token);
+
+        reply.ShouldBe(new Reading("dht22", 28.0));
+    }
+
     private static ResilientMqttClient NewClient(PulseMqttTestBroker broker, bool withSerializer = false) =>
         new(broker, new ResilientMqttClientOptions
         {

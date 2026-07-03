@@ -83,6 +83,19 @@ await using (var generatedEndpoint = client.MapMqtt("smoke/{n:int}/generated", (
     }
 }
 
+// Request/reply, generated shape: the handler's return value is the reply.
+await using (var responder = client.MapMqttRequest("smoke/{offset:int}/echo",
+    (int offset, SmokeReading request) => request with { Value = request.Value + offset }))
+{
+    await responder.Subscribed.WaitAsync(timeout.Token);
+    var reply = await client.RequestAsync<SmokeReading, SmokeReading>(
+        "smoke/5/echo", new SmokeReading("rpc", 1.0), cancellationToken: timeout.Token);
+    if (reply.Value != 6.0)
+    {
+        throw new InvalidOperationException("The generated MapMqttRequest endpoint did not reply.");
+    }
+}
+
 await client.DisconnectAsync(timeout.Token);
 Console.WriteLine($"Smoke passed: disposition={outcome.Disposition}, value={reading.Value}, state={client.State}");
 

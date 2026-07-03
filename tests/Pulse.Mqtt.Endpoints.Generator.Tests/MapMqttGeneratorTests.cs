@@ -16,9 +16,13 @@ public sealed class MapMqttGeneratorTests
 
         public sealed record Reading(double Value);
 
+        public sealed record Status(int Code);
+
         public interface IDeviceStore
         {
             Task SaveAsync(int id, Reading reading, CancellationToken ct);
+
+            Task<Status> GetStatusAsync(int id, Reading reading, CancellationToken ct);
         }
 
         public static class Subject
@@ -280,6 +284,72 @@ public sealed class MapMqttGeneratorTests
             """);
 
         diagnostics.ShouldHaveSingleItem().Id.ShouldBe("PMQE011");
+        emitted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Request_flagship_shape_generates_cleanly()
+    {
+        var (diagnostics, emitted) = Run("""
+            app.MapMqttRequest("devices/{id:int}/status",
+                (int id, Reading reading, IDeviceStore store, CancellationToken ct) => store.GetStatusAsync(id, reading, ct));
+            """);
+
+        diagnostics.ShouldBeEmpty();
+        emitted.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Request_sync_and_valuetask_returns_generate_cleanly()
+    {
+        var (syncDiagnostics, syncEmitted) = Run("""
+            client.MapMqttRequest("queries/x", (Reading reading) => new Status(1));
+            """);
+        syncDiagnostics.ShouldBeEmpty();
+        syncEmitted.ShouldBeTrue();
+
+        var (valueTaskDiagnostics, valueTaskEmitted) = Run("""
+            client.MapMqttRequest("queries/x", (Reading reading) => ValueTask.FromResult(new Status(1)));
+            """);
+        valueTaskDiagnostics.ShouldBeEmpty();
+        valueTaskEmitted.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Request_handler_without_a_return_value_is_refused()
+    {
+        var (voidDiagnostics, voidEmitted) = Run("""
+            client.MapMqttRequest("queries/x", (Reading reading) => { });
+            """);
+        voidDiagnostics.ShouldHaveSingleItem().Id.ShouldBe("PMQE012");
+        voidEmitted.ShouldBeFalse();
+
+        var (taskDiagnostics, taskEmitted) = Run("""
+            client.MapMqttRequest("queries/x", (Reading reading) => Task.CompletedTask);
+            """);
+        taskDiagnostics.ShouldHaveSingleItem().Id.ShouldBe("PMQE012");
+        taskEmitted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Request_handler_without_a_request_parameter_is_refused()
+    {
+        var (diagnostics, emitted) = Run("""
+            client.MapMqttRequest("queries/{id:int}", (int id) => new Status(id));
+            """);
+
+        diagnostics.ShouldHaveSingleItem().Id.ShouldBe("PMQE013");
+        emitted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Request_service_parameter_without_a_provider_is_refused()
+    {
+        var (diagnostics, emitted) = Run("""
+            client.MapMqttRequest("queries/x", (Reading reading, IDeviceStore store) => new Status(1));
+            """);
+
+        diagnostics.ShouldHaveSingleItem().Id.ShouldBe("PMQE007");
         emitted.ShouldBeFalse();
     }
 

@@ -2,6 +2,14 @@
 
 ## 2.25.0 (unreleased)
 
+- Added `MapMqttRequest`, Minimal-API-style request/reply endpoints: the handler's return value
+  is the reply — `(int deviceId, StatusQuery query, IDeviceStore store, CancellationToken ct) =>
+  store.GetStatusAsync(...)` — serialized to the request's response topic with correlation data
+  echoed, on both the client and `IHost`, with the same generated binding rules as `MapMqtt`.
+  Request handlers must return a value (`PMQE012`) and take the request payload (`PMQE013`);
+  `PMQE006` now points a value-returning `MapMqtt` handler at `MapMqttRequest`. Covered by the
+  Native AOT smoke.
+
 - Disposing a client whose keep-alive ping failed with a transport-specific exception (QUIC's
   `QuicException`, socket errors) no longer rethrows that exception from `DisposeAsync`: the
   keep-alive loop now swallows any mid-ping failure, as its disposal contract always assumed.
