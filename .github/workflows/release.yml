@@ -47,9 +47,17 @@ jobs:
         if: env.STABLE == 'true'
         # Every package ships one lockstep version, so a stable tag republishes all of them. Refuse a
         # tag that changes no shipped content since the previous tag — code, dependency versions, or
-        # the packed README — because it would republish byte-identical packages under a new version
-        # (as 2.20.0 did). Version bumps and PublicAPI ledger promotions are release bookkeeping, not
-        # shipped changes, so they do not count. Put [republish] in the tag message to override.
+        # a packed asset (README, icon) — because it would republish byte-identical packages under a
+        # new version (as 2.20.0 did). Version bumps and PublicAPI ledger promotions are release
+        # bookkeeping, not shipped changes, so they do not count.
+        #
+        # Directory.Build.props needs its own check rather than a plain name-only diff: it always
+        # changes at every release (VersionPrefix is bumped right after each tag), so watching the
+        # whole file would make the guard pass unconditionally — the exact failure it exists to catch.
+        # Its content is diffed with that one bookkeeping line filtered out, so a real metadata change
+        # (PackageIcon, PackageTags, license, ...) still counts but the version bump alone does not.
+        # Keep both the path list and the props-file check in sync with whatever gets packed.
+        # Put [republish] in the tag message to override.
         run: |
           previous=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
           if [ -z "$previous" ]; then
@@ -62,16 +70,20 @@ jobs:
             exit 0
           fi
 
-          changed=$(git diff --name-only "$previous" HEAD -- src Directory.Packages.props README.md \
+          changed=$(git diff --name-only "$previous" HEAD -- src Directory.Packages.props README.md icon.png \
             | grep -vE 'PublicAPI\.(Shipped|Unshipped)\.txt$' || true)
-          if [ -z "$changed" ]; then
+          build_props_changed=$(git diff "$previous" HEAD -- Directory.Build.props \
+            | grep -E '^[+-][^+-]' | grep -v 'VersionPrefix' || true)
+
+          if [ -z "$changed" ] && [ -z "$build_props_changed" ]; then
             echo "::error::No shipped content changed since $previous — this would republish identical packages under $GITHUB_REF_NAME."
-            echo "::error::Release only when code, dependency versions, or the README changed. Add [republish] to the tag message to override."
+            echo "::error::Release only when code, dependency versions, package metadata, or a packed asset changed. Add [republish] to the tag message to override."
             exit 1
           fi
 
           echo "Shipped content changed since $previous:"
-          echo "$changed"
+          [ -n "$changed" ] && echo "$changed"
+          [ -n "$build_props_changed" ] && echo "Directory.Build.props:" && echo "$build_props_changed"
 
       # System.Net.Quic needs the msquic native library; without it the QUIC transport tests
       # would be skipped instead of run.
