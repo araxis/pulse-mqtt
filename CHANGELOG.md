@@ -2,6 +2,16 @@
 
 ## 2.27.0 (unreleased)
 
+- Fixed a CONNACK-level server redirect (`ServerMoved` / `UseAnotherServer`) that could not be
+  followed reconnecting to the same server forever instead of faulting. When the broker rejected the
+  CONNACK with a redirect but the redirect was not followable — redirect-following is off (the
+  default), the server reference did not parse, or the hop budget was exhausted — the connect path
+  discarded the "could not follow" result and rethrew a *retryable* rejection, and the redirect
+  reason codes were terminal only on the live-disconnect path, not the CONNACK path. So the reconnect
+  strategy retried the same, relocated endpoint indefinitely and the client never faulted. An
+  unfollowable CONNACK redirect is now terminal (it faults), matching the disconnect path; a
+  followable one still retargets and retries as before.
+
 - Fixed an outbound topic alias being recorded for a publish that was then rejected by the broker's
   maximum-packet-size check, poisoning the topic. The alias was assigned and stored in the outbound
   table *before* the connection's size check ran, and that check throws without tearing down the
