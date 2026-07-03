@@ -16,7 +16,12 @@ public enum RouteOverflow
 /// <summary>Per-route delivery settings.</summary>
 public sealed record MqttRouteOptions
 {
-    /// <summary>The bounded capacity of the route's queue.</summary>
+    /// <summary>
+    /// The bounded capacity of the route's queue. For an acknowledged route stream, size this at or
+    /// above the client's advertised Receive Maximum so the broker's in-flight window throttles
+    /// before the queue fills and blocks the shared inbound sink; the client defaults it to that
+    /// value when you open an acknowledged stream without explicit options.
+    /// </summary>
     public int Capacity { get; init; } = 64;
 
     /// <summary>The overflow behavior when the queue is full. Defaults to <see cref="RouteOverflow.Wait"/>.</summary>

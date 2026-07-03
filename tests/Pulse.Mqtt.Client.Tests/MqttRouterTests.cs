@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
@@ -299,6 +300,78 @@ public sealed class MqttRouterTests
 
         client.State.ShouldBe(Pulse.Mqtt.Resilience.ConnectionState.Connected);
         factory.ConnectionsHandedOut.ShouldBe(1, "disposing an acknowledged stream must not reconnect the client");
+    }
+
+    [Fact]
+    public void Default_acknowledged_route_capacity_tracks_the_receive_maximum()
+    {
+        // With a Receive Maximum advertised, the default capacity matches it, so the broker's
+        // in-flight window throttles before an acknowledged route's queue can fill and block the sink.
+        ResilientMqttClient.DefaultAcknowledgedRouteCapacity(100).ShouldBe(100);
+        ResilientMqttClient.DefaultAcknowledgedRouteCapacity(ushort.MaxValue).ShouldBe(ushort.MaxValue);
+
+        // With none advertised (or a protocol-invalid zero) no finite capacity is provably safe, so
+        // fall back to the route default rather than pretending otherwise.
+        ResilientMqttClient.DefaultAcknowledgedRouteCapacity(null).ShouldBe(new MqttRouteOptions().Capacity);
+        ResilientMqttClient.DefaultAcknowledgedRouteCapacity(0).ShouldBe(new MqttRouteOptions().Capacity);
+    }
+
+    [Fact]
+    public async Task A_full_acknowledged_route_reports_backpressure_when_it_blocks_the_sink()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "router-ack-backpressure", KeepAliveSeconds = 0 },
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        // Capture the acknowledged-route backpressure counter for our route only.
+        var backpressured = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, l) =>
+            {
+                if (instrument.Meter.Name == PulseMqttDiagnostics.SourceName &&
+                    instrument.Name == "pulse.mqtt.client.route.acknowledged.backpressure")
+                {
+                    l.EnableMeasurementEvents(instrument);
+                }
+            },
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            foreach (var tag in tags)
+            {
+                if (tag is { Key: "route", Value: string route })
+                {
+                    backpressured.TrySetResult(route);
+                }
+            }
+        });
+        listener.Start();
+
+        var template = MqttRouteTemplate.Parse("bp/{id}");
+        await using var stream = client.OpenAcknowledgedRouteStream(template, new MqttRouteOptions { Capacity = 1, Overflow = RouteOverflow.Wait });
+        var subscribeTask = client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, timeout.Token);
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        await broker.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] }, timeout.Token);
+        await subscribeTask;
+
+        // The first message fills the Capacity-1 queue (left unread); the second finds it full, so the
+        // lossless sink must block on it. That block is exactly what the backpressure metric records.
+        await broker.SendAsync(
+            new MqttPublishPacket { Topic = "bp/9", QualityOfService = MqttQualityOfService.AtLeastOnce, PacketIdentifier = 42 }, timeout.Token);
+        await broker.SendAsync(
+            new MqttPublishPacket { Topic = "bp/9", QualityOfService = MqttQualityOfService.AtLeastOnce, PacketIdentifier = 43 }, timeout.Token);
+
+        (await backpressured.Task.WaitAsync(SafetyTimeout)).ShouldBe("bp/{id}");
     }
 
     [Fact]

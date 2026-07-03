@@ -8,6 +8,22 @@
   the read loop, faulting the connection and forcing a reconnect. That exception is now caught
   (the route is simply gone) so a routine stream disposal never disturbs the connection.
 
+- Documented, defaulted, and instrumented acknowledged-route backpressure. An acknowledged route
+  stream is lossless — a message is held until the consumer acknowledges it — and is delivered on
+  the shared inbound sink, so a stalled consumer applies backpressure to the whole client once its
+  queue fills, not just to its own route. This is intrinsic to lossless delivery over one
+  multiplexed MQTT connection (a PUBLISH must be read and parsed before its route is known, so a
+  single route cannot be paused without stopping the socket), not a defect, but it was undocumented,
+  silent, and under-sized by default. Now: the router documentation states it precisely (handler and
+  stream routes stay isolated within capacity, and lossy policies isolate them entirely; acknowledged
+  routes are the deliberate lossless exception); opening an acknowledged stream without explicit
+  options defaults its queue capacity to the client's advertised Receive Maximum, so a compliant
+  broker's in-flight window throttles before the queue can fill and block the sink; and a new
+  `pulse.mqtt.client.route.acknowledged.backpressure` metric (tagged by route) fires whenever a full
+  acknowledged route does block the sink, turning a silent freeze into a diagnosable signal. For true
+  isolation between a latency-sensitive route and a slow manual-ack one, use separate clients so each
+  has its own connection.
+
 - Fixed the WebSocket transport dropping bytes flushed just before disposal — the graceful MQTT
   DISCONNECT was lost and the peer saw an abrupt close instead of the close handshake. Disposal
   cancelled the transport before its buffered send pump drained, unlike the TCP and QUIC

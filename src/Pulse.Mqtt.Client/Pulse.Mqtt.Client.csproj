@@ -17,4 +17,8 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pulse.Mqtt.Client.Tests" />
+  </ItemGroup>
+
 </Project>
