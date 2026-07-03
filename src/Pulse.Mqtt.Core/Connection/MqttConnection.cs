@@ -71,6 +71,14 @@ public sealed class MqttConnection : IAsyncDisposable
     /// </summary>
     public Func<MqttPacket, MqttPacket>? OutboundTransform { get; set; }
 
+    /// <summary>
+    /// Invoked inside the send lock immediately after a packet has been fully written and flushed to
+    /// the transport. A stateful <see cref="OutboundTransform"/> can use this to commit side effects
+    /// (such as recording an assigned topic alias) only once the packet has actually reached the
+    /// wire — a send that throws first, e.g. on the maximum-packet-size check, never invokes it.
+    /// </summary>
+    internal Action? OutboundFlushed { get; set; }
+
     /// <summary>Completes when the receive loop has stopped, for orderly shutdown.</summary>
     public Task Completion => _receiveLoop ?? Task.CompletedTask;
 
@@ -125,6 +133,9 @@ public sealed class MqttConnection : IAsyncDisposable
             {
                 throw new MqttException("The transport closed while sending.");
             }
+
+            // The packet is on the wire; commit any deferred transform side effects.
+            OutboundFlushed?.Invoke();
         }
         finally
         {

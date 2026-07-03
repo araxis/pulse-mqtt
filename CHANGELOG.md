@@ -2,6 +2,15 @@
 
 ## 2.27.0 (unreleased)
 
+- Fixed an outbound topic alias being recorded for a publish that was then rejected by the broker's
+  maximum-packet-size check, poisoning the topic. The alias was assigned and stored in the outbound
+  table *before* the connection's size check ran, and that check throws without tearing down the
+  connection — so an oversized first publish to a topic left a dangling alias the broker never
+  learned, and the next (small) publish to that topic sent an empty topic name plus the unknown
+  alias, a protocol error the broker disconnects on. A newly assigned alias is now committed to the
+  table only after its establishing packet is actually flushed to the wire, so a rejected publish
+  records nothing.
+
 - Fixed the in-memory offline queue leaking capacity under `OverflowPolicy.DropOldest`: the evict path
   decided the queue was full using a `SemaphoreSlim.Wait(0)` taken *outside* the queue lock, then
   evicted and enqueued under the lock. If a concurrent removal (e.g. the connection-up flush) freed a
