@@ -57,6 +57,7 @@ QUIC is one line, not a fork.
 | `Pulse.Mqtt.Client` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Client?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Client) | The resilient client: supervisor, topic routing, typed messaging, request/response. |
 | `Pulse.Mqtt.Dataflow` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Dataflow?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Dataflow) | Dataflow source blocks for client messages, routes, acknowledged routes, and state transitions. |
 | `Pulse.Mqtt.DependencyInjection` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.DependencyInjection?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.DependencyInjection) | `AddPulseMqttClient`, named clients, hosted lifecycle, health checks. |
+| `Pulse.Mqtt.Endpoints` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Endpoints?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Endpoints) | Minimal-API-style `MapMqtt` endpoints: constrained route templates, per-message service scopes, subscribe-on-map. |
 | `Pulse.Mqtt.Serialization.Json` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Serialization.Json?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Serialization.Json) | Source-generated `System.Text.Json` payload serialization (AOT-safe). |
 | `Pulse.Mqtt.Serialization.MessagePack` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Serialization.MessagePack?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Serialization.MessagePack) | MessagePack payload serialization for compact binary messages. |
 | `Pulse.Mqtt.Serialization.Protobuf` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Serialization.Protobuf?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Serialization.Protobuf) | Protocol Buffers payload serialization for generated binary messages. |
@@ -116,6 +117,22 @@ Need broker acknowledgement to wait for application work? Use
 `OpenAcknowledgedRouteStream(...)` and call `AcknowledgeAsync` or `RejectAsync` after handling
 the routed message. `RejectAsync` is available when `CanReject` is true, which means the
 delivery can carry an MQTT 5 negative acknowledgement reason code.
+
+### Map endpoints, Minimal-API style
+
+```csharp
+// One call subscribes the filter and registers the handler; {deviceId:int} only
+// matches numeric levels, and the value comes back typed.
+await using var endpoint = client.MapMqtt("sensors/{deviceId:int}/temp", ctx =>
+{
+    Console.WriteLine($"device {ctx.Route.GetInt("deviceId")}: {Encoding.UTF8.GetString(ctx.Message.Payload.Span)}");
+    return ValueTask.CompletedTask;
+});
+
+// In a host, app.MapMqtt(...) resolves the registered client and scopes services per message.
+app.MapMqtt<Reading>("sensors/{deviceId:int}/reading", (reading, ctx) =>
+    ctx.Services.GetRequiredService<IDeviceStore>().SaveAsync(ctx.Route.GetInt("deviceId"), reading, ctx.CancellationToken));
+```
 
 ### Typed messaging
 

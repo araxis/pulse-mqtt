@@ -32,6 +32,7 @@ codec, raw client, or swap-point contracts without the resilient client.
 | Job | Add package | Package docs |
 | --- | --- | --- |
 | Host-managed clients, keyed DI, options binding, health checks | `Pulse.Mqtt.DependencyInjection` | [Dependency injection](/packages/dependency-injection) |
+| Minimal-API-style topic endpoints | `Pulse.Mqtt.Endpoints` | [Endpoints](/packages/endpoints) |
 | Durable relational session and queue storage | `Pulse.Mqtt.Storage.Sqlite` | [SQLite storage](/packages/storage-sqlite) |
 | Durable embedded document session and queue storage | `Pulse.Mqtt.Storage.LiteDB` | [LiteDB storage](/packages/storage-litedb) |
 | Bounded worker pipelines over messages, routes, acknowledgements, or state | `Pulse.Mqtt.Dataflow` | [Dataflow](/packages/dataflow) |

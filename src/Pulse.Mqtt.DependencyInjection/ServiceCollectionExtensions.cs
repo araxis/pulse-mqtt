@@ -32,6 +32,7 @@ public static class ServiceCollectionExtensions
 
         services.AddOptions<PulseMqttClientOptions>(name).Configure(configure);
         services.TryAddSingleton<IPulseMqttClientFactory, PulseMqttClientFactory>();
+        services.AddSingleton(new PulseMqttClientRegistration(name));
 
         services.AddKeyedSingleton(name, (provider, key) =>
         {

@@ -8,6 +8,7 @@ pipeline, serializer, transport, test, or analyzer packages only when the projec
 | `Pulse.Mqtt.Core` | [Reference](/reference/packages) | You need the codec, raw client, transports, or swap-point contracts without the resilient client. |
 | `Pulse.Mqtt.Client` | [Getting started](/guide/getting-started) | You need the resilient client, routing, typed messaging, request/response, and diagnostics. |
 | `Pulse.Mqtt.DependencyInjection` | [Dependency injection](./dependency-injection) | You want named clients, host lifecycle, options binding, and health checks. |
+| `Pulse.Mqtt.Endpoints` | [Endpoints](./endpoints) | Minimal-API-style `MapMqtt` with constrained templates and per-message service scopes. |
 | `Pulse.Mqtt.Dataflow` | [Dataflow](./dataflow) | MQTT input should feed bounded source blocks and pipeline consumers. |
 | `Pulse.Mqtt.Storage.Sqlite` | [SQLite storage](./storage-sqlite) | Session state and offline queue need a durable relational file store. |
 | `Pulse.Mqtt.Storage.LiteDB` | [LiteDB storage](./storage-litedb) | Session state and offline queue need a durable embedded document store. |
