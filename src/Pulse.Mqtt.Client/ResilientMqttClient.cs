@@ -1506,11 +1506,20 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                                 await candidate.DisposeAsync().ConfigureAwait(false);
 
                                 // A CONNACK-level redirect retargets the factory and rethrows: the
-                                // reason is retryable, so the strategy's next attempt already
-                                // connects to the referenced server.
+                                // reason is retryable, so the strategy's next attempt connects to the
+                                // referenced server. If the redirect cannot be followed — the option is
+                                // off, the server reference did not parse, or the hop budget is
+                                // exhausted — retrying would reconnect to the same relocated server
+                                // forever, so it is terminal, matching the live-disconnect redirect path.
                                 if (error is MqttConnectRejectedException rejected)
                                 {
-                                    TryFollowServerRedirect(rejected.ReasonCode, rejected.ServerReference);
+                                    if (!TryFollowServerRedirect(rejected.ReasonCode, rejected.ServerReference)
+                                        && rejected.ReasonCode is MqttReasonCode.ServerMoved or MqttReasonCode.UseAnotherServer)
+                                    {
+                                        throw new TerminalMqttConnectException(
+                                            "The broker redirected the connection to another server, but the redirect could not be followed.",
+                                            rejected);
+                                    }
                                 }
 
                                 throw;

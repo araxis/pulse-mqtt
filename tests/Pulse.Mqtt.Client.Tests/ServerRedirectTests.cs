@@ -74,6 +74,34 @@ public sealed class ServerRedirectTests
     }
 
     [Fact]
+    public async Task A_connack_redirect_stays_terminal_when_the_option_is_off()
+    {
+        var factory = new RedirectableSequencedFactory();
+        await using var client = NewClient(factory, followRedirects: false, out var transitions);
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+
+        var broker = await factory.Inner.NextBrokerAsync(timeout.Token);
+        await broker.ReadPacketAsync(timeout.Token); // the CONNECT
+        await broker.SendAsync(
+            new MqttConnAckPacket
+            {
+                ReasonCode = MqttReasonCode.UseAnotherServer,
+                ServerReference = "moved.example",
+            },
+            timeout.Token);
+
+        // With redirect-following off, a CONNACK-level redirect must fault rather than reconnect to
+        // the same server forever. Before the fix the reason was not terminal on the CONNACK path
+        // (only on the disconnect path), so the strategy retried the same endpoint indefinitely and
+        // never faulted.
+        await transitions.WaitForAsync(
+            changes => changes.Any(change => change.Current == ConnectionState.Faulted), timeout.Token);
+        factory.Targets.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task The_hop_bound_turns_an_endless_redirect_chain_terminal()
     {
         var factory = new RedirectableSequencedFactory();
