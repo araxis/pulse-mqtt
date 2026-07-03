@@ -38,7 +38,10 @@ public sealed class MessagePackMqttSerializer : IMqttSerializer
     {
         try
         {
-            return MessagePackSerializer.Deserialize<T>(payload, _options);
+            var result = MessagePackSerializer.Deserialize<T>(payload, _options);
+            return result is T typed
+                ? typed
+                : throw new MqttException($"The payload did not deserialize to {typeof(T).Name}.");
         }
         catch (MessagePackSerializationException ex)
         {
