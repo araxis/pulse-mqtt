@@ -177,6 +177,47 @@ public sealed class MqttDataflowSourceTests
     }
 
     [Fact]
+    public async Task Route_source_block_with_invalid_options_does_not_leak_a_route()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        await using var client = new ResilientMqttClient(broker, NewOptions("invalid-route-opts"));
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+        await client.SubscribeAsync(MqttRouteTemplate.Parse("leak/{id}"), timeout.Token);
+
+        // An invalid bounded capacity must throw AND leave no route registered. Before the fix the
+        // route was opened before the throwing MqttDataflowSource constructor, so it leaked — capturing
+        // matching inbound messages into an undrained channel instead of letting them fall through.
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            client.ToRouteSourceBlock("leak/{id}", sourceOptions: new MqttDataflowSourceOptions { BoundedCapacity = 0 }));
+
+        await broker.PublishAsync(new MqttPublishPacket { Topic = "leak/1" }, timeout.Token);
+        (await client.Router.Unmatched.ReadAsync(timeout.Token)).Topic.ShouldBe("leak/1");
+    }
+
+    [Fact]
+    public async Task Acknowledged_route_source_block_with_invalid_options_does_not_leak_a_route()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        await using var client = new ResilientMqttClient(broker, NewOptions("invalid-ack-route-opts"));
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+        await client.SubscribeAsync(MqttRouteTemplate.Parse("leak-ack/{id}"), timeout.Token);
+
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            client.ToAcknowledgedRouteSourceBlock("leak-ack/{id}", sourceOptions: new MqttDataflowSourceOptions { BoundedCapacity = 0 }));
+
+        // A leaked acknowledged route would consume the message on the sink; with none, it falls
+        // through to the regular router and surfaces as unmatched.
+        await broker.PublishAsync(new MqttPublishPacket { Topic = "leak-ack/1" }, timeout.Token);
+        (await client.Router.Unmatched.ReadAsync(timeout.Token)).Topic.ShouldBe("leak-ack/1");
+    }
+
+    [Fact]
     public async Task Source_stream_failures_fault_the_block()
     {
         await using var source = new MqttDataflowSource<int>(FaultingSequence());

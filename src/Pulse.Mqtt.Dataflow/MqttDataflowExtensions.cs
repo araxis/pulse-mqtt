@@ -62,6 +62,13 @@ public static class MqttDataflowExtensions
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(template);
 
+        // Validate the source options before opening the route stream. Otherwise an invalid capacity
+        // throws inside the MqttDataflowSource constructor after the route is already registered, and
+        // its disposal is owned by the pump — which the throw prevents from ever starting — so the
+        // route would leak (and its undrained channel eventually stalls dispatch). ToStateSourceBlock
+        // validates up front for the same reason.
+        MqttDataflowSourceOptions.Validate(sourceOptions);
+
         var stream = client.OpenRouteStream(template, routeOptions);
         return new MqttDataflowSource<MqttRoutedMessage>(
             stream.ReadAllAsync(),
@@ -103,6 +110,10 @@ public static class MqttDataflowExtensions
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(template);
+
+        // Validate the source options before opening the stream — see ToRouteSourceBlock — so an
+        // invalid capacity cannot leak the acknowledged route registration.
+        MqttDataflowSourceOptions.Validate(sourceOptions);
 
         var stream = client.OpenAcknowledgedRouteStream(template, routeOptions);
         return new MqttDataflowSource<MqttAcknowledgedRoutedMessage>(
