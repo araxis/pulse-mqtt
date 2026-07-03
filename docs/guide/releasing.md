@@ -61,9 +61,32 @@ there is always a fresh package to test against without burning a stable version
 
 ## Versioning
 
-`Directory.Build.props` carries `VersionPrefix` for local builds; the release workflow
-overrides the version with the tag (`v1.2.3` → `1.2.3`, `v1.2.3-rc.1` → `1.2.3-rc.1`). Keep
-`VersionPrefix` in step with the next planned release after tagging.
+**All packages share one version and ship together (lockstep).** A single `VersionPrefix` in
+`Directory.Build.props` drives every package, one `vX.Y.Z` tag releases the whole set, and each
+add-on's dependency on `Pulse.Mqtt.Core` is stamped to that same version. This is deliberate:
+the packages are one tightly-coupled family (everything builds on `Core`), so lockstep keeps
+"what version am I on" a single answer, keeps a given version a set that was tested together,
+and matches how coupled .NET families such as `Microsoft.Extensions.*` ship. The alternative —
+per-package versions — was considered and rejected: it buys little here because most changes
+touch `Core` and cascade anyway, and it turns bug reports into an N-dimensional support matrix.
+
+`Directory.Build.props` carries `VersionPrefix` for local builds; the release workflow overrides
+the version with the tag (`v1.2.3` → `1.2.3`, `v1.2.3-rc.1` → `1.2.3-rc.1`). Keep `VersionPrefix`
+in step with the next planned release after tagging.
+
+### Release only on a shipped change
+
+Because a stable tag republishes every package, **cut a release only when shipped content
+actually changed since the last tag** — code under `src/`, dependency versions in
+`Directory.Packages.props`, or the packed `README.md`. Docs, tests, samples, and CI changes do
+not ship in the packages, so they do not warrant a release on their own; let them ride the next
+one that does. Version bumps and `PublicAPI` ledger promotions are release bookkeeping, not
+shipped changes.
+
+The release workflow enforces this: a stable tag whose shipped content is identical to the
+previous tag fails fast with a clear message, rather than publishing a fleet of byte-identical
+packages under a new number. For the rare intentional re-publish (for example, recovering from a
+botched push), put `[republish]` in the tag message to bypass the guard.
 
 ## This documentation site
 
