@@ -2,6 +2,10 @@
 
 ## 2.25.0 (unreleased)
 
+- Disposing a client whose keep-alive ping failed with a transport-specific exception (QUIC's
+  `QuicException`, socket errors) no longer rethrows that exception from `DisposeAsync`: the
+  keep-alive loop now swallows any mid-ping failure, as its disposal contract always assumed.
+
 - Fixed a rare QoS 1/2 message loss when a publish races a reconnect (the long-standing chaos
   flake): a message could land in the offline queue just after the connection-up flush had
   scanned — stranded while `Connected` until the next reconnect — or record into the in-flight
