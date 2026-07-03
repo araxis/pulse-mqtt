@@ -2,6 +2,9 @@
 
 ## 2.23.0 (unreleased)
 
+- Added a package icon: a dark hexagon with a green pulse trace, shown on nuget.org and in the
+  Visual Studio / `dotnet` package UIs for every package.
+
 ## 2.22.0
 
 - Added a Blazor WebAssembly sample running the client in the browser over the WebSocket
