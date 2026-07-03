@@ -55,7 +55,12 @@ public sealed class WebSocketTransport : IMqttTransport
         }
         catch
         {
-            // Drain timed out or the pump faulted; fall through to force teardown.
+            // The graceful drain timed out (a half-open peer whose send window is full can block
+            // the close frame) or the pump faulted. Abort forcibly closes the socket, unblocking a
+            // send/close stuck against that peer — without it the Task.WhenAll below would wait on
+            // the still-stuck pump unbounded, since _socket.Dispose() (which would unblock it) comes
+            // after the wait. The graceful-close budget must be a hard bound on disposal.
+            _socket.Abort();
         }
 
         await _lifetime.CancelAsync().ConfigureAwait(false);

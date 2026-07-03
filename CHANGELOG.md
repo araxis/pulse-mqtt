@@ -12,7 +12,8 @@
   DISCONNECT was lost and the peer saw an abrupt close instead of the close handshake. Disposal
   cancelled the transport before its buffered send pump drained, unlike the TCP and QUIC
   transports. Disposal now drains the send pump (flushing the final bytes and closing the socket
-  gracefully) before cancelling, bounded by a short timeout so a dead peer cannot hang it.
+  gracefully) before cancelling, bounded by a short timeout — after which the socket is aborted so
+  a half-open peer whose send window is full cannot hang disposal past that bound.
 
 - Fixed request/response being permanently disabled after a transient failure: the shared
   response route was memoized with `??=` and never reset, so if the very first `RequestAsync`/
@@ -32,7 +33,10 @@
   mid-reconcile on a resumed session: the reconcile cleared the pending set before the broker
   acknowledged, so an interrupted round-trip left the broker never told (and, since the broker
   keeps resuming the session, never replayed). Each pending change is now removed only after the
-  broker acknowledges it, so an interrupted reconcile retries on the next connection-up.
+  broker acknowledges it — and only the exact filter that was reconciled, so a concurrent
+  re-subscribe of the same topic with changed options (a QoS upgrade, `NoLocal`, …) during the
+  in-flight reconcile survives to apply on the next connection-up. An interrupted reconcile
+  retries on the next connection-up.
 - Fixed a publish that raced the connection-up flush being stranded in the offline queue until
   the next reconnect: it could enqueue after the flush's final scan but before the client marked
   itself connected, seeing no live connection at both its check and its nudge. Connection-up now

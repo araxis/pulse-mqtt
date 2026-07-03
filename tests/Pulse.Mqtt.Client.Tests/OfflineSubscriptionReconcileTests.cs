@@ -104,6 +104,55 @@ public sealed class OfflineSubscriptionReconcileTests
             timeout.Token);
     }
 
+    [Fact]
+    public async Task A_concurrent_resubscribe_with_changed_options_survives_the_reconcile()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var topic = $"offline/{Guid.NewGuid():N}";
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket
+            {
+                ClientId = "offsub-opts",
+                KeepAliveSeconds = 0,
+                CleanStart = false,
+                SessionExpiryInterval = 300,
+            },
+            Backoff = new BackoffOptions { BaseDelay = TimeSpan.FromMilliseconds(1), MaxDelay = TimeSpan.FromMilliseconds(5) },
+        });
+
+        var template = MqttRouteTemplate.Parse(topic);
+        await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.AtLeastOnce)], timeout.Token);
+
+        await client.ConnectAsync(timeout.Token);
+        var broker1 = await factory.NextBrokerAsync(timeout.Token);
+        await broker1.AcceptConnectionAsync(timeout.Token, sessionPresent: true);
+
+        // The reconcile sends the pending QoS 1 subscribe and blocks on its SUBACK.
+        var reconcile1 = (await broker1.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        reconcile1.TopicFilters.ShouldHaveSingleItem().MaximumQualityOfService.ShouldBe(MqttQualityOfService.AtLeastOnce);
+
+        // While the reconcile is in flight (still no live connection), the app re-subscribes the SAME
+        // topic with an upgraded QoS 2 — recorded on the offline (pending) path.
+        await client.SubscribeAsync([template.ToTopicFilter(MqttQualityOfService.ExactlyOnce)], timeout.Token);
+
+        // Now let the reconcile's SUBACK land. It must remove only the QoS 1 filter it sent, not the
+        // newer QoS 2 filter now pending — before the fix it removed by topic and dropped the upgrade.
+        await broker1.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = reconcile1.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] }, timeout.Token);
+        await broker1.DisposeAsync();
+
+        // The next resumed connection must reconcile the surviving QoS 2 upgrade.
+        var broker2 = await factory.NextBrokerAsync(timeout.Token);
+        await broker2.AcceptConnectionAsync(timeout.Token, sessionPresent: true);
+        var reconcile2 = (await broker2.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        reconcile2.TopicFilters.ShouldHaveSingleItem().MaximumQualityOfService.ShouldBe(MqttQualityOfService.ExactlyOnce);
+
+        await broker2.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = reconcile2.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService2] }, timeout.Token);
+    }
+
     private static async Task WaitForStateAsync(ResilientMqttClient client, Func<ConnectionState, bool> predicate, CancellationToken cancellationToken)
     {
         while (!predicate(client.State))

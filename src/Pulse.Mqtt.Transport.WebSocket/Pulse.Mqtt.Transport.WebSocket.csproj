@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Pulse.Mqtt.Core\Pulse.Mqtt.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pulse.Mqtt.Client.Tests" />
+  </ItemGroup>
+
 </Project>

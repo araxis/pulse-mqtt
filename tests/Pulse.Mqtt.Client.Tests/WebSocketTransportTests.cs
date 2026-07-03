@@ -191,4 +191,66 @@ public sealed class WebSocketTransportTests
         var received = await socket.ReceiveAsync(buffer, cancellationToken);
         return buffer[..received.Count];
     }
+
+    [Fact]
+    public async Task Disposal_stays_bounded_when_the_close_handshake_blocks()
+    {
+        var socket = new BlockingCloseWebSocket();
+        var transport = new WebSocketTransport(socket);
+
+        MqttPingCodec.WriteRequest(transport.Output);
+        await transport.Output.FlushAsync();
+
+        // The peer's send window is full, so the close frame can never be sent and CloseOutputAsync
+        // blocks forever. Disposal must still complete within the graceful-close bound (Abort forces
+        // the stuck close) rather than hang until the OS TCP timeout.
+        var dispose = transport.DisposeAsync().AsTask();
+        var finished = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(10)));
+        finished.ShouldBe(dispose, "disposal must not hang past the graceful-close bound when the close handshake blocks");
+        await dispose;
+    }
+
+    // A WebSocket whose CloseOutputAsync never completes on its own — modeling a half-open peer with
+    // a saturated send window — until Abort forces it. SendAsync accepts (the drain succeeds) and
+    // ReceiveAsync blocks until the transport's lifetime token cancels.
+    private sealed class BlockingCloseWebSocket : WebSocket
+    {
+        private readonly TaskCompletionSource _closeGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private volatile WebSocketState _state = WebSocketState.Open;
+
+        public override WebSocketState State => _state;
+
+        public override WebSocketCloseStatus? CloseStatus => null;
+
+        public override string? CloseStatusDescription => null;
+
+        public override string? SubProtocol => "mqtt";
+
+        public override void Abort()
+        {
+            _state = WebSocketState.Aborted;
+            _closeGate.TrySetException(new WebSocketException(WebSocketError.ConnectionClosedPrematurely));
+        }
+
+        public override void Dispose()
+        {
+            _state = WebSocketState.Closed;
+            _closeGate.TrySetResult();
+        }
+
+        public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new OperationCanceledException(cancellationToken);
+        }
+
+        public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken) =>
+            _closeGate.Task;
+
+        public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken) =>
+            _closeGate.Task;
+    }
 }
