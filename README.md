@@ -210,6 +210,14 @@ dotnet run --project samples/Pulse.Mqtt.WorkerSample
 dotnet run --project samples/Pulse.Mqtt.WorkerSample -- --Mqtt:Host localhost --Mqtt:Port 1883
 ```
 
+[`samples/Pulse.Mqtt.BlazorWasmSample`](samples/Pulse.Mqtt.BlazorWasmSample) runs the client in
+the browser: MQTT over the browser's WebSocket from Blazor WebAssembly, with live connection
+state and pub/sub against any broker with a WebSocket listener (EMQX's is `ws://host:8083/mqtt`):
+
+```
+dotnet run --project samples/Pulse.Mqtt.BlazorWasmSample
+```
+
 ## Performance
 
 Measured with BenchmarkDotNet (`MemoryDiagnoser`) on .NET 10:
