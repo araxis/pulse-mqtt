@@ -51,4 +51,8 @@ internal static partial class PulseMqttLog
     [LoggerMessage(EventId = 11, Level = LogLevel.Warning,
         Message = "MQTT client {ClientId} reached its redirect bound of {MaxServerRedirects} consecutive hops; treating the next redirect as terminal")]
     public static partial void ServerRedirectBoundReached(ILogger logger, string clientId, int maxServerRedirects);
+
+    [LoggerMessage(EventId = 12, Level = LogLevel.Information,
+        Message = "MQTT client {ClientId}: the opportunistic offline-queue flush after a queued publish failed; the message stays queued and the next connection-up flush will drain it")]
+    public static partial void QueuedPublishNudgeFailed(ILogger logger, string clientId, Exception error);
 }

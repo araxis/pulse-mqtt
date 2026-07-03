@@ -22,9 +22,10 @@
   queueing (flushes are serialized through one gate), identifier allocation skips identifiers a
   session entry still holds (`MqttInFlightSession.ContainsOutbound`), and connection-up runs a
   second redelivery pass when late entries deposited during the transition. The re-check flush
-  is best-effort: any connection-death exception from it is swallowed (the message is already
-  queued and the next connection-up flush drains it), so a transport failure while nudging the
-  queue never escapes `PublishAsync`.
+  is best-effort: because the message is already queued (and the authoritative connection-up
+  flush will drain it), no failure from it escapes `PublishAsync` — a transport death is
+  expected there, while any other failure (a store/decode error) is logged rather than silently
+  swallowed.
 
 - Fixed disposing a `MapMqtt` endpoint silently starving another endpoint on the same topic
   filter (`a/{x}` and `a/{y}` both subscribe `a/+`): endpoint subscriptions are now

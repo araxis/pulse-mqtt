@@ -413,12 +413,18 @@ public sealed class ResilientMqttClient : IAsyncDisposable
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // The connection died again while nudging the queue. The message the caller asked
-                // to publish is already enqueued (the outcome below is Queued), so a connection-death
-                // exception from this best-effort flush must not escape — and the type is the
-                // transport's choice (MqttException, IOException, SocketException, QuicException, ...),
-                // so it cannot be enumerated. The next connection-up flush drains the queue.
-                // Caller cancellation still propagates.
+                // This nudge is purely opportunistic: the message the caller asked to publish is
+                // already enqueued (the outcome below is Queued), and the authoritative
+                // connection-up flush will drain the queue. So no failure here may escape into the
+                // caller's publish — the common case is the connection dying again, whose exception
+                // type is the transport's choice (MqttException, IOException, SocketException,
+                // QuicException, ...) and cannot be enumerated. But swallowing must not be silent:
+                // a store/decode error or a genuine bug surfacing through the flush is logged rather
+                // than lost. Caller cancellation still propagates.
+                if (_options.Logger is { } logger)
+                {
+                    PulseMqttLog.QueuedPublishNudgeFailed(logger, _clientId, ex);
+                }
             }
         }
 
