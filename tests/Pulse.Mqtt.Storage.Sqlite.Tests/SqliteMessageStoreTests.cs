@@ -44,6 +44,40 @@ public sealed class SqliteMessageStoreTests
         Encoding.UTF8.GetString(head.Payload.Span).ShouldBe("hello");
     }
 
+    [Theory]
+    [InlineData(MqttQualityOfService.AtLeastOnce)]
+    [InlineData(MqttQualityOfService.ExactlyOnce)]
+    public async Task A_qos_publish_queued_before_it_is_sent_round_trips_without_an_identifier(MqttQualityOfService qos)
+    {
+        using var database = new TempDatabase();
+
+        // The resilient client enqueues a QoS > 0 publish on the offline path with NO packet
+        // identifier — the client assigns one only at send time. Persisting it must not throw, and
+        // it must reload without an identifier so the flush assigns a fresh one.
+        var queued = new MqttPublishPacket
+        {
+            Topic = "orders/1",
+            Payload = Encoding.UTF8.GetBytes("hello"),
+            QualityOfService = qos,
+            PacketIdentifier = null,
+            ProtocolVersion = MqttProtocolVersion.V500,
+        };
+
+        await using (var store = new SqliteMessageStore(database.Path, Unbounded))
+        {
+            await store.EnqueueAsync(queued, CancellationToken.None); // threw before the fix
+            store.Count.ShouldBe(1);
+        }
+
+        await using var reopened = new SqliteMessageStore(database.Path, Unbounded);
+        var head = await reopened.PeekAsync(CancellationToken.None);
+        head.ShouldNotBeNull();
+        head.Topic.ShouldBe("orders/1");
+        head.QualityOfService.ShouldBe(qos);
+        head.PacketIdentifier.ShouldBeNull();
+        Encoding.UTF8.GetString(head.Payload.Span).ShouldBe("hello");
+    }
+
     [Fact]
     public async Task A_peeked_but_not_removed_publish_is_resent_after_a_crash()
     {

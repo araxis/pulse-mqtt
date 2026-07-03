@@ -1,2 +1,5 @@
 #nullable enable
 Pulse.Mqtt.Resilience.MqttInFlightSession.ContainsOutbound(ushort packetIdentifier) -> bool
+Pulse.Mqtt.Packets.MqttPublishStorage
+static Pulse.Mqtt.Packets.MqttPublishStorage.FromStorageForm(Pulse.Mqtt.Packets.MqttPublishPacket! packet) -> Pulse.Mqtt.Packets.MqttPublishPacket!
+static Pulse.Mqtt.Packets.MqttPublishStorage.ToStorageForm(Pulse.Mqtt.Packets.MqttPublishPacket! packet) -> Pulse.Mqtt.Packets.MqttPublishPacket!
