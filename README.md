@@ -117,17 +117,19 @@ delivery can carry an MQTT 5 negative acknowledgement reason code.
 ### Map endpoints, Minimal-API style
 
 ```csharp
-// One call subscribes the filter and registers the handler; {deviceId:int} only
-// matches numeric levels, and the value comes back typed.
-await using var endpoint = client.MapMqtt("sensors/{deviceId:int}/temp", ctx =>
-{
-    Console.WriteLine($"device {ctx.Route.GetInt("deviceId")}: {Encoding.UTF8.GetString(ctx.Message.Payload.Span)}");
-    return ValueTask.CompletedTask;
-});
+// One call subscribes the filter and registers the handler. Write the parameters you need —
+// route values (typed by their constraints), the payload, services, a token, in any order —
+// and the bundled source generator binds them at compile time. No reflection, AOT-clean.
+client.MapMqtt("sensors/{deviceId:int}/temp",
+    (int deviceId, Reading reading, CancellationToken ct) => Save(deviceId, reading, ct));
 
-// In a host, app.MapMqtt(...) resolves the registered client and scopes services per message.
-app.MapMqtt<Reading>("sensors/{deviceId:int}/reading", (reading, ctx) =>
-    ctx.Services.GetRequiredService<IDeviceStore>().SaveAsync(ctx.Route.GetInt("deviceId"), reading, ctx.CancellationToken));
+// In a host, app.MapMqtt(...) resolves the registered client, and handler parameters like
+// IDeviceStore resolve from a fresh service scope per message.
+app.MapMqtt("sensors/{deviceId:int}/reading",
+    (int deviceId, Reading reading, IDeviceStore store, CancellationToken ct) =>
+        store.SaveAsync(deviceId, reading, ct));
+
+// A call site that cannot be bound is a compile error (PMQE001–PMQE008), never a runtime surprise.
 ```
 
 ### Typed messaging

@@ -53,6 +53,16 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         "The MapMqtt handler must return void, Task, or ValueTask; '{0}' is not supported",
         "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor ServicesNotPassed = new(
+        "PMQE007", "Handler needs a service provider",
+        "Handler parameter '{0}' resolves from services, but this MapMqtt call passes no provider and every delivery would throw — pass the services argument, or map on the host",
+        "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor StaticFormUnsupported = new(
+        "PMQE008", "MapMqtt must be called as an extension method",
+        "MapMqtt with a delegate handler cannot be generated for the static invocation form — call it as an extension method (client.MapMqtt(...) or app.MapMqtt(...))",
+        "Pulse.Mqtt.Endpoints", DiagnosticSeverity.Error, isEnabledByDefault: true);
+
     /// <inheritdoc />
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -125,6 +135,16 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         };
 
         var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+
+        // Every argument index below assumes the reduced form; the static invocation form shifts
+        // them all by the receiver and cannot be intercepted with the emitted signatures, so it
+        // is rejected honestly rather than misread.
+        if (method.ReducedFrom is null)
+        {
+            diagnostics.Add(Diagnostic.Create(StaticFormUnsupported, invocation.GetLocation()));
+            return Fail(context, invocation, receiver, diagnostics, token);
+        }
+
         var arguments = invocation.ArgumentList.Arguments;
         var templateArgument = receiver == Receiver.HostNamed ? arguments[1] : arguments[0];
         var handlerArgument = receiver == Receiver.HostNamed ? arguments[2] : arguments[1];
@@ -171,6 +191,21 @@ public sealed class MapMqttGenerator : IIncrementalGenerator
         if (parameters is null)
         {
             return Fail(context, invocation, receiver, diagnostics, token);
+        }
+
+        // On the bare client nothing supplies a container implicitly: a service-bound parameter
+        // with the services argument omitted at the call site is a guaranteed throw on the first
+        // delivery, so it is refused here instead. Host receivers always flow app.Services.
+        if (receiver == Receiver.Client && parameters.Any(p => p.Binding == Binding.Service))
+        {
+            var servicesProvided = arguments.Count >= 4
+                || arguments.Any(a => a.NameColon?.Name.Identifier.ValueText == "services");
+            if (!servicesProvided)
+            {
+                var first = parameters.First(p => p.Binding == Binding.Service);
+                diagnostics.Add(Diagnostic.Create(ServicesNotPassed, handlerArgument.GetLocation(), first.Name));
+                return Fail(context, invocation, receiver, diagnostics, token);
+            }
         }
 
         var location = context.SemanticModel.GetInterceptableLocation(invocation, token);
