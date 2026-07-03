@@ -172,7 +172,7 @@ public sealed class LiteDbMessageStore : IMessageStore, IAsyncDisposable, IDispo
             DateTimeOffset? enqueuedAt = head.TryGetValue("EnqueuedAt", out var stamp) && stamp.IsInt64
                 ? DateTimeOffset.FromUnixTimeMilliseconds(stamp.AsInt64)
                 : null;
-            return new MqttQueuedPublish(packet, enqueuedAt);
+            return new MqttQueuedPublish(packet, enqueuedAt) { Sequence = head["_id"].AsInt64 };
         }, cancellationToken);
 
     /// <inheritdoc />
@@ -185,6 +185,23 @@ public sealed class LiteDbMessageStore : IMessageStore, IAsyncDisposable, IDispo
                 _space?.Release();
             }
         }, cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask RemoveAsync(MqttQueuedPublish entry, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return _store.RunAsync(database =>
+        {
+            // Delete the specific flushed row by its id. If a DropOldest enqueue already evicted it,
+            // the row is gone and this deletes nothing — the current head (a different, unsent
+            // message) is left in place instead of being wrongly removed.
+            if (Queue(database).Delete(entry.Sequence))
+            {
+                _count--;
+                _space?.Release();
+            }
+        }, cancellationToken);
+    }
 
     /// <inheritdoc />
     public ValueTask ClearAsync(CancellationToken cancellationToken) =>

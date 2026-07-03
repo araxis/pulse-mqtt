@@ -40,6 +40,26 @@ public sealed class InMemoryMessageStoreTests
     }
 
     [Fact]
+    public async Task Removing_a_flushed_entry_evicted_mid_flush_leaves_the_unsent_message()
+    {
+        // Models the flush racing a DropOldest eviction: peek the head, a concurrent enqueue evicts
+        // it (the flush is mid-send), then the flush removes what it peeked. RemoveAsync must remove
+        // only that entry, not "the current head" — which is now a different, unsent message.
+        var store = NewStore(2, OverflowPolicy.DropOldest);
+        await store.EnqueueAsync(Packet("a"), CancellationToken.None);
+        await store.EnqueueAsync(Packet("b"), CancellationToken.None); // queue full: [a, b]
+
+        var peeked = await store.PeekQueuedAsync(CancellationToken.None);
+        peeked!.Packet.Topic.ShouldBe("a");
+
+        await store.EnqueueAsync(Packet("c"), CancellationToken.None); // DropOldest evicts a: [b, c]
+        await store.RemoveAsync(peeked, CancellationToken.None);       // remove 'a' (already gone) — a no-op
+
+        store.Count.ShouldBe(2);
+        (await store.PeekAsync(CancellationToken.None))!.Topic.ShouldBe("b"); // 'b' preserved, still to send
+    }
+
+    [Fact]
     public async Task Drop_newest_keeps_the_queue_and_counts()
     {
         var store = NewStore(2, OverflowPolicy.DropNewest);
