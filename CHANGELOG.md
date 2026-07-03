@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.23.0 (unreleased)
+## 2.23.0
 
 - Added a package icon: a dark hexagon with a green pulse trace, shown on nuget.org and in the
   Visual Studio / `dotnet` package UIs for every package.
