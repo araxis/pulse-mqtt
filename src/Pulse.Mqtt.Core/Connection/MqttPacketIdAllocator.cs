@@ -11,6 +11,18 @@ internal sealed class MqttPacketIdAllocator
     private readonly object _gate = new();
     private ushort _next;
 
+    /// <summary>The number of identifiers currently reserved. For diagnostics and tests.</summary>
+    internal int InUseCount
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _inUse.Count;
+            }
+        }
+    }
+
     /// <summary>Reserves the next free identifier.</summary>
     /// <exception cref="MqttException">All 65535 identifiers are in flight.</exception>
     public ushort Rent()

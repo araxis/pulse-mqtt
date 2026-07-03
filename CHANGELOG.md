@@ -2,6 +2,17 @@
 
 ## 2.27.0 (unreleased)
 
+- Fixed a QoS 1/2 publish cancelled while it waited for a receive-maximum slot leaking its packet
+  identifier on a persistent session (the sibling of the completion-cancel leak above). The publish
+  rents an identifier, then waits on the send-quota semaphore before anything reaches the wire; a
+  caller cancellation there threw before any session entry was recorded, but the `finally` returned
+  the identifier only when the exchange had settled or there was no session — so with a session
+  present the identifier was parked for an exchange that never existed and could never be resumed.
+  Repeated cancellations under a saturated receive-maximum window exhaust the identifier space and
+  break all further QoS>0 publishing until reconnect. The cleanup now parks the identifier (and the
+  quota slot) only when the session actually holds the exchange (`MqttInFlightSession.ContainsOutbound`),
+  so a publish cancelled before it was ever sent always returns its identifier.
+
 - Fixed a publish cancelled at the moment its exchange completed leaking a packet identifier and a
   receive-maximum slot. On a persistent session, the completion bookkeeping that removes the finished
   exchange (`OutboundCompletedAsync`) ran on the caller's cancellation token; if the caller cancelled

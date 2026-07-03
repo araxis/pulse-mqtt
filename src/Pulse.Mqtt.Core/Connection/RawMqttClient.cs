@@ -86,6 +86,9 @@ public sealed class RawMqttClient : IAsyncDisposable
     /// <summary>Completes when the inbound pump stops — the connection is over, however it ended.</summary>
     public Task Completion => _pump ?? Task.CompletedTask;
 
+    /// <summary>The number of packet identifiers currently reserved on this connection. For tests.</summary>
+    internal int InFlightIdentifierCount => _packetIds.InUseCount;
+
     /// <summary>
     /// The broker's DISCONNECT, when the session ended with one. <see langword="null"/> for a
     /// socket-level loss or a client-initiated close.
@@ -398,17 +401,22 @@ public sealed class RawMqttClient : IAsyncDisposable
         }
         finally
         {
-            // Release the receive-maximum slot only when the id is also released — when the exchange
-            // truly settled, or there is no session to resume it. A cancelled-but-on-the-wire publish on
-            // a persistent session parks both: the broker still counts the message against its Receive
-            // Maximum, so freeing the slot early would let a later burst exceed it. The connection drop
-            // on the next reconnect re-arms the quota.
-            if (quotaHeld && (settled || _session is null))
+            // Park the id and the receive-maximum slot only when a persistent session actually holds
+            // this exchange to resume — recorded by OutboundSentAsync once the PUBLISH is on the wire.
+            // The broker still counts a sent-but-unfinished message against its Receive Maximum, and
+            // RedeliverAsync resumes it by that id, so freeing either early would lose the entry or let
+            // a later burst exceed the window. But a publish that never reached the wire recorded no
+            // entry — e.g. one cancelled while waiting for a quota slot — so both the id and (if held)
+            // the slot must be released. Keying that decision on session-nullness alone leaked the id
+            // for any pre-send cancellation on a persistent session.
+            var heldForResume = !settled && _session is { } resumeSession && resumeSession.ContainsOutbound(id);
+
+            if (quotaHeld && !heldForResume)
             {
                 quota!.Release();
             }
 
-            if (settled || _session is null)
+            if (!heldForResume)
             {
                 _packetIds.Return(id);
             }

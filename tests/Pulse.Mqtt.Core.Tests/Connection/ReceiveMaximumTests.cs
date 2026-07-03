@@ -174,6 +174,41 @@ public sealed class ReceiveMaximumTests
     }
 
     [Fact]
+    public async Task Cancelling_a_publish_waiting_for_a_slot_returns_its_identifier()
+    {
+        var session = new MqttInFlightSession((_, _) => ValueTask.CompletedTask);
+        var (client, broker, timeout) = await ConnectedAsync(receiveMaximum: 1, session);
+
+        // The first publish takes the only receive-maximum slot and reaches the wire.
+        var first = Publish(client, "a", timeout.Token);
+        var sent = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfType<MqttPublishPacket>();
+        client.InFlightIdentifierCount.ShouldBe(1);
+
+        // A second publish rents an id, then blocks waiting for a slot; cancel it there — before it ever
+        // reaches the wire or records a session entry.
+        using var cancelSecond = new CancellationTokenSource();
+        var second = Publish(client, "b", cancelSecond.Token);
+        while (client.InFlightIdentifierCount < 2)
+        {
+            await Task.Delay(1, timeout.Token); // it has rented its id and is now gated on the quota
+        }
+
+        cancelSecond.Cancel();
+        await Should.ThrowAsync<OperationCanceledException>(async () => await second);
+
+        // Its id must be returned: nothing was sent and no session entry was recorded, so there is
+        // nothing to resume. Before the fix the id was parked forever because a session was present.
+        client.InFlightIdentifierCount.ShouldBe(1);
+
+        // The genuinely in-flight first publish still holds its id until it completes.
+        await broker.SendAsync(
+            new MqttPublishAckPacket { PacketType = MqttPacketType.PubAck, PacketIdentifier = sent.PacketIdentifier!.Value },
+            timeout.Token);
+        (await first).ShouldBe(MqttReasonCode.Success);
+        client.InFlightIdentifierCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task A_publish_cancelled_during_its_completion_persist_still_settles_and_frees_the_slot()
     {
         var persistReached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
