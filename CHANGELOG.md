@@ -2,6 +2,16 @@
 
 ## 2.25.0 (unreleased)
 
+- Fixed the durable offline stores (`Pulse.Mqtt.Storage.Sqlite`, `Pulse.Mqtt.Storage.LiteDB`)
+  throwing when a QoS 1/2 publish is queued while offline: such a publish has no packet
+  identifier yet (the client assigns one at send time), but the stores wire-encode at enqueue,
+  which requires one — so the publish crashed and the message was lost, defeating the durable
+  queue for its main use case. The stores now persist an unassigned identifier with the reserved
+  placeholder and restore it to none on load (`MqttPublishStorage`), so an offline QoS 1/2
+  publish round-trips and flushes with a freshly assigned identifier on reconnect. In-flight
+  session packets, which carry a real identifier, are unaffected. (Pre-existing; not a 2.25.0
+  regression.)
+
 - Added `MapMqttRequest`, Minimal-API-style request/reply endpoints: the handler's return value
   is the reply — `(int deviceId, StatusQuery query, IDeviceStore store, CancellationToken ct) =>
   store.GetStatusAsync(...)` — serialized to the request's response topic with correlation data

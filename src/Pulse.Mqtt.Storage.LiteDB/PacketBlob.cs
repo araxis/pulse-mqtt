@@ -14,8 +14,10 @@ internal static class PacketBlob
 {
     public static byte[] Encode(MqttPublishPacket packet)
     {
+        // A QoS > 0 publish still in the offline queue has no identifier yet; store it with the
+        // reserved placeholder so the wire codec (which requires one for QoS > 0) can encode it.
         var writer = new ArrayBufferWriter<byte>();
-        MqttPacketWriter.Write(writer, packet);
+        MqttPacketWriter.Write(writer, MqttPublishStorage.ToStorageForm(packet));
         return writer.WrittenMemory.ToArray();
     }
 
@@ -27,7 +29,7 @@ internal static class PacketBlob
         }
 
         return MqttPacketDecoder.Decode(header, body, version) is MqttPublishPacket publish
-            ? publish
+            ? MqttPublishStorage.FromStorageForm(publish)
             : throw new LiteDbStorageException("A stored packet blob did not decode to a PUBLISH.");
     }
 }
