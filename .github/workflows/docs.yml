@@ -53,7 +53,20 @@ jobs:
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     steps:
+      # GitHub's Pages backend intermittently returns a terminal "Deployment failed, try again
+      # later" — it has failed most recent runs and always succeeds on a manual re-run. One
+      # automatic retry (the official action only, no third-party dependency) turns that routine
+      # re-run into a no-op; both attempts publish the same already-built artifact.
       - id: deployment
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+
+      - name: Pause before retrying a failed Pages deployment
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 20
+
+      - id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
