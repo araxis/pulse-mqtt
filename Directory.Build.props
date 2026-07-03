@@ -21,11 +21,13 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>mqtt;mqtt5;mqtt-client;iot;messaging;client;resilience;aot</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
 </Project>
