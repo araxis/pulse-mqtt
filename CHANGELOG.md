@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.26.0 (unreleased)
+## 2.26.0
 
 - Fixed disposing an acknowledged route stream tearing down the whole client connection: if the
   stream's consumer had paused and a delivery was pending on the shared inbound sink, disposing
