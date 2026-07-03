@@ -2,6 +2,14 @@
 
 ## 2.25.0 (unreleased)
 
+- The `MapMqtt` generator now refuses two call shapes that previously compiled and threw at
+  runtime: a service-bound handler parameter on a client call that passes no `services`
+  provider (`PMQE007`), and the static invocation form
+  `MapMqttDelegateExtensions.MapMqtt(...)`, which cannot be intercepted (`PMQE008`). The
+  generator's diagnostics are now covered by a dedicated test suite.
+- Docs and README now show the Minimal-API-style handler signatures on the bare client —
+  including `services:` for per-message scopes without a host.
+
 ## 2.24.0
 
 - `Pulse.Mqtt.Endpoints` now ships a source generator: `MapMqtt` accepts Minimal-API-style
