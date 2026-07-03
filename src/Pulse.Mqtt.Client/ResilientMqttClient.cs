@@ -806,7 +806,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         }
 
         var requestOptions = options ?? new MqttRequestOptions();
-        await EnsureResponseRouteAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureResponseRouteAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
 
         var correlation = Guid.NewGuid().ToString("N");
         var pending = new TaskCompletionSource<MqttPublishPacket>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -887,7 +887,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         }
 
         var streamOptions = options ?? new MqttRequestStreamOptions();
-        await EnsureResponseRouteAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureResponseRouteAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
 
         var correlation = Guid.NewGuid().ToString("N");
         var channel = Channel.CreateBounded<MqttPublishPacket>(new BoundedChannelOptions(streamOptions.Capacity)
@@ -1131,11 +1131,20 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         MqttRouteOptions? options) =>
         RegisterRequestHandler(MqttRouteTemplate.Parse(template), handler, options);
 
-    private Task EnsureResponseRouteAsync(CancellationToken cancellationToken)
+    private Task EnsureResponseRouteAsync()
     {
         lock (_rpcGate)
         {
-            _rpcRoute ??= EnsureResponseRouteCoreAsync(cancellationToken);
+            // Set up the shared response route once, but never keep a failed attempt: a faulted or
+            // canceled prior setup is discarded so the next request retries instead of re-throwing
+            // the first failure for the client's whole lifetime. The setup runs with a token
+            // independent of any caller (it is bounded by the subscribe/ack timeout and offline-safe)
+            // so one request's cancellation cannot cancel — and poison — the route every request shares.
+            if (_rpcRoute is null || _rpcRoute.IsFaulted || _rpcRoute.IsCanceled)
+            {
+                _rpcRoute = EnsureResponseRouteCoreAsync(CancellationToken.None);
+            }
+
             return _rpcRoute;
         }
     }

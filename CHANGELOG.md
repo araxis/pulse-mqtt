@@ -2,6 +2,13 @@
 
 ## 2.26.0 (unreleased)
 
+- Fixed request/response being permanently disabled after a transient failure: the shared
+  response route was memoized with `??=` and never reset, so if the very first `RequestAsync`/
+  `RequestStreamAsync` setup faulted (a transient session-store error, or the first caller's
+  own cancellation) every later request re-threw that first failure forever. The route is now
+  rebuilt when a prior attempt faulted or was canceled, and the setup runs on a token
+  independent of any single caller so one request's cancellation can no longer poison it.
+
 - Fixed the offline-queue flush dropping an unsent message under `OverflowPolicy.DropOldest`: the
   flush peeked the head, sent it, then removed "the head" — but a concurrent `DropOldest` enqueue
   could evict that head mid-send, so the removal deleted a different, still-unsent message. The

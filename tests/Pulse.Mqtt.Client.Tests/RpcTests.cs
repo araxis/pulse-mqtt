@@ -1,7 +1,9 @@
+using System.IO;
 using System.Text;
 using Microsoft.Extensions.Time.Testing;
 using Pulse.Mqtt.Packets;
 using Pulse.Mqtt.Protocol;
+using Pulse.Mqtt.Resilience;
 using Pulse.Mqtt.Routing;
 using Pulse.Mqtt.Serialization.Json;
 using Shouldly;
@@ -187,5 +189,73 @@ public sealed class RpcTests
         }
 
         return (client, broker, time, timeout.Token);
+    }
+
+    [Fact]
+    public async Task Rpc_recovers_after_the_first_response_route_setup_fails()
+    {
+        var factory = new SequencedTransportFactory();
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "rpc", KeepAliveSeconds = 0 },
+            Serializer = new JsonMqttSerializer(TestJsonContext.Default),
+            SessionStore = new ThrowOnceOnUpsertSessionStore(),
+        });
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        while (client.State != ConnectionState.Connected)
+        {
+            await Task.Delay(5, timeout.Token);
+        }
+
+        // The first request's response-route setup faults on the session store's first upsert.
+        await Should.ThrowAsync<IOException>(async () =>
+            await client.RequestAsync<TelemetryReading, TelemetryReading>(
+                "svc/echo", new TelemetryReading("d", 1.0), cancellationToken: timeout.Token));
+
+        // A second, healthy request must RETRY the route setup — not re-throw the cached failure.
+        // Before the fix, _rpcRoute held the faulted task forever and this re-threw the IOException
+        // without ever reaching the wire.
+        var retry = client.RequestAsync<TelemetryReading, TelemetryReading>(
+            "svc/echo", new TelemetryReading("d", 1.0), cancellationToken: timeout.Token);
+
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        subscribe.TopicFilters.ShouldHaveSingleItem().Topic.ShouldBe("pulse-rpc/rpc/+");
+        await broker.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] }, timeout.Token);
+
+        var request = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttPublishPacket>();
+        await broker.SendAsync(
+            new MqttPublishAckPacket { PacketType = Pulse.Mqtt.Codec.MqttPacketType.PubAck, PacketIdentifier = request.PacketIdentifier!.Value }, timeout.Token);
+        await broker.SendAsync(new MqttPublishPacket
+        {
+            Topic = request.ResponseTopic!,
+            Payload = new JsonMqttSerializer(TestJsonContext.Default).Serialize(new TelemetryReading("d", 2.0)),
+            CorrelationData = request.CorrelationData,
+        }, timeout.Token);
+
+        (await retry).ShouldBe(new TelemetryReading("d", 2.0));
+    }
+
+    /// <summary>Throws once on the first UpsertSubscriptionsAsync (the RPC response-route setup), then works.</summary>
+    private sealed class ThrowOnceOnUpsertSessionStore : ISessionStore
+    {
+        private readonly InMemorySessionStore _inner = new();
+        private int _upserts;
+
+        public ValueTask SaveSubscriptionsAsync(IReadOnlyList<MqttTopicFilter> topicFilters, CancellationToken cancellationToken) =>
+            _inner.SaveSubscriptionsAsync(topicFilters, cancellationToken);
+
+        public ValueTask<IReadOnlyList<MqttTopicFilter>> LoadSubscriptionsAsync(CancellationToken cancellationToken) =>
+            _inner.LoadSubscriptionsAsync(cancellationToken);
+
+        public ValueTask ClearAsync(CancellationToken cancellationToken) => _inner.ClearAsync(cancellationToken);
+
+        public ValueTask UpsertSubscriptionsAsync(IReadOnlyList<MqttTopicFilter> topicFilters, CancellationToken cancellationToken) =>
+            Interlocked.Increment(ref _upserts) == 1
+                ? throw new IOException("transient session-store failure")
+                : ((ISessionStore)_inner).UpsertSubscriptionsAsync(topicFilters, cancellationToken);
     }
 }
