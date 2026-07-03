@@ -43,4 +43,12 @@ internal static partial class PulseMqttLog
     [LoggerMessage(EventId = 9, Level = LogLevel.Information,
         Message = "MQTT client {ClientId} dropped a queued publish to {Topic}: its {ExpirySeconds}s message expiry elapsed while offline")]
     public static partial void QueuedPublishExpired(ILogger logger, string clientId, string topic, uint expirySeconds);
+
+    [LoggerMessage(EventId = 10, Level = LogLevel.Information,
+        Message = "MQTT client {ClientId} is following a server redirect to {Host}:{Port} (hop {Hop})")]
+    public static partial void FollowingServerRedirect(ILogger logger, string clientId, string host, int? port, int hop);
+
+    [LoggerMessage(EventId = 11, Level = LogLevel.Warning,
+        Message = "MQTT client {ClientId} reached its redirect bound of {MaxServerRedirects} consecutive hops; treating the next redirect as terminal")]
+    public static partial void ServerRedirectBoundReached(ILogger logger, string clientId, int maxServerRedirects);
 }
