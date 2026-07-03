@@ -73,8 +73,34 @@ What happens next depends on the reason, through the same `IReconnectDecision`:
   purpose: another connection owns the session now, and auto-reconnecting would steal it back
   in an endless takeover war.
 
-Swap the decision to change the classification — for example, to implement automatic redirects
-on `ServerMoved` using the down-context's `ServerReference`.
+Swap the decision to change the classification, or — for redirects specifically — turn on the
+built-in following below.
+
+### Following server redirects
+
+Clusters rebalance by redirecting clients: a DISCONNECT (or CONNACK rejection) with
+`UseAnotherServer` / `ServerMoved` and a `Server Reference` naming the next broker. By default
+that faults sticky, surfacing the reference for the operator. Opt in to have the client follow
+it instead:
+
+```csharp
+new ResilientMqttClientOptions
+{
+    FollowServerRedirects = true,
+    // MaxServerRedirects = 8 — rapid hops allowed before the next redirect is terminal.
+}
+```
+
+The client re-targets its transport at the referenced `host[:port]` (space-delimited lists use
+the first entry; bracketed IPv6 works) and reconnects there — session store, offline queue, and
+subscriptions all carry over, exactly like any other reconnect. The built-in TCP, WebSocket,
+and QUIC factories support re-targeting; a custom factory opts in by implementing
+`IRedirectableTransportFactory`.
+
+The hop bound exists for the misconfigured case of brokers redirecting to each other in a loop:
+rapid hops count against `MaxServerRedirects` even when each hop briefly connects, and the
+budget renews once the chain has been quiet for a minute — so occasional rebalancing over days
+of uptime is never punished.
 
 ## Sticky faults
 

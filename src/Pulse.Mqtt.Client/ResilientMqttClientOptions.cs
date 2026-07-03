@@ -25,6 +25,22 @@ public sealed record ResilientMqttClientOptions
     /// <summary>Bounds for the default backoff strategy. Ignored when <see cref="ReconnectStrategy"/> is set.</summary>
     public BackoffOptions Backoff { get; init; } = new();
 
+    /// <summary>
+    /// Follows MQTT 5 server redirects instead of faulting: when the broker answers or disconnects
+    /// with <c>UseAnotherServer</c> / <c>ServerMoved</c> and a <c>Server Reference</c>, the client
+    /// retargets its transport (when the factory implements
+    /// <see cref="Transport.IRedirectableTransportFactory"/>) and reconnects there. Off by default.
+    /// </summary>
+    public bool FollowServerRedirects { get; init; }
+
+    /// <summary>
+    /// How many redirects the client follows in quick succession before treating the next one as
+    /// terminal — the guard against two brokers redirecting to each other forever. The budget
+    /// renews once the chain has been quiet for a minute, so occasional rebalancing over a long
+    /// uptime is never counted against it.
+    /// </summary>
+    public int MaxServerRedirects { get; init; } = 8;
+
     /// <summary>Owns the reconnect loop. Default: exponential backoff with full jitter.</summary>
     public IReconnectStrategy? ReconnectStrategy { get; init; }
 

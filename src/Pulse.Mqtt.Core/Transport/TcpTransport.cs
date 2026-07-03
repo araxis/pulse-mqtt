@@ -54,7 +54,7 @@ public sealed class TcpTransport : IMqttTransport
 }
 
 /// <summary>Connects <see cref="TcpTransport"/> instances from <see cref="TcpTransportOptions"/>.</summary>
-public sealed class TcpTransportFactory : IMqttTransportFactory
+public sealed class TcpTransportFactory : IMqttTransportFactory, IRedirectableTransportFactory
 {
     private readonly TcpTransportOptions _options;
 
@@ -63,6 +63,14 @@ public sealed class TcpTransportFactory : IMqttTransportFactory
     {
         ArgumentNullException.ThrowIfNull(options);
         _options = options;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>An explicitly pinned <see cref="TcpTransportOptions.TlsTargetHost"/> stays pinned.</remarks>
+    public IMqttTransportFactory WithServer(string host, int? port)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(host);
+        return new TcpTransportFactory(_options with { Host = host, Port = port ?? _options.Port });
     }
 
     /// <inheritdoc />

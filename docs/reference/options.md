@@ -31,6 +31,8 @@ For direct construction; with DI these come from `PulseMqttClientOptions` plus b
 | `Raw` | `new()` | Per-connection settings (below) |
 | `OfflineQueue` | `new()` | Offline queue bounds and policy (below) |
 | `Backoff` | `new()` | Default backoff bounds; ignored when `ReconnectStrategy` is set |
+| `FollowServerRedirects` | `false` | Follow MQTT 5 `UseAnotherServer`/`ServerMoved` redirects instead of faulting ([resilience](../guide/resilience#following-server-redirects)) |
+| `MaxServerRedirects` | `8` | Rapid redirect hops allowed before the next redirect is terminal |
 | `ReconnectStrategy` | backoff + jitter | The reconnect loop ([swap](../guide/extending#custom-reconnect-strategy)) |
 | `ReconnectDecision` | auth-final | Retry-or-fault classification ([swap](../guide/extending#custom-reconnect-decision)) |
 | `Lifecycle` | re-subscriber | Connection up/down hooks ([swap](../guide/extending#custom-lifecycle)) |

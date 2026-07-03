@@ -2,6 +2,11 @@
 
 ## 2.22.0 (unreleased)
 
+- Added opt-in server-redirect following: with `FollowServerRedirects`, an MQTT 5
+  `UseAnotherServer`/`ServerMoved` (in a DISCONNECT or CONNACK) re-targets the transport at the
+  referenced server and reconnects there instead of faulting, bounded by `MaxServerRedirects`
+  for rapid redirect loops. The TCP, WebSocket, and QUIC factories are redirect-capable; custom
+  transports opt in via `IRedirectableTransportFactory`.
 - The offline queue now honors MQTT 5 message expiry across the offline wait: expired messages
   are dropped instead of delivered stale (logged, with a `DroppedExpired` metric disposition),
   and surviving messages go out with the queue time subtracted from their remaining expiry.

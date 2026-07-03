@@ -1,1 +1,2 @@
 #nullable enable
+Pulse.Mqtt.Transport.WebSocketTransportFactory.WithServer(string! host, int? port) -> Pulse.Mqtt.Transport.IMqttTransportFactory!

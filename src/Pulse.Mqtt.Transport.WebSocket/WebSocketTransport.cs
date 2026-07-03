@@ -156,7 +156,7 @@ public sealed class WebSocketTransport : IMqttTransport
 }
 
 /// <summary>Connects <see cref="WebSocketTransport"/> instances from <see cref="WebSocketTransportOptions"/>.</summary>
-public sealed class WebSocketTransportFactory : IMqttTransportFactory
+public sealed class WebSocketTransportFactory : IMqttTransportFactory, IRedirectableTransportFactory
 {
     private readonly WebSocketTransportOptions _options;
 
@@ -165,6 +165,20 @@ public sealed class WebSocketTransportFactory : IMqttTransportFactory
     {
         ArgumentNullException.ThrowIfNull(options);
         _options = options;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>The scheme, path, and every other option carry over; only host and port change.</remarks>
+    public IMqttTransportFactory WithServer(string host, int? port)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(host);
+        var uri = new UriBuilder(_options.Uri) { Host = host };
+        if (port is { } newPort)
+        {
+            uri.Port = newPort;
+        }
+
+        return new WebSocketTransportFactory(_options with { Uri = uri.Uri });
     }
 
     /// <inheritdoc />

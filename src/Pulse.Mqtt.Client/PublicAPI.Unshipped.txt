@@ -1,1 +1,5 @@
 #nullable enable
+Pulse.Mqtt.Client.ResilientMqttClientOptions.FollowServerRedirects.get -> bool
+Pulse.Mqtt.Client.ResilientMqttClientOptions.FollowServerRedirects.init -> void
+Pulse.Mqtt.Client.ResilientMqttClientOptions.MaxServerRedirects.get -> int
+Pulse.Mqtt.Client.ResilientMqttClientOptions.MaxServerRedirects.init -> void

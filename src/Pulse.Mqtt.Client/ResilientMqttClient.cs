@@ -22,7 +22,14 @@ namespace Pulse.Mqtt.Client;
 /// </summary>
 public sealed class ResilientMqttClient : IAsyncDisposable
 {
-    private readonly IMqttTransportFactory _transportFactory;
+    // A redirect chain that pauses this long is considered over, so the hop budget renews.
+    // Misconfigured ping-pong loops cycle in seconds; legitimate rebalances are minutes apart.
+    private static readonly TimeSpan RedirectChainQuietPeriod = TimeSpan.FromSeconds(60);
+
+    // Mutable only for redirect following: the supervisor loop is the sole reader and writer.
+    private IMqttTransportFactory _transportFactory;
+    private int _redirectHops;
+    private long _lastRedirectTimestamp;
     private readonly ResilientMqttClientOptions _options;
     private readonly TimeProvider _time;
     private readonly IReconnectStrategy _strategy;
@@ -1398,6 +1405,15 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                                     clientIdTag,
                                     new KeyValuePair<string, object?>("outcome", "error"));
                                 await candidate.DisposeAsync().ConfigureAwait(false);
+
+                                // A CONNACK-level redirect retargets the factory and rethrows: the
+                                // reason is retryable, so the strategy's next attempt already
+                                // connects to the referenced server.
+                                if (error is MqttConnectRejectedException rejected)
+                                {
+                                    TryFollowServerRedirect(rejected.ReasonCode, rejected.ServerReference);
+                                }
+
                                 throw;
                             }
                         },
@@ -1503,9 +1519,16 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                 }
 
                 // A broker that said "stop" — a ban, a takeover, a redirect — must not be
-                // hammered with reconnects. The decision classifies; terminal reasons fault.
+                // hammered with reconnects. The decision classifies; terminal reasons fault,
+                // unless the reason is a redirect the client is configured to follow.
                 if (serverDisconnect is not null && !_decision.ShouldRetry(_attempt, serverDisconnect))
                 {
+                    if (TryFollowServerRedirect(serverDisconnect.ReasonCode, serverDisconnect.ServerReference))
+                    {
+                        _attempt++;
+                        continue;
+                    }
+
                     Fault(serverDisconnect);
                     return;
                 }
@@ -1517,6 +1540,53 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         {
             Fault(error);
         }
+    }
+
+    /// <summary>
+    /// Retargets the transport at the broker-referenced server when redirect following applies:
+    /// the option is on, the reason is a redirect, the reference parses, the factory can be
+    /// retargeted, and the consecutive-hop bound is not exhausted.
+    /// </summary>
+    private bool TryFollowServerRedirect(MqttReasonCode? reason, string? serverReference)
+    {
+        if (!_options.FollowServerRedirects
+            || reason is not (MqttReasonCode.UseAnotherServer or MqttReasonCode.ServerMoved)
+            || _transportFactory is not IRedirectableTransportFactory redirectable
+            || !MqttServerReference.TryParse(serverReference, out var host, out var port))
+        {
+            return false;
+        }
+
+        // The bound targets rapid ping-pong loops, not occasional rebalancing over a long
+        // uptime: a chain that has been quiet renews its budget.
+        if (_redirectHops > 0 && _time.GetElapsedTime(_lastRedirectTimestamp) >= RedirectChainQuietPeriod)
+        {
+            _redirectHops = 0;
+        }
+
+        if (_redirectHops >= _options.MaxServerRedirects)
+        {
+            if (_options.Logger is { } boundLogger)
+            {
+                PulseMqttLog.ServerRedirectBoundReached(boundLogger, _clientId, _options.MaxServerRedirects);
+            }
+
+            return false;
+        }
+
+        _redirectHops++;
+        _lastRedirectTimestamp = _time.GetTimestamp();
+        _transportFactory = redirectable.WithServer(host, port);
+        if (_options.Logger is { } logger)
+        {
+            PulseMqttLog.FollowingServerRedirect(logger, _clientId, host, port, _redirectHops);
+        }
+
+        PulseMqttDiagnostics.StateTransitions.Add(
+            1,
+            new KeyValuePair<string, object?>("client.id", _clientId),
+            new KeyValuePair<string, object?>("state", "Redirected"));
+        return true;
     }
 
     private async Task PublishBirthAsync(RawMqttClient raw, CancellationToken cancellationToken)
