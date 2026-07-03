@@ -129,7 +129,7 @@ app.MapMqtt("sensors/{deviceId:int}/reading",
     (int deviceId, Reading reading, IDeviceStore store, CancellationToken ct) =>
         store.SaveAsync(deviceId, reading, ct));
 
-// A call site that cannot be bound is a compile error (PMQE001–PMQE008), never a runtime surprise.
+// A call site that cannot be bound is a compile error (PMQE001–PMQE011), never a runtime surprise.
 ```
 
 ### Typed messaging
