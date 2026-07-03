@@ -21,12 +21,16 @@
   identifier and silently replace it. Publishes now re-check for a live connection after
   queueing (flushes are serialized through one gate), identifier allocation skips identifiers a
   session entry still holds (`MqttInFlightSession.ContainsOutbound`), and connection-up runs a
-  second redelivery pass when late entries deposited during the transition.
+  second redelivery pass when late entries deposited during the transition. The re-check flush
+  is best-effort: any connection-death exception from it is swallowed (the message is already
+  queued and the next connection-up flush drains it), so a transport failure while nudging the
+  queue never escapes `PublishAsync`.
 
 - Fixed disposing a `MapMqtt` endpoint silently starving another endpoint on the same topic
   filter (`a/{x}` and `a/{y}` both subscribe `a/+`): endpoint subscriptions are now
   reference-counted per client, and the broker filter is released only with the last endpoint
-  using it.
+  using it. Disposing an endpoint whose subscription was denied releases nothing (it took no
+  reference), so it cannot unsubscribe a filter a granted endpoint still holds.
 - Shared subscription route templates (`$share/<group>/...`) now dispatch: matching skips the
   `$share/<group>/` prefix, which the broker never includes in delivered topics — previously
   such routes subscribed successfully and then received nothing. Malformed `$share` templates
