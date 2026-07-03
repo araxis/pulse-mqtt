@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.22.0 (unreleased)
+## 2.22.0
 
 - Added a Blazor WebAssembly sample running the client in the browser over the WebSocket
   transport, and a CI trim gate that publishes it so trimming regressions for WASM consumers
