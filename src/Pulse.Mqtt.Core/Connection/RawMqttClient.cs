@@ -301,7 +301,7 @@ public sealed class RawMqttClient : IAsyncDisposable
             return MqttReasonCode.Success;
         }
 
-        var id = _packetIds.Rent();
+        var id = RentIdentifier();
 
         // The identifier returns to the allocator only when the exchange truly finishes (or the
         // packet never reached the wire). When a persistent session keeps an interrupted entry,
@@ -399,6 +399,25 @@ public sealed class RawMqttClient : IAsyncDisposable
             if (settled || _session is null)
             {
                 _packetIds.Return(id);
+            }
+        }
+    }
+
+    // Rents an identifier no in-flight session entry still holds. A publish racing a reconnect
+    // can record into the shared session after this connection reserved the connect-time
+    // snapshot's identifiers, so a plain rent could collide with such an entry — and since MQTT
+    // packet identifiers share one space across PUBLISH/SUBSCRIBE/UNSUBSCRIBE, a colliding
+    // publish would make OutboundSentAsync's update-in-place silently replace (lose) the
+    // session-held message. Skipped identifiers stay rented here on behalf of their entries,
+    // exactly as the connect-time Reserve would have done.
+    private ushort RentIdentifier()
+    {
+        while (true)
+        {
+            var id = _packetIds.Rent();
+            if (_session is not { } session || !session.ContainsOutbound(id))
+            {
+                return id;
             }
         }
     }
@@ -653,7 +672,7 @@ public sealed class RawMqttClient : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(topicFilters);
         var connection = ConnectedOrThrow();
 
-        var id = _packetIds.Rent();
+        var id = RentIdentifier();
         try
         {
             var subscribe = new MqttSubscribePacket
@@ -681,7 +700,7 @@ public sealed class RawMqttClient : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(topicFilters);
         var connection = ConnectedOrThrow();
 
-        var id = _packetIds.Rent();
+        var id = RentIdentifier();
         try
         {
             var unsubscribe = new MqttUnsubscribePacket

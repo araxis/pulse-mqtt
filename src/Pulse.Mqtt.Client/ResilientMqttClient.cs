@@ -51,6 +51,10 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     private readonly object _stateGate = new();
     private readonly object _subscriptionGate = new();
 
+    // Serializes offline-queue flushes: the connection-up flush and the post-enqueue nudge in
+    // PublishCoreAsync must not interleave, or two drains could double-send the same head.
+    private readonly SemaphoreSlim _flushGate = new(1, 1);
+
     private readonly Lazy<MqttRouter> _router;
     private readonly string _clientId;
     private readonly PulseMqttDiagnostics.IOfflineQueueProbe _offlineProbe;
@@ -396,7 +400,37 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         }
 
         await _messageStore.EnqueueAsync(packet, _time.GetUtcNow(), cancellationToken).ConfigureAwait(false);
+
+        // The connection may have come up while this publish was between the _raw check and the
+        // enqueue, with the connection-up flush already past its final queue scan. Nothing else
+        // ever flushes while Connected, so without this re-check the message would sit in the
+        // queue until the NEXT reconnect — or forever (the chaos-suite one-message loss).
+        if (_raw is { } liveNow)
+        {
+            try
+            {
+                await FlushQueuedGatedAsync(liveNow, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is MqttException or InvalidOperationException or ObjectDisposedException)
+            {
+                // The connection died again; the next connection-up flush drains the queue.
+            }
+        }
+
         return new PublishOutcome(PublishDisposition.Queued);
+    }
+
+    private async Task FlushQueuedGatedAsync(RawMqttClient raw, CancellationToken cancellationToken)
+    {
+        await _flushGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await FlushQueuedAsync(raw, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
     }
 
     /// <summary>
@@ -1450,7 +1484,17 @@ public sealed class ResilientMqttClient : IAsyncDisposable
                     // its original order before any newly-queued traffic.
                     await raw!.RedeliverAsync(cancellationToken).ConfigureAwait(false);
                     await PublishBirthAsync(raw!, cancellationToken).ConfigureAwait(false);
-                    await FlushQueuedAsync(raw!, cancellationToken).ConfigureAwait(false);
+                    await FlushQueuedGatedAsync(raw!, cancellationToken).ConfigureAwait(false);
+
+                    // A publish racing the previous connection's death can record into the shared
+                    // in-flight session after RedeliverAsync's snapshot walked it. No publish can
+                    // target this connection before _raw is set below, so anything present now is
+                    // that late debris — resume it here instead of stranding it until the next
+                    // reconnect.
+                    if (_inFlightSession is not null && _inFlightSession.Snapshot().Outbound.Count > 0)
+                    {
+                        await raw!.RedeliverAsync(cancellationToken).ConfigureAwait(false);
+                    }
                 }
                 catch (OperationCanceledException)
                 {

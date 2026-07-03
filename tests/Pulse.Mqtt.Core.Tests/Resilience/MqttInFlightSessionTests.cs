@@ -154,4 +154,19 @@ public sealed class MqttInFlightSessionTests
         cleared.Outbound.ShouldBeEmpty();
         cleared.InboundExactlyOnce.ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task ContainsOutbound_tracks_the_held_identifiers()
+    {
+        var session = new MqttInFlightSession((_, _) => ValueTask.CompletedTask);
+
+        session.ContainsOutbound(5).ShouldBeFalse();
+
+        await session.OutboundSentAsync(Publish(5), MqttInFlightStage.AwaitingPubAck, CancellationToken.None);
+        session.ContainsOutbound(5).ShouldBeTrue();
+        session.ContainsOutbound(6).ShouldBeFalse();
+
+        await session.OutboundCompletedAsync(5, CancellationToken.None);
+        session.ContainsOutbound(5).ShouldBeFalse();
+    }
 }

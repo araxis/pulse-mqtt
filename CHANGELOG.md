@@ -2,6 +2,15 @@
 
 ## 2.25.0 (unreleased)
 
+- Fixed a rare QoS 1/2 message loss when a publish races a reconnect (the long-standing chaos
+  flake): a message could land in the offline queue just after the connection-up flush had
+  scanned — stranded while `Connected` until the next reconnect — or record into the in-flight
+  session just after redelivery walked it, where a later publish could rent the same packet
+  identifier and silently replace it. Publishes now re-check for a live connection after
+  queueing (flushes are serialized through one gate), identifier allocation skips identifiers a
+  session entry still holds (`MqttInFlightSession.ContainsOutbound`), and connection-up runs a
+  second redelivery pass when late entries deposited during the transition.
+
 - Fixed disposing a `MapMqtt` endpoint silently starving another endpoint on the same topic
   filter (`a/{x}` and `a/{y}` both subscribe `a/+`): endpoint subscriptions are now
   reference-counted per client, and the broker filter is released only with the last endpoint
