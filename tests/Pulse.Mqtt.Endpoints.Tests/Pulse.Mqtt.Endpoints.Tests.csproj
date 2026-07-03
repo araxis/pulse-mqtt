@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Pulse.Mqtt.Endpoints.Generated</InterceptorsNamespaces>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
@@ -19,6 +20,7 @@
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Core\Pulse.Mqtt.Core.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Client\Pulse.Mqtt.Client.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Endpoints\Pulse.Mqtt.Endpoints.csproj" />
+    <ProjectReference Include="..\..\src\Pulse.Mqtt.Endpoints.Generator\Pulse.Mqtt.Endpoints.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.DependencyInjection\Pulse.Mqtt.DependencyInjection.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Serialization.Json\Pulse.Mqtt.Serialization.Json.csproj" />
     <ProjectReference Include="..\..\src\Pulse.Mqtt.Testing\Pulse.Mqtt.Testing.csproj" />
