@@ -2,6 +2,12 @@
 
 ## 2.26.0 (unreleased)
 
+- Fixed disposing an acknowledged route stream tearing down the whole client connection: if the
+  stream's consumer had paused and a delivery was pending on the shared inbound sink, disposing
+  the stream completed its channel and the pending write's `ChannelClosedException` escaped into
+  the read loop, faulting the connection and forcing a reconnect. That exception is now caught
+  (the route is simply gone) so a routine stream disposal never disturbs the connection.
+
 - Fixed the WebSocket transport dropping bytes flushed just before disposal — the graceful MQTT
   DISCONNECT was lost and the peer saw an abrupt close instead of the close handshake. Disposal
   cancelled the transport before its buffered send pump drained, unlike the TCP and QUIC
