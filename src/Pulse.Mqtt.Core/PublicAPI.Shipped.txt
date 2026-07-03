@@ -809,3 +809,7 @@ Pulse.Mqtt.Routing.MqttRouteConstraint.Int = 1 -> Pulse.Mqtt.Routing.MqttRouteCo
 Pulse.Mqtt.Routing.MqttRouteConstraint.Long = 2 -> Pulse.Mqtt.Routing.MqttRouteConstraint
 Pulse.Mqtt.Routing.MqttRouteConstraint.None = 0 -> Pulse.Mqtt.Routing.MqttRouteConstraint
 Pulse.Mqtt.Routing.MqttRouteTemplate.ParameterConstraints.get -> System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.Routing.MqttRouteConstraint>!
+Pulse.Mqtt.Resilience.MqttInFlightSession.ContainsOutbound(ushort packetIdentifier) -> bool
+Pulse.Mqtt.Packets.MqttPublishStorage
+static Pulse.Mqtt.Packets.MqttPublishStorage.FromStorageForm(Pulse.Mqtt.Packets.MqttPublishPacket! packet) -> Pulse.Mqtt.Packets.MqttPublishPacket!
+static Pulse.Mqtt.Packets.MqttPublishStorage.ToStorageForm(Pulse.Mqtt.Packets.MqttPublishPacket! packet) -> Pulse.Mqtt.Packets.MqttPublishPacket!

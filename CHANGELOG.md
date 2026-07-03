@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.26.0 (unreleased)
+
 ## 2.25.0
 
 - Fixed the durable offline stores (`Pulse.Mqtt.Storage.Sqlite`, `Pulse.Mqtt.Storage.LiteDB`)
