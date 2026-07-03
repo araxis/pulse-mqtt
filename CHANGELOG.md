@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.25.0 (unreleased)
+## 2.25.0
 
 - Fixed the durable offline stores (`Pulse.Mqtt.Storage.Sqlite`, `Pulse.Mqtt.Storage.LiteDB`)
   throwing when a QoS 1/2 publish is queued while offline: such a publish has no packet
