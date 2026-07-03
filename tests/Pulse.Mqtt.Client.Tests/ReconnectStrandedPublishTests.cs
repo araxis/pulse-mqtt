@@ -158,6 +158,64 @@ public sealed class ReconnectStrandedPublishTests
         store.Count.ShouldBe(1, "the failed flush leaves the message queued for the next connection-up flush");
     }
 
+    [Fact]
+    public async Task A_non_transport_failure_during_the_post_enqueue_flush_is_swallowed_but_logged()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var factory = new SequencedTransportFactory();
+        var store = new PoisonPeekGatedStore();
+        var logger = new RecordingLogger();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket
+            {
+                ClientId = "strand-poison",
+                KeepAliveSeconds = 0,
+                CleanStart = false,
+                SessionExpiryInterval = 300,
+            },
+            Backoff = new BackoffOptions { BaseDelay = TimeSpan.FromMilliseconds(1), MaxDelay = TimeSpan.FromMilliseconds(5) },
+            MessageStore = store,
+            Logger = logger,
+        });
+
+        await client.ConnectAsync(timeout.Token);
+        var broker1 = await factory.NextBrokerAsync(timeout.Token);
+        await broker1.AcceptConnectionAsync(timeout.Token);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        await broker1.DisposeAsync();
+        while (factory.ConnectionsHandedOut < 2)
+        {
+            await Task.Delay(5, timeout.Token);
+        }
+
+        store.Arm();
+        var publishTask = client.PublishAsync(
+            new MqttPublishPacket
+            {
+                Topic = "chaos/poison",
+                Payload = Encoding.UTF8.GetBytes("23"),
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+            },
+            timeout.Token);
+        await store.EnqueueEntered.WaitAsync(timeout.Token);
+
+        var broker2 = await factory.NextBrokerAsync(timeout.Token);
+        await broker2.AcceptConnectionAsync(timeout.Token, sessionPresent: true);
+        await WaitForStateAsync(client, ConnectionState.Connected, timeout.Token);
+
+        // A non-transport error (a corrupt/undecodable head, modeled as a FormatException on peek)
+        // surfaces through the nudge flush. It must not escape the publish — the message is queued —
+        // but unlike a transport death it must be logged rather than silently discarded.
+        store.PoisonPeek();
+        store.Release();
+
+        var outcome = await publishTask;
+        outcome.Disposition.ShouldBe(PublishDisposition.Queued);
+        logger.Events.ShouldContain(12); // QueuedPublishNudgeFailed — the swallow is visible
+    }
+
     private static async Task WaitForStateAsync(ResilientMqttClient client, ConnectionState state, CancellationToken token)
     {
         while (client.State != state)
@@ -211,6 +269,93 @@ public sealed class ReconnectStrandedPublishTests
                 _armed = false;
                 _entered.Release();
                 await _gate.Task;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gates the enqueue like <see cref="GatedMessageStore"/>, and can be armed to throw a
+    /// non-transport exception (a corrupt-head <see cref="FormatException"/>) from the next
+    /// <c>PeekQueuedAsync</c> — the exact shape a durable store's decode error would take when the
+    /// post-enqueue flush reaches it.
+    /// </summary>
+    private sealed class PoisonPeekGatedStore : IMessageStore
+    {
+        private readonly InMemoryMessageStore _inner = new(new OfflineQueueOptions());
+        private readonly SemaphoreSlim _entered = new(0);
+        private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private volatile bool _armed;
+        private volatile bool _poisonPeek;
+
+        public SemaphoreSlim EnqueueEntered => _entered;
+
+        public int Count => _inner.Count;
+
+        public long DroppedCount => _inner.DroppedCount;
+
+        public void Arm() => _armed = true;
+
+        public void Release() => _gate.TrySetResult();
+
+        public void PoisonPeek() => _poisonPeek = true;
+
+        public async ValueTask EnqueueAsync(MqttPublishPacket packet, CancellationToken cancellationToken)
+        {
+            await PauseIfArmedAsync();
+            await _inner.EnqueueAsync(packet, cancellationToken);
+        }
+
+        public async ValueTask EnqueueAsync(MqttPublishPacket packet, DateTimeOffset enqueuedAt, CancellationToken cancellationToken)
+        {
+            await PauseIfArmedAsync();
+            await _inner.EnqueueAsync(packet, enqueuedAt, cancellationToken);
+        }
+
+        public ValueTask<MqttPublishPacket?> PeekAsync(CancellationToken cancellationToken) => _inner.PeekAsync(cancellationToken);
+
+        public ValueTask<MqttQueuedPublish?> PeekQueuedAsync(CancellationToken cancellationToken) =>
+            _poisonPeek
+                ? throw new FormatException("A stored packet blob is corrupt.")
+                : _inner.PeekQueuedAsync(cancellationToken);
+
+        public ValueTask RemoveHeadAsync(CancellationToken cancellationToken) => _inner.RemoveHeadAsync(cancellationToken);
+
+        public ValueTask ClearAsync(CancellationToken cancellationToken) => _inner.ClearAsync(cancellationToken);
+
+        private async Task PauseIfArmedAsync()
+        {
+            if (_armed)
+            {
+                _armed = false;
+                _entered.Release();
+                await _gate.Task;
+            }
+        }
+    }
+
+    private sealed class RecordingLogger : Microsoft.Extensions.Logging.ILogger
+    {
+        private readonly List<int> _events = [];
+
+        public IReadOnlyList<int> Events
+        {
+            get { lock (_events) { return [.. _events]; } }
+        }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            Microsoft.Extensions.Logging.LogLevel logLevel,
+            Microsoft.Extensions.Logging.EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            lock (_events)
+            {
+                _events.Add(eventId.Id);
             }
         }
     }
