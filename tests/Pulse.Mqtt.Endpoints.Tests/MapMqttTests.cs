@@ -256,6 +256,45 @@ public sealed class MapMqttTests
     }
 
     [Fact]
+    public async Task Disposing_one_endpoint_twice_keeps_a_shared_filter_alive()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await using var broker = new PulseMqttTestBroker();
+        await using var client = NewClient(broker);
+        await client.ConnectAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        // Distinct templates, one broker filter (alerts/+): the shared filter has two references.
+        var survivorSeen = new SemaphoreSlim(0);
+        var survivorCount = 0;
+        var survivor = client.MapMqtt("alerts/{level}", _ =>
+        {
+            Interlocked.Increment(ref survivorCount);
+            survivorSeen.Release();
+            return ValueTask.CompletedTask;
+        });
+        var disposed = client.MapMqtt("alerts/{severity}", _ => ValueTask.CompletedTask);
+        await survivor.Subscribed.WaitAsync(timeout.Token);
+        await disposed.Subscribed.WaitAsync(timeout.Token);
+
+        await using var publisher = NewClient(broker);
+        await publisher.ConnectAsync(timeout.Token);
+        await publisher.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        // Dispose the SAME endpoint twice. A second release would drop the shared filter's refcount
+        // to zero and unsubscribe alerts/+, starving the survivor. The idempotency guard must make
+        // the second dispose a no-op; before the fix the survivor read below timed out.
+        await disposed.DisposeAsync();
+        await disposed.DisposeAsync();
+
+        await publisher.PublishAsync(
+            new MqttPublishPacket { Topic = "alerts/orange", Payload = "y"u8.ToArray(), QualityOfService = MqttQualityOfService.AtLeastOnce }, timeout.Token);
+        await survivorSeen.WaitAsync(timeout.Token);
+
+        survivorCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Disposing_a_denied_endpoint_does_not_unsubscribe_a_granted_shared_filter()
     {
         using var timeout = new CancellationTokenSource(SafetyTimeout);

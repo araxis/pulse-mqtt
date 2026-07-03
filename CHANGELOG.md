@@ -2,6 +2,14 @@
 
 ## 2.27.0 (unreleased)
 
+- Fixed `MqttEndpoint.DisposeAsync` (Pulse.Mqtt.Endpoints) not being idempotent: disposing the same
+  endpoint twice released its shared-subscription reference twice, so when two endpoints shared one
+  broker filter (e.g. `alerts/{level}` and `alerts/{severity}` both subscribing `alerts/+`) a
+  double-dispose of one dropped the refcount to zero and unsubscribed the filter the other, still-live
+  endpoint depended on — silently starving it. A double-dispose is legitimate (`await using` plus a
+  container or explicit dispose), and `IAsyncDisposable` requires tolerating it. Disposal is now
+  guarded so the second call is a no-op, matching the sibling `MqttSubscribedRoute`.
+
 - Fixed disposing a full handler/stream route tearing down the entire router: if a non-acknowledged
   route's queue was full (default `RouteOverflow.Wait`) so the shared dispatch loop was blocked
   writing to it, disposing that route's stream completed its channel and the pending write's
