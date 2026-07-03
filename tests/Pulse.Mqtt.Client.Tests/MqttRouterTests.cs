@@ -90,6 +90,33 @@ public sealed class MqttRouterTests
     }
 
     [Fact]
+    public async Task Disposing_a_blocked_route_stream_does_not_stop_other_routes()
+    {
+        var (source, router) = NewRouter();
+        await using var _ = router;
+
+        // Route A: capacity 1, Wait, deliberately left undrained so it fills and then blocks the
+        // single shared dispatch loop on its WriteAsync.
+        var slow = router.OpenRouteStream("slow/#", new MqttRouteOptions { Capacity = 1, Overflow = RouteOverflow.Wait });
+        // Route B: healthy — it must keep receiving after A is disposed.
+        await using var fast = router.OpenRouteStream("fast/#");
+
+        source.Writer.TryWrite(Message("slow/1")); // fills A's capacity-1 channel
+        source.Writer.TryWrite(Message("slow/2")); // dispatch loop parks here writing to the full A
+        await Task.Delay(150);
+
+        // Dispose A while the dispatch loop is blocked on its full channel. Completing the channel
+        // faults the pending WriteAsync with ChannelClosedException. Before the fix that escaped into
+        // DispatchAsync, was swallowed by the source-fault handler, and completed every route's channel
+        // — so the read below would fault/time out. After the fix delivery to B is unaffected.
+        await slow.DisposeAsync();
+
+        source.Writer.TryWrite(Message("fast/1"));
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        (await fast.Reader.ReadAsync(timeout.Token)).Message.Topic.ShouldBe("fast/1");
+    }
+
+    [Fact]
     public async Task A_faulting_handler_surfaces_and_dispatch_continues()
     {
         var (source, router) = NewRouter();
