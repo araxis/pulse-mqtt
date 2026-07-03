@@ -813,3 +813,7 @@ Pulse.Mqtt.Resilience.MqttInFlightSession.ContainsOutbound(ushort packetIdentifi
 Pulse.Mqtt.Packets.MqttPublishStorage
 static Pulse.Mqtt.Packets.MqttPublishStorage.FromStorageForm(Pulse.Mqtt.Packets.MqttPublishPacket! packet) -> Pulse.Mqtt.Packets.MqttPublishPacket!
 static Pulse.Mqtt.Packets.MqttPublishStorage.ToStorageForm(Pulse.Mqtt.Packets.MqttPublishPacket! packet) -> Pulse.Mqtt.Packets.MqttPublishPacket!
+Pulse.Mqtt.Resilience.IMessageStore.RemoveAsync(Pulse.Mqtt.Resilience.MqttQueuedPublish! entry, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.InMemoryMessageStore.RemoveAsync(Pulse.Mqtt.Resilience.MqttQueuedPublish! entry, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Resilience.MqttQueuedPublish.Sequence.get -> long
+Pulse.Mqtt.Resilience.MqttQueuedPublish.Sequence.init -> void

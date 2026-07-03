@@ -1,2 +1,1 @@
 #nullable enable
-Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.RemoveAsync(Pulse.Mqtt.Resilience.MqttQueuedPublish! entry, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask

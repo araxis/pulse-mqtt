@@ -1,5 +1,7 @@
 # Changelog
 
+## 2.27.0 (unreleased)
+
 ## 2.26.0
 
 - Fixed disposing an acknowledged route stream tearing down the whole client connection: if the

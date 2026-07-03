@@ -25,3 +25,4 @@ Pulse.Mqtt.Storage.LiteDB.LiteDbStorageException.LiteDbStorageException(string! 
 Pulse.Mqtt.Storage.LiteDB.LiteDbStorageException.LiteDbStorageException(string! message, System.Exception! innerException) -> void
 Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.DateTimeOffset enqueuedAt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
 Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.PeekQueuedAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttQueuedPublish?>
+Pulse.Mqtt.Storage.LiteDB.LiteDbMessageStore.RemoveAsync(Pulse.Mqtt.Resilience.MqttQueuedPublish! entry, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask

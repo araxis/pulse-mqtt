@@ -1,5 +1,1 @@
 #nullable enable
-Pulse.Mqtt.Resilience.IMessageStore.RemoveAsync(Pulse.Mqtt.Resilience.MqttQueuedPublish! entry, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
-Pulse.Mqtt.Resilience.InMemoryMessageStore.RemoveAsync(Pulse.Mqtt.Resilience.MqttQueuedPublish! entry, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
-Pulse.Mqtt.Resilience.MqttQueuedPublish.Sequence.get -> long
-Pulse.Mqtt.Resilience.MqttQueuedPublish.Sequence.init -> void

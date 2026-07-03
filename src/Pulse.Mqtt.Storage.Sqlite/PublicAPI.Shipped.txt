@@ -25,3 +25,4 @@ Pulse.Mqtt.Storage.Sqlite.SqliteStorageException.SqliteStorageException(string! 
 Pulse.Mqtt.Storage.Sqlite.SqliteStorageException.SqliteStorageException(string! message, System.Exception! innerException) -> void
 Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.DateTimeOffset enqueuedAt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
 Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.PeekQueuedAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttQueuedPublish?>
+Pulse.Mqtt.Storage.Sqlite.SqliteMessageStore.RemoveAsync(Pulse.Mqtt.Resilience.MqttQueuedPublish! entry, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
