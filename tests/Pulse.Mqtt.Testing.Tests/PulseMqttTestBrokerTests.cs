@@ -54,6 +54,57 @@ public sealed class PulseMqttTestBrokerTests
     }
 
     [Fact]
+    public async Task An_mqtt5_publish_forwards_to_a_311_subscriber_with_v5_properties_stripped()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        await using var subscriber = new RawMqttClient(broker);
+        await using var publisher = new RawMqttClient(broker);
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+
+        await subscriber.ConnectAsync(NewConnect("v3-sub", MqttProtocolVersion.V311), timeout.Token);
+        await publisher.ConnectAsync(NewConnect("v5-pub", MqttProtocolVersion.V500), timeout.Token);
+
+        await subscriber.SubscribeAsync(
+            [new MqttTopicFilter("mixed/topic") { MaximumQualityOfService = MqttQualityOfService.AtLeastOnce }],
+            timeout.Token);
+
+        // An MQTT 5 publish carrying MQTT 5-only properties. Forwarding it to the 3.1.1 subscriber must
+        // strip those (a 3.1.1 PUBLISH cannot carry them) — before the fix the encode threw and faulted
+        // the forward, so the subscriber never received it and the publisher's session was torn down.
+        await publisher.PublishAsync(
+            new MqttPublishPacket
+            {
+                Topic = "mixed/topic",
+                Payload = "hi"u8.ToArray(),
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                ContentType = "text/plain",
+                ResponseTopic = "reply/here",
+                MessageExpiryInterval = 60,
+                PayloadFormatIndicator = MqttPayloadFormatIndicator.Utf8,
+                CorrelationData = new byte[] { 1, 2, 3 },
+                UserProperties = [new MqttUserProperty("k", "v")],
+            },
+            timeout.Token);
+
+        var received = await subscriber.Messages.ReadAsync(timeout.Token);
+        received.ProtocolVersion.ShouldBe(MqttProtocolVersion.V311);
+        received.Topic.ShouldBe("mixed/topic");
+        Encoding.UTF8.GetString(received.Payload.Span).ShouldBe("hi");
+        received.ContentType.ShouldBeNull();
+        received.ResponseTopic.ShouldBeNull();
+        received.MessageExpiryInterval.ShouldBeNull();
+        received.CorrelationData.ShouldBeNull();
+        received.UserProperties.ShouldBeEmpty();
+        received.PayloadFormatIndicator.ShouldBe(MqttPayloadFormatIndicator.Unspecified);
+
+        // The publisher's session is unharmed: a second publish still round-trips.
+        await publisher.PublishAsync(
+            new MqttPublishPacket { Topic = "mixed/topic", Payload = "again"u8.ToArray(), QualityOfService = MqttQualityOfService.AtLeastOnce },
+            timeout.Token);
+        Encoding.UTF8.GetString((await subscriber.Messages.ReadAsync(timeout.Token)).Payload.Span).ShouldBe("again");
+    }
+
+    [Fact]
     public async Task Retained_messages_are_disabled_by_default()
     {
         await using var broker = new PulseMqttTestBroker();
