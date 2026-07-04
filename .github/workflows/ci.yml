@@ -43,6 +43,21 @@ jobs:
         # warning here means a library change broke trimming for WASM consumers.
         run: dotnet publish samples/Pulse.Mqtt.BlazorWasmSample -c Release --no-restore -o wasm-publish
 
+      - name: Publish the AOT smoke app (native AOT gate)
+        # Unlike the WASM trim gate above, this runs the native-AOT ILC compiler and native codegen
+        # over the Pulse stack, so an AOT-incompatible construct or a new trim/AOT warning (IL2xxx /
+        # IL3xxx) fails the build here. PublishAot comes from the project file; passing it on the
+        # command line would apply it to the netstandard2.0 generator and error (NETSDK1207). The grep
+        # catches analyzer warnings that are emitted as warnings rather than errors.
+        run: |
+          set -o pipefail
+          sudo apt-get install -y clang zlib1g-dev
+          dotnet publish aot/Pulse.Mqtt.AotSmoke -c Release -r linux-x64 2>&1 | tee aot-publish.log
+          if grep -qE "warning IL[0-9]{4}" aot-publish.log; then
+            echo "::error::Native-AOT/trim warnings (ILxxxx) detected in the AOT smoke publish"
+            exit 1
+          fi
+
       - name: Pack
         run: dotnet pack -c Release --no-build -o packages
 
