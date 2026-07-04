@@ -2,6 +2,12 @@
 
 ## 2.28.0 (unreleased)
 
+- The published packages now ship source-linked debugging symbols. Every assembly embeds a portable
+  PDB (so the `.nupkg` carries symbols with no separate symbol package to fetch) and SourceLink maps
+  those symbols to the exact commit on GitHub, so consumers can step into the library source and get
+  source-mapped stack traces. Previously the packages shipped no symbols at all, leaving the existing
+  `ContinuousIntegrationBuild` / `EmbedUntrackedSources` settings inert.
+
 ## 2.27.0
 
 - Fixed the in-process test broker (`Pulse.Mqtt.Testing`) crashing when forwarding an MQTT 5 publish
