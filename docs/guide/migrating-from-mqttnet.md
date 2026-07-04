@@ -79,7 +79,7 @@ await client.PublishAsync(
     ct);
 
 // or fluent / typed:
-await client.Publish("sensors/boiler/temp").ExactlyOnce().WithRetain().WithPayload(reading).PublishAsync(ct);
+await client.Publish("sensors/boiler/temp").ExactlyOnce().WithRetain().WithPayload(reading).SendAsync(ct);
 ```
 
 Pulse returns a [`PublishOutcome`](./publishing#outcomes--no-silent-loss): `Delivered`, `Queued`

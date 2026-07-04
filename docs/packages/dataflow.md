@@ -72,7 +72,7 @@ var worker = new ActionBlock<MqttAcknowledgedRoutedMessage>(async routed =>
     }
     catch when (routed.CanReject)
     {
-        await routed.RejectAsync(MqttReasonCode.UnspecifiedError, token);
+        await routed.RejectAsync(MqttReasonCode.UnspecifiedError, cancellationToken: token);
     }
 });
 ```
