@@ -10,6 +10,9 @@
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
     <NeutralLanguage>en-US</NeutralLanguage>
+    <!-- Embed a portable PDB in each assembly so the shipped .nupkg carries symbols with no separate
+         .snupkg to push; SourceLink (below, on packable projects) maps those symbols back to source. -->
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -22,12 +25,16 @@
     <PackageTags>mqtt;mqtt5;mqtt-client;iot;messaging;client;resilience;aot</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
+    <!-- SourceLink: embed the repository URL and untracked sources so a debugger can step into the
+         library source from the embedded symbols. Pays off only with the symbols above present. -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
     <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="\" Visible="false" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>
