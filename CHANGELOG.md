@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.27.0 (unreleased)
+## 2.27.0
 
 - Fixed the in-process test broker (`Pulse.Mqtt.Testing`) crashing when forwarding an MQTT 5 publish
   to an MQTT 3.1.1 subscriber. It cloned the publish with the subscriber's protocol version but kept
