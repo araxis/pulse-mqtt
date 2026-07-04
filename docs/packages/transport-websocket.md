@@ -22,7 +22,7 @@ dotnet add package Pulse.Mqtt.Transport.WebSocket
 ## Configure with dependency injection
 
 ```csharp
-using Pulse.Mqtt.Transport.WebSocket;
+using Pulse.Mqtt.Transport;
 
 builder.Services
     .AddPulseMqttClient("devices", configure)
