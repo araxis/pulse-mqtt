@@ -2,6 +2,14 @@
 
 ## 2.27.0 (unreleased)
 
+- Fixed the in-process test broker (`Pulse.Mqtt.Testing`) crashing when forwarding an MQTT 5 publish
+  to an MQTT 3.1.1 subscriber. It cloned the publish with the subscriber's protocol version but kept
+  the MQTT 5-only properties (content type, user properties, response topic, correlation data,
+  message-expiry, payload-format, subscription identifiers); the 3.1.1 encoder then threw on those
+  properties, and the exception faulted the forward and tore down the publisher's session instead of
+  delivering the message. The broker now strips the MQTT 5-only properties when downgrading a publish
+  to a 3.1.1 subscriber, as a real broker does, so mixed-version pub/sub works in tests.
+
 - Fixed a QoS 1/2 publish cancelled while it waited for a receive-maximum slot leaking its packet
   identifier on a persistent session (the sibling of the completion-cancel leak above). The publish
   rents an identifier, then waits on the send-quota semaphore before anything reaches the wire; a

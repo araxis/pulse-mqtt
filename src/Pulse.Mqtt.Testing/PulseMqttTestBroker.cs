@@ -262,6 +262,24 @@ public sealed class PulseMqttTestBroker : IMqttTransportFactory, IAsyncDisposabl
             Retain = retainedReplay || (filter.RetainAsPublished && message.Retain),
         };
 
+        // Downgrading an MQTT 5 publish to a 3.1.1 subscriber: strip the MQTT 5-only properties, which
+        // the 3.1.1 encoder rejects. A real broker drops these fields when forwarding across versions;
+        // without this the encode throws and faults the forward (and the publisher's session).
+        if (session.ProtocolVersion == MqttProtocolVersion.V311)
+        {
+            forward = forward with
+            {
+                PayloadFormatIndicator = MqttPayloadFormatIndicator.Unspecified,
+                MessageExpiryInterval = null,
+                TopicAlias = null,
+                ResponseTopic = null,
+                CorrelationData = null,
+                ContentType = null,
+                SubscriptionIdentifiers = [],
+                UserProperties = [],
+            };
+        }
+
         await session.SendAsync(forward, cancellationToken).ConfigureAwait(false);
     }
 
