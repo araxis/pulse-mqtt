@@ -1,7 +1,7 @@
 # <img src="https://raw.githubusercontent.com/araxis/pulse-mqtt/main/icon.png" alt="" width="32" height="32" align="top" /> Pulse.Mqtt
 
-[![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Client?logo=nuget&label=Pulse.Mqtt.Client)](https://www.nuget.org/packages/Pulse.Mqtt.Client)
-[![Downloads](https://img.shields.io/nuget/dt/Pulse.Mqtt.Client?logo=nuget&label=downloads)](https://www.nuget.org/packages/Pulse.Mqtt.Client)
+[![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Client?logo=nuget&label=Pulse.Mqtt.Client)](https://www.nuget.org/packages/Pulse.Mqtt.Core)
+[![Downloads](https://img.shields.io/nuget/dt/Pulse.Mqtt.Client?logo=nuget&label=downloads)](https://www.nuget.org/packages/Pulse.Mqtt.Core)
 [![CI](https://github.com/araxis/pulse-mqtt/actions/workflows/ci.yml/badge.svg)](https://github.com/araxis/pulse-mqtt/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%2010.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com)
