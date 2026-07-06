@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.28.0 (unreleased)
+## 2.28.0
 
 - Added declarative route delivery modes. Fluent routes can now opt into
   `.ManualAcknowledgement()` and finish with `HandleAsync(...)` or `StreamAsync(...)`, while
