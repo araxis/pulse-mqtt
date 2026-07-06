@@ -169,9 +169,9 @@ so a publish interrupted mid-exchange is never lost:
   already received its PUBREC re-sends only the **PUBREL**.
 - Inbound QoS 2 duplicate-suppression state is restored too after Pulse has accepted the
   delivery with PUBREC, so a message the broker redelivers after the reconnect is acknowledged
-  but **not delivered to your handlers twice**. If you opt into acknowledged route streams and
-  the connection drops before your code calls `AcknowledgeAsync`, Pulse has not sent PUBREC yet;
-  the broker redelivery can reach your stream again.
+  but **not delivered to your handlers twice**. If you opt into manual acknowledgement route
+  delivery and the connection drops before your code calls `AcknowledgeAsync`, Pulse has not sent
+  PUBREC yet; the broker redelivery can reach your manual handler or stream again.
 - If the broker reports a **fresh** session (it did not preserve the old one), the in-flight
   state is discarded per the specification.
 

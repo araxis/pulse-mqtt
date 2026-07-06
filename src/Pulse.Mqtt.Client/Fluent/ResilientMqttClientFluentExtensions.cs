@@ -117,7 +117,7 @@ public static class ResilientMqttClientFluentExtensions
         ArgumentException.ThrowIfNullOrEmpty(template);
         ArgumentNullException.ThrowIfNull(handler);
         var routeTemplate = MqttRouteTemplate.Parse(template);
-        return OnCoreAsync(
+        return SubscribeRouteAsync(
             client,
             routeTemplate,
             routeTemplate.ToTopicFilter(maximumQualityOfService),
@@ -178,7 +178,7 @@ public static class ResilientMqttClientFluentExtensions
         ArgumentException.ThrowIfNullOrEmpty(template);
         ArgumentNullException.ThrowIfNull(handler);
         var routeTemplate = MqttRouteTemplate.Parse(template);
-        return OnCoreAsync(
+        return SubscribeRouteAsync(
             client,
             routeTemplate,
             routeTemplate.ToTopicFilter(maximumQualityOfService),
@@ -194,7 +194,7 @@ public static class ResilientMqttClientFluentExtensions
         return new MqttRequestBuilder(client, topic);
     }
 
-    private static async Task<MqttSubscribedRoute> OnCoreAsync(
+    internal static async Task<MqttSubscribedRoute> SubscribeRouteAsync(
         ResilientMqttClient client,
         MqttRouteTemplate template,
         MqttTopicFilter topicFilter,
@@ -215,6 +215,62 @@ public static class ResilientMqttClientFluentExtensions
             route?.Dispose();
             if (route is not null)
             {
+                await TryUnsubscribeAsync(client, topicFilter.Topic).ConfigureAwait(false);
+            }
+
+            throw;
+        }
+    }
+
+    internal static async Task<MqttSubscribedRouteStream> SubscribeRouteStreamAsync(
+        ResilientMqttClient client,
+        MqttRouteTemplate template,
+        MqttTopicFilter topicFilter,
+        Func<MqttRouteStream> openStream,
+        CancellationToken cancellationToken)
+    {
+        MqttRouteStream? stream = null;
+        try
+        {
+            stream = openStream();
+            var granted = await client.SubscribeAsync([topicFilter], cancellationToken)
+                .ConfigureAwait(false);
+            ThrowIfSubscribeFailed(template, granted);
+            return new MqttSubscribedRouteStream(client, stream, topicFilter);
+        }
+        catch
+        {
+            if (stream is not null)
+            {
+                await stream.DisposeAsync().ConfigureAwait(false);
+                await TryUnsubscribeAsync(client, topicFilter.Topic).ConfigureAwait(false);
+            }
+
+            throw;
+        }
+    }
+
+    internal static async Task<MqttSubscribedAcknowledgedRouteStream> SubscribeAcknowledgedRouteStreamAsync(
+        ResilientMqttClient client,
+        MqttRouteTemplate template,
+        MqttTopicFilter topicFilter,
+        Func<MqttAcknowledgedRouteStream> openStream,
+        CancellationToken cancellationToken)
+    {
+        MqttAcknowledgedRouteStream? stream = null;
+        try
+        {
+            stream = openStream();
+            var granted = await client.SubscribeAsync([topicFilter], cancellationToken)
+                .ConfigureAwait(false);
+            ThrowIfSubscribeFailed(template, granted);
+            return new MqttSubscribedAcknowledgedRouteStream(client, stream, topicFilter);
+        }
+        catch
+        {
+            if (stream is not null)
+            {
+                await stream.DisposeAsync().ConfigureAwait(false);
                 await TryUnsubscribeAsync(client, topicFilter.Topic).ConfigureAwait(false);
             }
 

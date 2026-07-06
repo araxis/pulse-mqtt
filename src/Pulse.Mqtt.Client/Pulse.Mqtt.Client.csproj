@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Pulse.Mqtt.Endpoints" />
     <InternalsVisibleTo Include="Pulse.Mqtt.Client.Tests" />
   </ItemGroup>
 

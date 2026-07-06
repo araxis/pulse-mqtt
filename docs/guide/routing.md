@@ -54,6 +54,17 @@ using IDisposable route = client.RegisterRoute(
 registration removes the local handler only; use `UnsubscribeAsync` when the broker should stop
 delivering that filter.
 
+The route builder has subscribed terminals when one call should own both pieces:
+
+```csharp
+await using var route = await client.Route("orders/{id}")
+    .AtLeastOnce()
+    .HandleAsync(async (message, values, token) =>
+    {
+        await store.SaveAsync(values["id"], message.Payload, token);
+    }, token);
+```
+
 `SubscribeAsync(template, qos, token)` is the concise form for a route-template broker
 subscription. Use `MqttRouteTemplate.ToTopicFilter(...)` when MQTT 5 subscription options need
 to be explicit:
@@ -124,11 +135,57 @@ using var link = source.LinkTo(
 `SubscribeAsync` first, or use an existing fluent route helper when you want subscription and
 local route ownership together. For event-style consumers, use `DataflowBlock.AsObservable(source)`.
 
-## Acknowledged streams
+## Delivery modes
 
-The default raw stream and route stream acknowledge inbound QoS 1/2 publishes automatically
-after Pulse accepts them into its local queue. Use an acknowledged route stream when broker
-acknowledgement must wait for application work:
+The default raw stream and routes use automatic acknowledgement: inbound QoS 1/2 publishes are
+acknowledged after Pulse accepts them into local routing. `SubscribeAsync` does not change that;
+it only controls broker subscription.
+
+Use manual acknowledgement when the broker must not receive PUBACK/PUBREC until application work
+has completed. Manual delivery is a route-local choice:
+
+```csharp
+await using var route = await client.Route("jobs/{jobId}")
+    .AtLeastOnce()
+    .ManualAcknowledgement()
+    .HandleAsync(async (routed, token) =>
+    {
+        await RunJobAsync(routed.Values["jobId"], routed.Message, token);
+        await routed.AcknowledgeAsync(token);
+    }, token);
+```
+
+Use the low-level manual handler API when broker subscription ownership is separate:
+
+```csharp
+var template = MqttRouteTemplate.Parse("jobs/{jobId}");
+await client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, token);
+
+using var route = client.RegisterManualAcknowledgementRoute(
+    template,
+    async (routed, token) =>
+    {
+        await RunJobAsync(routed.Values["jobId"], routed.Message, token);
+        await routed.AcknowledgeAsync(token);
+    });
+```
+
+For pull consumers, use either the subscribed fluent terminal or the low-level stream:
+
+```csharp
+await using var stream = await client.Route("jobs/{jobId}")
+    .AtLeastOnce()
+    .ManualAcknowledgement()
+    .StreamAsync(token);
+
+await foreach (MqttAcknowledgedRoutedMessage routed in stream.ReadAllAsync(token))
+{
+    await RunJobAsync(routed.Values["jobId"], routed.Message, token);
+    await routed.AcknowledgeAsync(token);
+}
+```
+
+The equivalent low-level stream keeps broker subscription separate:
 
 ```csharp
 var template = MqttRouteTemplate.Parse("jobs/{jobId}");
@@ -156,15 +213,15 @@ await foreach (MqttAcknowledgedRoutedMessage routed in stream.ReadAllAsync(token
 }
 ```
 
-An acknowledged stream is a single-owner route: the first matching acknowledged stream receives
-the message and owns its `AcknowledgeAsync` / `RejectAsync` call. If no acknowledged stream
-matches, Pulse falls back to the normal auto-ack raw message stream.
+Manual routes are single-owner routes: the first matching manual route receives the message and
+owns its `AcknowledgeAsync` / `RejectAsync` call. If no manual route matches, Pulse falls back to
+the normal automatic raw message stream and automatic routes.
 
 `RejectAsync` is available only when `CanReject` is true: MQTT 5 QoS 1/2 deliveries can carry
 negative publish acknowledgement reason codes. MQTT 3.1.1 and QoS 0 deliveries cannot, so
 `RejectAsync` throws `NotSupportedException` and leaves the message unacknowledged.
 
-Acknowledged streams are lossless-only: `MqttRouteOptions.Overflow` must be `Wait`. Lossy
+Manual acknowledgement routes are lossless-only: `MqttRouteOptions.Overflow` must be `Wait`. Lossy
 overflow modes are rejected because dropping a queued message would also drop the only pending
 protocol acknowledgement context.
 

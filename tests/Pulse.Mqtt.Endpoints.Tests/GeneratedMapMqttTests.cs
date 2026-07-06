@@ -51,6 +51,38 @@ public sealed class GeneratedMapMqttTests
     }
 
     [Fact]
+    public async Task Context_binding_can_ack_manual_endpoint_messages()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await using var broker = new PulseMqttTestBroker();
+        await using var client = NewClient(broker, withSerializer: true);
+        await client.ConnectAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var received = new TaskCompletionSource<(int Device, Reading Reading, MqttAcknowledgementMode Mode)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var endpoint = client.MapMqtt(
+            "sensors/{deviceId:int}/manual",
+            async (Reading reading, int deviceId, MqttEndpointContext context) =>
+            {
+                received.TrySetResult((deviceId, reading, context.Acknowledgement));
+                await context.AcknowledgeAsync(context.CancellationToken);
+            },
+            options: new MqttEndpointOptions { Acknowledgement = MqttAcknowledgementMode.Manual });
+        await endpoint.Subscribed.WaitAsync(timeout.Token);
+
+        await using var publisher = NewClient(broker, withSerializer: true);
+        await publisher.ConnectAsync(timeout.Token);
+        await publisher.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+        await publisher.PublishAsync("sensors/51/manual", new Reading("bmp390", 1009.8), cancellationToken: timeout.Token);
+
+        var (device, reading, mode) = await received.Task.WaitAsync(timeout.Token);
+        device.ShouldBe(51);
+        reading.ShouldBe(new Reading("bmp390", 1009.8));
+        mode.ShouldBe(MqttAcknowledgementMode.Manual);
+    }
+
+    [Fact]
     public async Task Services_inject_into_host_mapped_handlers()
     {
         using var timeout = new CancellationTokenSource(SafetyTimeout);

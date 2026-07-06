@@ -55,10 +55,10 @@ using var link = source.LinkTo(
     new DataflowLinkOptions { PropagateCompletion = true });
 ```
 
-## Acknowledged route source
+## Manual acknowledgement route source
 
-Use acknowledged route blocks when application work must finish before the broker receives the
-message acknowledgement:
+Use the acknowledged route source block when application work must finish before the broker
+receives the message acknowledgement:
 
 ```csharp
 await using var source = client.ToAcknowledgedRouteSourceBlock(template, cancellationToken: token);

@@ -350,3 +350,55 @@ Pulse.Mqtt.Client.ResilientMqttClientOptions.FollowServerRedirects.get -> bool
 Pulse.Mqtt.Client.ResilientMqttClientOptions.FollowServerRedirects.init -> void
 Pulse.Mqtt.Client.ResilientMqttClientOptions.MaxServerRedirects.get -> int
 Pulse.Mqtt.Client.ResilientMqttClientOptions.MaxServerRedirects.init -> void
+Pulse.Mqtt.Client.MqttAcknowledgementMode
+Pulse.Mqtt.Client.MqttAcknowledgementMode.Automatic = 0 -> Pulse.Mqtt.Client.MqttAcknowledgementMode
+Pulse.Mqtt.Client.MqttAcknowledgementMode.Manual = 1 -> Pulse.Mqtt.Client.MqttAcknowledgementMode
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.AtLeastOnce() -> Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.AtMostOnce() -> Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.ExactlyOnce() -> Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.HandleAsync(Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler! handler) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttSubscribedRoute!>!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.HandleAsync(Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler! handler, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttSubscribedRoute!>!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.StreamAsync() -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttSubscribedAcknowledgedRouteStream!>!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.StreamAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttSubscribedAcknowledgedRouteStream!>!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.ToTopicFilter() -> Pulse.Mqtt.MqttTopicFilter!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.WithConcurrency(int maxConcurrency) -> Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.WithNoLocal(bool noLocal = true) -> Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.WithQualityOfService(Pulse.Mqtt.MqttQualityOfService maximumQualityOfService) -> Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.WithQueue(int capacity, Pulse.Mqtt.Client.RouteOverflow overflow = Pulse.Mqtt.Client.RouteOverflow.Wait) -> Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.WithRetainAsPublished(bool retainAsPublished = true) -> Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder!
+Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder.WithRetainHandling(Pulse.Mqtt.MqttRetainHandling retainHandling) -> Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteBuilder.AtLeastOnce() -> Pulse.Mqtt.Client.MqttRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteBuilder.AtMostOnce() -> Pulse.Mqtt.Client.MqttRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteBuilder.ExactlyOnce() -> Pulse.Mqtt.Client.MqttRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteBuilder.HandleAsync(Pulse.Mqtt.Client.MqttRouteHandler! handler) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttSubscribedRoute!>!
+Pulse.Mqtt.Client.MqttRouteBuilder.HandleAsync(Pulse.Mqtt.Client.MqttRouteHandler! handler, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttSubscribedRoute!>!
+Pulse.Mqtt.Client.MqttRouteBuilder.HandleAsync<T>(Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttSubscribedRoute!>!
+Pulse.Mqtt.Client.MqttRouteBuilder.HandleAsync<T>(Pulse.Mqtt.Client.MqttTypedRouteHandler<T>! handler, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttSubscribedRoute!>!
+Pulse.Mqtt.Client.MqttRouteBuilder.ManualAcknowledgement() -> Pulse.Mqtt.Client.MqttManualAcknowledgementRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteBuilder.StreamAsync() -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttSubscribedRouteStream!>!
+Pulse.Mqtt.Client.MqttRouteBuilder.StreamAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Pulse.Mqtt.Client.MqttSubscribedRouteStream!>!
+Pulse.Mqtt.Client.MqttRouteBuilder.ToTopicFilter() -> Pulse.Mqtt.MqttTopicFilter!
+Pulse.Mqtt.Client.MqttRouteBuilder.WithNoLocal(bool noLocal = true) -> Pulse.Mqtt.Client.MqttRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteBuilder.WithQualityOfService(Pulse.Mqtt.MqttQualityOfService maximumQualityOfService) -> Pulse.Mqtt.Client.MqttRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteBuilder.WithRetainAsPublished(bool retainAsPublished = true) -> Pulse.Mqtt.Client.MqttRouteBuilder!
+Pulse.Mqtt.Client.MqttRouteBuilder.WithRetainHandling(Pulse.Mqtt.MqttRetainHandling retainHandling) -> Pulse.Mqtt.Client.MqttRouteBuilder!
+Pulse.Mqtt.Client.MqttRouter.RegisterManualAcknowledgementRoute(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.MqttRouter.RegisterManualAcknowledgementRoute(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.MqttRouter.RegisterManualAcknowledgementRoute(string! template, Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.MqttRouter.RegisterManualAcknowledgementRoute(string! template, Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.MqttSubscribedAcknowledgedRouteStream
+Pulse.Mqtt.Client.MqttSubscribedAcknowledgedRouteStream.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Client.MqttSubscribedAcknowledgedRouteStream.Reader.get -> System.Threading.Channels.ChannelReader<Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage!>!
+Pulse.Mqtt.Client.MqttSubscribedAcknowledgedRouteStream.ReadAllAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Pulse.Mqtt.Client.MqttAcknowledgedRoutedMessage!>!
+Pulse.Mqtt.Client.MqttSubscribedAcknowledgedRouteStream.TopicFilter.get -> Pulse.Mqtt.MqttTopicFilter!
+Pulse.Mqtt.Client.MqttSubscribedRouteStream
+Pulse.Mqtt.Client.MqttSubscribedRouteStream.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Client.MqttSubscribedRouteStream.Reader.get -> System.Threading.Channels.ChannelReader<Pulse.Mqtt.Client.MqttRoutedMessage>!
+Pulse.Mqtt.Client.MqttSubscribedRouteStream.ReadAllAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Pulse.Mqtt.Client.MqttRoutedMessage>!
+Pulse.Mqtt.Client.MqttSubscribedRouteStream.TopicFilter.get -> Pulse.Mqtt.MqttTopicFilter!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterManualAcknowledgementRoute(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterManualAcknowledgementRoute(Pulse.Mqtt.Routing.MqttRouteTemplate! template, Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterManualAcknowledgementRoute(string! template, Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler! handler) -> System.IDisposable!
+Pulse.Mqtt.Client.ResilientMqttClient.RegisterManualAcknowledgementRoute(string! template, Pulse.Mqtt.Client.MqttManualAcknowledgementRouteHandler! handler, Pulse.Mqtt.Client.MqttRouteOptions? options) -> System.IDisposable!

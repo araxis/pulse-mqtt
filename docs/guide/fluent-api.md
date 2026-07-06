@@ -73,7 +73,35 @@ await using var route = await client.OnAsync<TelemetryReading>(
 
 Async disposal unregisters the local route and unsubscribes the broker filter.
 
-When you want queue/concurrency tuning or explicit subscription ownership, use the route builder:
+When one route should own both broker subscription and local dispatch, the route builder has
+asynchronous terminals:
+
+```csharp
+await using var route = await client.Route("sensors/{deviceId}/temp")
+    .AtLeastOnce()
+    .WithConcurrency(4)
+    .HandleAsync<TelemetryReading>((reading, message, ct) =>
+        Handle(reading, message.Values["deviceId"]), ct);
+```
+
+When broker acknowledgement must wait for application work, make the route delivery mode
+manual before the terminal:
+
+```csharp
+await using var route = await client.Route("orders/{id}")
+    .AtLeastOnce()
+    .ManualAcknowledgement()
+    .HandleAsync(async (message, ct) =>
+    {
+        await PersistAsync(message.Message, ct);
+        await message.AcknowledgeAsync(ct);
+    }, ct);
+```
+
+`ManualAcknowledgement().StreamAsync(ct)` returns a subscribed acknowledged stream and disposes
+both the local route and broker subscription with the stream.
+
+When you want explicit subscription ownership, use the local route terminals:
 
 ```csharp
 var route = client.Route("sensors/{deviceId}/temp");
@@ -86,10 +114,9 @@ using var registration = route
         Handle(reading, message.Values["deviceId"]));
 ```
 
-Terminals: `Handle` (raw handler), `Handle<T>` (typed), and `Stream` for the `await foreach`
-form. The builder registers only local routing. Use `ToTopicFilter(...)` with `SubscribeAsync`
-when broker delivery is needed; everything from [Routing](./routing) — bounded queues, overflow,
-fault isolation — applies unchanged.
+Local terminals are `Handle` (raw handler), `Handle<T>` (typed), and `Stream` for the
+`await foreach` form. Everything from [Routing](./routing) — broker subscription, bounded
+queues, overflow, acknowledgement mode, and fault isolation — applies unchanged.
 
 ## Request and response
 

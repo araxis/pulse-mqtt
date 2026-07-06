@@ -17,6 +17,9 @@ public sealed record MqttEndpointOptions
     /// <summary>How the broker replays retained messages for this subscription.</summary>
     public MqttRetainHandling RetainHandling { get; init; } = MqttRetainHandling.SendAtSubscribe;
 
+    /// <summary>Whether this endpoint acknowledges after local routing or requires the handler to do it.</summary>
+    public MqttAcknowledgementMode Acknowledgement { get; init; } = MqttAcknowledgementMode.Automatic;
+
     /// <summary>Local dispatch settings (queue bounds, concurrency) for the endpoint's route.</summary>
     public MqttRouteOptions? Route { get; init; }
 }

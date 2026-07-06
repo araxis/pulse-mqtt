@@ -214,6 +214,146 @@ public sealed class FluentApiTests
     }
 
     [Fact]
+    public async Task Manual_acknowledgement_handle_async_subscribes_and_delays_ack()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var transport = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(
+            transport,
+            new ResilientMqttClientOptions
+            {
+                Connect = new MqttConnectPacket
+                {
+                    ClientId = "manual-handle",
+                    KeepAliveSeconds = 0,
+                },
+            });
+
+        await client.ConnectAsync(timeout.Token);
+        var broker = await transport.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var routeTask = client.Route("jobs/{id}")
+            .AtLeastOnce()
+            .ManualAcknowledgement()
+            .HandleAsync(
+                async (message, token) =>
+                {
+                    received.TrySetResult(message.Values["id"]);
+                    await release.Task.WaitAsync(token);
+                    await message.AcknowledgeAsync(token);
+                },
+                timeout.Token);
+
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token))
+            .ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        subscribe.TopicFilters.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            filter => filter.Topic.ShouldBe("jobs/+"),
+            filter => filter.MaximumQualityOfService.ShouldBe(MqttQualityOfService.AtLeastOnce));
+        await broker.SendAsync(
+            new MqttSubAckPacket
+            {
+                PacketIdentifier = subscribe.PacketIdentifier,
+                ReasonCodes = [MqttReasonCode.GrantedQualityOfService1],
+            },
+            timeout.Token);
+
+        await using var route = await routeTask.WaitAsync(SafetyTimeout);
+        route.TopicFilter.Topic.ShouldBe("jobs/+");
+        route.TopicFilter.MaximumQualityOfService.ShouldBe(MqttQualityOfService.AtLeastOnce);
+
+        await broker.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "jobs/73",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                PacketIdentifier = 73,
+            },
+            timeout.Token);
+
+        (await received.Task.WaitAsync(SafetyTimeout)).ShouldBe("73");
+        var ackRead = Task.Run(() => broker.ReadPacketAsync(timeout.Token), CancellationToken.None);
+        (await Task.WhenAny(ackRead, Task.Delay(100, timeout.Token))).ShouldNotBe(ackRead);
+
+        release.SetResult();
+        var ack = (await ackRead.WaitAsync(SafetyTimeout)).ShouldBeOfTypeOrThrow<MqttPublishAckPacket>();
+        ack.PacketIdentifier.ShouldBe((ushort)73);
+    }
+
+    [Fact]
+    public async Task Manual_acknowledgement_stream_async_subscribes_and_unsubscribes_on_disposal()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var transport = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(
+            transport,
+            new ResilientMqttClientOptions
+            {
+                Connect = new MqttConnectPacket
+                {
+                    ClientId = "manual-stream",
+                    KeepAliveSeconds = 0,
+                },
+            });
+
+        await client.ConnectAsync(timeout.Token);
+        var broker = await transport.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var routeTask = client.Route("jobs/{id}")
+            .AtLeastOnce()
+            .ManualAcknowledgement()
+            .StreamAsync(timeout.Token);
+
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token))
+            .ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        subscribe.TopicFilters.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            filter => filter.Topic.ShouldBe("jobs/+"),
+            filter => filter.MaximumQualityOfService.ShouldBe(MqttQualityOfService.AtLeastOnce));
+        await broker.SendAsync(
+            new MqttSubAckPacket
+            {
+                PacketIdentifier = subscribe.PacketIdentifier,
+                ReasonCodes = [MqttReasonCode.GrantedQualityOfService1],
+            },
+            timeout.Token);
+
+        var route = await routeTask.WaitAsync(SafetyTimeout);
+        await broker.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "jobs/91",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                PacketIdentifier = 91,
+            },
+            timeout.Token);
+
+        var routed = await route.Reader.ReadAsync(timeout.Token);
+        routed.Values["id"].ShouldBe("91");
+        await routed.AcknowledgeAsync(timeout.Token);
+        (await broker.ReadPacketAsync(timeout.Token))
+            .ShouldBeOfTypeOrThrow<MqttPublishAckPacket>()
+            .PacketIdentifier.ShouldBe((ushort)91);
+
+        var disposeTask = route.DisposeAsync().AsTask();
+        var unsubscribe = (await broker.ReadPacketAsync(timeout.Token))
+            .ShouldBeOfTypeOrThrow<MqttUnsubscribePacket>();
+        unsubscribe.TopicFilters.ShouldBe(["jobs/+"]);
+        await broker.SendAsync(
+            new MqttUnsubAckPacket
+            {
+                PacketIdentifier = unsubscribe.PacketIdentifier,
+                ReasonCodes = [MqttReasonCode.Success],
+            },
+            timeout.Token);
+        await disposeTask.WaitAsync(SafetyTimeout);
+    }
+
+    [Fact]
     public async Task A_fluent_request_round_trips_through_a_responder()
     {
         var (client, _, ct) = await ConnectedAsync();

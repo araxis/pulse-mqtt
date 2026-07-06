@@ -51,6 +51,19 @@ public sealed class MapMqttGeneratorTests
     }
 
     [Fact]
+    public void Context_binding_with_manual_acknowledgement_options_generates_cleanly()
+    {
+        var (diagnostics, emitted) = Run("""
+            client.MapMqtt("sensors/{id:int}/reading",
+                async (int id, Reading reading, MqttEndpointContext context) => await context.AcknowledgeAsync(context.CancellationToken),
+                options: new MqttEndpointOptions { Acknowledgement = MqttAcknowledgementMode.Manual });
+            """);
+
+        diagnostics.ShouldBeEmpty();
+        emitted.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Client_service_parameter_without_a_provider_is_refused()
     {
         var (diagnostics, emitted) = Run("""

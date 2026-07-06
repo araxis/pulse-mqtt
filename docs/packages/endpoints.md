@@ -36,6 +36,26 @@ client.MapMqtt<Reading>("sensors/{deviceId:int}/reading", (reading, ctx) =>
     Store.SaveAsync(ctx.Route.GetInt("deviceId"), reading, ctx.CancellationToken));
 ```
 
+By default, `MapMqtt` uses automatic acknowledgement: QoS 1/2 messages are acknowledged after
+Pulse accepts them into local routing. Set the endpoint's delivery mode to manual when the
+handler must persist or process the message before the broker is acknowledged:
+
+```csharp
+client.MapMqtt("orders/{id}", async ctx =>
+{
+    await Store.SaveAsync(ctx.Route.GetString("id"), ctx.Message, ctx.CancellationToken);
+    await ctx.AcknowledgeAsync(ctx.CancellationToken);
+}, new MqttEndpointOptions
+{
+    QualityOfService = MqttQualityOfService.AtLeastOnce,
+    Acknowledgement = MqttAcknowledgementMode.Manual,
+});
+```
+
+In automatic mode, `ctx.AcknowledgeAsync(...)` and `ctx.RejectAsync(...)` throw
+`InvalidOperationException`. In manual mode, `ctx.CanReject` tells you whether MQTT can carry a
+negative acknowledgement reason for this delivery. Request/reply endpoints stay automatic.
+
 ## Map on the host
 
 `app.MapMqtt(...)` is a thin helper over the client surface: it resolves the registered client
@@ -77,10 +97,12 @@ handlers included.
 
 ## What one map call does
 
-- Parses the template and registers the local route (`RegisterRoute` underneath — dispatch,
-  bounded queues, and fault isolation are the existing machinery, unchanged).
+- Parses the template and registers the local route (`RegisterRoute` for automatic endpoints,
+  `RegisterManualAcknowledgementRoute` for manual ones — dispatch, bounded queues, and fault
+  isolation are the existing machinery, unchanged).
 - Subscribes the matching filter with the options you pass (`QualityOfService` defaults to
   at-least-once). Offline, the subscription is queued and applied on the next connection.
+- Uses automatic acknowledgement unless `Acknowledgement = MqttAcknowledgementMode.Manual` is set.
 - Returns an `MqttEndpoint`: `Subscribed` completes when the broker granted (or queued) the
   subscription and faults if it was denied; disposing unregisters the route and unsubscribes.
 

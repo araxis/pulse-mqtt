@@ -289,6 +289,152 @@ public sealed class MqttRouterTests
     }
 
     [Fact]
+    public async Task Acknowledged_route_handler_waits_for_handler_ack()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "router-ack-handler", KeepAliveSeconds = 0 },
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var received = new TaskCompletionSource<MqttAcknowledgedRoutedMessage>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var template = MqttRouteTemplate.Parse("sensors/{id}");
+        using var registration = client.RegisterManualAcknowledgementRoute(
+            template,
+            async (routed, token) =>
+            {
+                received.TrySetResult(routed);
+                await release.Task.WaitAsync(token);
+                await routed.AcknowledgeAsync(token);
+            });
+        var subscribeTask = client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, timeout.Token);
+
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        await broker.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] },
+            timeout.Token);
+        await subscribeTask;
+
+        await broker.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "sensors/11",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                PacketIdentifier = 44,
+            },
+            timeout.Token);
+
+        var routed = await received.Task.WaitAsync(SafetyTimeout);
+        routed.Values["id"].ShouldBe("11");
+
+        var ackRead = Task.Run(() => broker.ReadPacketAsync(timeout.Token), CancellationToken.None);
+        (await Task.WhenAny(ackRead, Task.Delay(100, timeout.Token))).ShouldNotBe(ackRead);
+
+        release.SetResult();
+        var ack = (await ackRead.WaitAsync(SafetyTimeout)).ShouldBeOfTypeOrThrow<MqttPublishAckPacket>();
+        ack.PacketType.ShouldBe(Pulse.Mqtt.Codec.MqttPacketType.PubAck);
+        ack.PacketIdentifier.ShouldBe((ushort)44);
+    }
+
+    [Fact]
+    public async Task Acknowledged_route_handler_can_reject()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "router-ack-reject", KeepAliveSeconds = 0 },
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var template = MqttRouteTemplate.Parse("sensors/{id}");
+        using var registration = client.RegisterManualAcknowledgementRoute(
+            template,
+            (routed, token) => routed.RejectAsync(MqttReasonCode.UnspecifiedError, "not persisted", token));
+        var subscribeTask = client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, timeout.Token);
+
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        await broker.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] },
+            timeout.Token);
+        await subscribeTask;
+
+        await broker.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "sensors/12",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                PacketIdentifier = 45,
+            },
+            timeout.Token);
+
+        var ack = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttPublishAckPacket>();
+        ack.PacketType.ShouldBe(Pulse.Mqtt.Codec.MqttPacketType.PubAck);
+        ack.PacketIdentifier.ShouldBe((ushort)45);
+        ack.ReasonCode.ShouldBe(MqttReasonCode.UnspecifiedError);
+        ack.ReasonString.ShouldBe("not persisted");
+    }
+
+    [Fact]
+    public async Task Acknowledged_route_handler_faults_do_not_ack()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "router-ack-fault", KeepAliveSeconds = 0 },
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var faulted = new TaskCompletionSource<(string Template, Exception Error)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        client.Router.HandlerFaulted += (template, error) => faulted.TrySetResult((template, error));
+        var template = MqttRouteTemplate.Parse("faults/{id}");
+        using var registration = client.RegisterManualAcknowledgementRoute(
+            template,
+            (_, _) => throw new InvalidOperationException("handler failed"));
+        var subscribeTask = client.SubscribeAsync(template, MqttQualityOfService.AtLeastOnce, timeout.Token);
+
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        await broker.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] },
+            timeout.Token);
+        await subscribeTask;
+
+        await broker.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "faults/1",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                PacketIdentifier = 46,
+            },
+            timeout.Token);
+
+        var (templateText, error) = await faulted.Task.WaitAsync(SafetyTimeout);
+        templateText.ShouldBe("faults/{id}");
+        error.ShouldBeOfType<InvalidOperationException>();
+
+        using var noAckTimeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        await Should.ThrowAsync<OperationCanceledException>(() => broker.ReadPacketAsync(noAckTimeout.Token));
+    }
+
+    [Fact]
     public async Task Disposing_a_blocked_acknowledged_stream_does_not_fault_the_connection()
     {
         var factory = new SequencedTransportFactory();
@@ -419,6 +565,23 @@ public sealed class MqttRouterTests
     }
 
     [Fact]
+    public async Task Acknowledged_route_handler_rejects_lossy_overflow()
+    {
+        var (source, router) = NewRouter();
+        await using var _ = router;
+
+        var thrown = Should.Throw<ArgumentException>(() =>
+            router.RegisterManualAcknowledgementRoute("s/#", (_, _) => ValueTask.CompletedTask, new MqttRouteOptions
+            {
+                Capacity = 1,
+                Overflow = RouteOverflow.DropNewest,
+            }));
+
+        thrown.Message.ShouldContain(nameof(RouteOverflow.Wait));
+        source.Writer.TryComplete();
+    }
+
+    [Fact]
     public async Task Overlapping_acknowledged_route_streams_use_first_match_only()
     {
         var factory = new SequencedTransportFactory();
@@ -462,6 +625,64 @@ public sealed class MqttRouterTests
         var ack = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttPublishAckPacket>();
         ack.PacketType.ShouldBe(Pulse.Mqtt.Codec.MqttPacketType.PubAck);
         ack.PacketIdentifier.ShouldBe((ushort)43);
+    }
+
+    [Fact]
+    public async Task Overlapping_acknowledged_route_handlers_use_first_match_only()
+    {
+        var factory = new SequencedTransportFactory();
+        await using var client = new ResilientMqttClient(factory, new ResilientMqttClientOptions
+        {
+            Connect = new MqttConnectPacket { ClientId = "router-ack-handler-overlap", KeepAliveSeconds = 0 },
+        });
+
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await client.ConnectAsync(timeout.Token);
+        var broker = await factory.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var firstSeen = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondSeen = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var first = client.RegisterManualAcknowledgementRoute(
+            "sensors/#",
+            async (routed, token) =>
+            {
+                firstSeen.TrySetResult();
+                await routed.AcknowledgeAsync(token);
+            });
+        using var second = client.RegisterManualAcknowledgementRoute(
+            "sensors/{id}",
+            (_, _) =>
+            {
+                secondSeen.TrySetResult();
+                return ValueTask.CompletedTask;
+            });
+        var subscribeTask = client.SubscribeAsync(
+            [new MqttTopicFilter("sensors/#") { MaximumQualityOfService = MqttQualityOfService.AtLeastOnce }],
+            timeout.Token);
+
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        await broker.SendAsync(
+            new MqttSubAckPacket { PacketIdentifier = subscribe.PacketIdentifier, ReasonCodes = [MqttReasonCode.GrantedQualityOfService1] },
+            timeout.Token);
+        await subscribeTask;
+
+        await broker.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "sensors/9",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                PacketIdentifier = 47,
+            },
+            timeout.Token);
+
+        await firstSeen.Task.WaitAsync(SafetyTimeout);
+        (await Task.WhenAny(secondSeen.Task, Task.Delay(100, timeout.Token))).ShouldNotBe(secondSeen.Task);
+
+        var ack = (await broker.ReadPacketAsync(timeout.Token)).ShouldBeOfTypeOrThrow<MqttPublishAckPacket>();
+        ack.PacketType.ShouldBe(Pulse.Mqtt.Codec.MqttPacketType.PubAck);
+        ack.PacketIdentifier.ShouldBe((ushort)47);
     }
 
     [Fact]
