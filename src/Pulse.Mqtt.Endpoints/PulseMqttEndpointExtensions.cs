@@ -29,13 +29,19 @@ public static class PulseMqttEndpointExtensions
         ArgumentNullException.ThrowIfNull(handler);
 
         var route = MqttRouteTemplate.Parse(template);
+        var endpointOptions = options ?? Defaults;
         var invoker = new ScopedInvoker(services);
-        var registration = client.RegisterRoute(
-            route,
-            (message, values, token) => invoker.InvokeAsync(handler, message, values, token),
-            (options ?? Defaults).Route);
+        var registration = endpointOptions.Acknowledgement == MqttAcknowledgementMode.Manual
+            ? client.RegisterManualAcknowledgementRoute(
+                route,
+                (message, token) => invoker.InvokeAsync(handler, message, token),
+                endpointOptions.Route)
+            : client.RegisterRoute(
+                route,
+                (message, values, token) => invoker.InvokeAsync(handler, message, values, token),
+                endpointOptions.Route);
 
-        return Complete(client, route, registration, options);
+        return Complete(client, route, registration, endpointOptions);
     }
 
     /// <summary>
@@ -56,14 +62,27 @@ public static class PulseMqttEndpointExtensions
         ArgumentNullException.ThrowIfNull(handler);
 
         var route = MqttRouteTemplate.Parse(template);
+        var endpointOptions = options ?? Defaults;
         var invoker = new ScopedInvoker(services);
-        var registration = client.RegisterRoute<TPayload>(
-            route,
-            (payload, routed, token) => invoker.InvokeAsync(
-                context => handler(payload, context), routed.Message, routed.Values, token),
-            (options ?? Defaults).Route);
+        var serializer = endpointOptions.Acknowledgement == MqttAcknowledgementMode.Manual
+            ? client.SerializerOrThrow()
+            : null;
+        var registration = endpointOptions.Acknowledgement == MqttAcknowledgementMode.Manual
+            ? client.RegisterManualAcknowledgementRoute(
+                route,
+                (routed, token) =>
+                {
+                    var payload = serializer!.Deserialize<TPayload>(routed.Message.Payload);
+                    return invoker.InvokeAsync(context => handler(payload, context), routed, token);
+                },
+                endpointOptions.Route)
+            : client.RegisterRoute<TPayload>(
+                route,
+                (payload, routed, token) => invoker.InvokeAsync(
+                    context => handler(payload, context), routed.Message, routed.Values, token),
+                endpointOptions.Route);
 
-        return Complete(client, route, registration, options);
+        return Complete(client, route, registration, endpointOptions);
     }
 
     /// <summary>
@@ -86,14 +105,16 @@ public static class PulseMqttEndpointExtensions
         ArgumentNullException.ThrowIfNull(handler);
 
         var route = MqttRouteTemplate.Parse(template);
+        var endpointOptions = options ?? Defaults;
+        ThrowIfManualRequestAcknowledgement(endpointOptions);
         var invoker = new ScopedInvoker(services);
         var registration = client.RegisterRequestHandler<TRequest, TResponse>(
             route,
             (request, routed, token) => invoker.InvokeAsync(
                 context => handler(request, context), routed.Message, routed.Values, token),
-            (options ?? Defaults).Route);
+            endpointOptions.Route);
 
-        return Complete(client, route, registration, options);
+        return Complete(client, route, registration, endpointOptions);
     }
 
     private static readonly MqttEndpointOptions Defaults = new();
@@ -102,9 +123,8 @@ public static class PulseMqttEndpointExtensions
         ResilientMqttClient client,
         MqttRouteTemplate route,
         IDisposable registration,
-        MqttEndpointOptions? options)
+        MqttEndpointOptions endpointOptions)
     {
-        var endpointOptions = options ?? Defaults;
         var filter = route.ToTopicFilter(
             endpointOptions.QualityOfService,
             endpointOptions.NoLocal,
@@ -119,6 +139,16 @@ public static class PulseMqttEndpointExtensions
         return new MqttEndpoint(
             client, route, registration, subscriptions,
             subscriptions.SubscribeAsync(client, route, filter));
+    }
+
+    private static void ThrowIfManualRequestAcknowledgement(MqttEndpointOptions options)
+    {
+        if (options.Acknowledgement == MqttAcknowledgementMode.Manual)
+        {
+            throw new ArgumentException(
+                "Manual acknowledgement is not supported for request/reply endpoints.",
+                nameof(options));
+        }
     }
 
     /// <summary>Runs each invocation in its own service scope when a provider is present.</summary>
@@ -142,6 +172,36 @@ public static class PulseMqttEndpointExtensions
             await using (scope.ConfigureAwait(false))
             {
                 await handler(new MqttEndpointContext(message, values, scope.ServiceProvider, cancellationToken)).ConfigureAwait(false);
+            }
+        }
+
+        public async ValueTask InvokeAsync(
+            Func<MqttEndpointContext, ValueTask> handler,
+            MqttAcknowledgedRoutedMessage routed,
+            CancellationToken cancellationToken)
+        {
+            if (_scopes is null)
+            {
+                await handler(new MqttEndpointContext(
+                        routed.Message,
+                        routed.Values,
+                        services,
+                        cancellationToken,
+                        routed))
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            var scope = _scopes.CreateAsyncScope();
+            await using (scope.ConfigureAwait(false))
+            {
+                await handler(new MqttEndpointContext(
+                        routed.Message,
+                        routed.Values,
+                        scope.ServiceProvider,
+                        cancellationToken,
+                        routed))
+                    .ConfigureAwait(false);
             }
         }
 

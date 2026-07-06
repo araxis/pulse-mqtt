@@ -109,10 +109,23 @@ using var route = client.RegisterRoute(template, (message, values, ct) =>
 // SubscribeAsync owns broker delivery; RegisterRoute owns local dispatch and captured values.
 ```
 
-Need broker acknowledgement to wait for application work? Use
-`OpenAcknowledgedRouteStream(...)` and call `AcknowledgeAsync` or `RejectAsync` after handling
-the routed message. `RejectAsync` is available when `CanReject` is true, which means the
-delivery can carry an MQTT 5 negative acknowledgement reason code.
+Need broker acknowledgement to wait for application work? Make that route manual:
+
+```csharp
+await using var manual = await client.Route("orders/{id}")
+    .AtLeastOnce()
+    .ManualAcknowledgement()
+    .HandleAsync(async (message, ct) =>
+    {
+        await PersistAsync(message.Message, ct);
+        await message.AcknowledgeAsync(ct);
+    }, ct);
+```
+
+The low-level `OpenAcknowledgedRouteStream(...)` remains available for pull consumers. In both
+forms, call `AcknowledgeAsync` or `RejectAsync` after handling the routed message. `RejectAsync`
+is available when `CanReject` is true, which means the delivery can carry an MQTT 5 negative
+acknowledgement reason code.
 
 ### Map endpoints, Minimal-API style
 
@@ -128,6 +141,13 @@ client.MapMqtt("sensors/{deviceId:int}/temp",
 app.MapMqtt("sensors/{deviceId:int}/reading",
     (int deviceId, Reading reading, IDeviceStore store, CancellationToken ct) =>
         store.SaveAsync(deviceId, reading, ct));
+
+// Endpoint acknowledgement is declarative too: default automatic, manual per route when needed.
+client.MapMqtt("orders/{id}", async ctx =>
+{
+    await PersistAsync(ctx.Message, ctx.CancellationToken);
+    await ctx.AcknowledgeAsync(ctx.CancellationToken);
+}, new MqttEndpointOptions { Acknowledgement = MqttAcknowledgementMode.Manual });
 
 // Request/reply: the return value IS the reply — published to the request's response topic
 // with correlation data echoed. client.RequestAsync<TReq, TRes>(...) is the caller side.

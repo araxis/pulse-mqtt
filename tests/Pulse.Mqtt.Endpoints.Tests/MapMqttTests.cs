@@ -113,6 +113,160 @@ public sealed class MapMqttTests
     }
 
     [Fact]
+    public async Task Manual_acknowledgement_endpoint_waits_for_context_ack()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        var transport = new WireTransportFactory();
+        await using var client = new ResilientMqttClient(
+            transport,
+            new ResilientMqttClientOptions
+            {
+                Connect = new MqttConnectPacket
+                {
+                    ClientId = "ep-manual-wire",
+                    KeepAliveSeconds = 0,
+                },
+            });
+        await client.ConnectAsync(timeout.Token);
+        var broker = await transport.NextBrokerAsync(timeout.Token);
+        await broker.AcceptConnectionAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var received = new TaskCompletionSource<MqttEndpointContext>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var endpoint = client.MapMqtt(
+            "orders/{id}",
+            async context =>
+            {
+                received.TrySetResult(context);
+                await release.Task.WaitAsync(context.CancellationToken);
+                await context.AcknowledgeAsync(context.CancellationToken);
+            },
+            new MqttEndpointOptions
+            {
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                Acknowledgement = MqttAcknowledgementMode.Manual,
+            });
+
+        var subscribe = (await broker.ReadPacketAsync(timeout.Token))
+            .ShouldBeOfTypeOrThrow<MqttSubscribePacket>();
+        subscribe.TopicFilters.ShouldHaveSingleItem().ShouldSatisfyAllConditions(
+            filter => filter.Topic.ShouldBe("orders/+"),
+            filter => filter.MaximumQualityOfService.ShouldBe(MqttQualityOfService.AtLeastOnce));
+        await broker.SendAsync(
+            new MqttSubAckPacket
+            {
+                PacketIdentifier = subscribe.PacketIdentifier,
+                ReasonCodes = [MqttReasonCode.GrantedQualityOfService1],
+            },
+            timeout.Token);
+        await endpoint.Subscribed.WaitAsync(timeout.Token);
+
+        await broker.SendAsync(
+            new MqttPublishPacket
+            {
+                Topic = "orders/77",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                PacketIdentifier = 77,
+            },
+            timeout.Token);
+
+        var context = await received.Task.WaitAsync(SafetyTimeout);
+        context.Acknowledgement.ShouldBe(MqttAcknowledgementMode.Manual);
+        context.IsAcknowledged.ShouldBeFalse();
+        context.CanReject.ShouldBeTrue();
+
+        var ackRead = Task.Run(() => broker.ReadPacketAsync(timeout.Token), CancellationToken.None);
+        (await Task.WhenAny(ackRead, Task.Delay(100, timeout.Token))).ShouldNotBe(ackRead);
+
+        release.SetResult();
+        var ack = (await ackRead.WaitAsync(SafetyTimeout)).ShouldBeOfTypeOrThrow<MqttPublishAckPacket>();
+        ack.PacketIdentifier.ShouldBe((ushort)77);
+        context.IsAcknowledged.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Manual_acknowledgement_typed_endpoint_deserializes_payload()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await using var broker = new PulseMqttTestBroker();
+        await using var client = NewClient(broker, withSerializer: true);
+        await client.ConnectAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var received = new TaskCompletionSource<(Reading Reading, int Device, MqttAcknowledgementMode Mode)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var endpoint = client.MapMqtt<Reading>(
+            "sensors/{deviceId:int}/manual-reading",
+            async (reading, context) =>
+            {
+                received.TrySetResult((reading, context.Route.GetInt("deviceId"), context.Acknowledgement));
+                await context.AcknowledgeAsync(context.CancellationToken);
+            },
+            new MqttEndpointOptions { Acknowledgement = MqttAcknowledgementMode.Manual });
+        await endpoint.Subscribed.WaitAsync(timeout.Token);
+
+        await using var publisher = NewClient(broker, withSerializer: true);
+        await publisher.ConnectAsync(timeout.Token);
+        await publisher.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+        await publisher.PublishAsync(
+            "sensors/12/manual-reading",
+            new Reading("sht31", 19.75),
+            MqttQualityOfService.AtLeastOnce,
+            cancellationToken: timeout.Token);
+
+        var (reading, device, mode) = await received.Task.WaitAsync(timeout.Token);
+        reading.ShouldBe(new Reading("sht31", 19.75));
+        device.ShouldBe(12);
+        mode.ShouldBe(MqttAcknowledgementMode.Manual);
+    }
+
+    [Fact]
+    public async Task Automatic_endpoint_acknowledgement_methods_throw()
+    {
+        using var timeout = new CancellationTokenSource(SafetyTimeout);
+        await using var broker = new PulseMqttTestBroker();
+        await using var client = NewClient(broker);
+        await client.ConnectAsync(timeout.Token);
+        await client.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+
+        var failure = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var endpoint = client.MapMqtt("orders/{id}", async context =>
+        {
+            context.Acknowledgement.ShouldBe(MqttAcknowledgementMode.Automatic);
+            context.IsAcknowledged.ShouldBeTrue();
+            context.CanReject.ShouldBeFalse();
+
+            try
+            {
+                await context.AcknowledgeAsync(context.CancellationToken);
+            }
+            catch (Exception error)
+            {
+                failure.TrySetResult(error);
+            }
+        });
+        await endpoint.Subscribed.WaitAsync(timeout.Token);
+
+        await using var publisher = NewClient(broker);
+        await publisher.ConnectAsync(timeout.Token);
+        await publisher.WaitUntilConnectedAsync(SafetyTimeout, timeout.Token);
+        await publisher.PublishAsync(
+            new MqttPublishPacket
+            {
+                Topic = "orders/auto",
+                Payload = "ok"u8.ToArray(),
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+            },
+            timeout.Token);
+
+        var error = await failure.Task.WaitAsync(timeout.Token);
+        error.ShouldBeOfType<InvalidOperationException>();
+        error.Message.ShouldContain("automatic acknowledgement");
+    }
+
+    [Fact]
     public async Task Each_invocation_gets_its_own_service_scope()
     {
         using var timeout = new CancellationTokenSource(SafetyTimeout);

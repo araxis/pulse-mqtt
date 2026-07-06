@@ -595,6 +595,48 @@ public sealed class ResilientMqttClient : IAsyncDisposable
         RegisterRoute(MqttRouteTemplate.Parse(template), handler, options);
 
     /// <summary>
+    /// Registers a local handler for a route template where the handler explicitly acknowledges or
+    /// rejects each matching inbound message. Subscribe the matching broker filter separately with
+    /// <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public IDisposable RegisterManualAcknowledgementRoute(
+        MqttRouteTemplate template,
+        MqttManualAcknowledgementRouteHandler handler) =>
+        RegisterManualAcknowledgementRoute(template, handler, options: null);
+
+    /// <summary>
+    /// Registers a local handler for a route template where the handler explicitly acknowledges or
+    /// rejects each matching inbound message. Subscribe the matching broker filter separately with
+    /// <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public IDisposable RegisterManualAcknowledgementRoute(
+        MqttRouteTemplate template,
+        MqttManualAcknowledgementRouteHandler handler,
+        MqttRouteOptions? options) =>
+        Router.RegisterManualAcknowledgementRoute(template, handler, AcknowledgedRouteOptionsOrDefault(options));
+
+    /// <summary>
+    /// Registers a local handler for a route template given as text where the handler explicitly
+    /// acknowledges or rejects each matching inbound message. Subscribe the matching broker filter
+    /// separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public IDisposable RegisterManualAcknowledgementRoute(
+        string template,
+        MqttManualAcknowledgementRouteHandler handler) =>
+        RegisterManualAcknowledgementRoute(MqttRouteTemplate.Parse(template), handler, options: null);
+
+    /// <summary>
+    /// Registers a local handler for a route template given as text where the handler explicitly
+    /// acknowledges or rejects each matching inbound message. Subscribe the matching broker filter
+    /// separately with <see cref="SubscribeAsync"/>.
+    /// </summary>
+    public IDisposable RegisterManualAcknowledgementRoute(
+        string template,
+        MqttManualAcknowledgementRouteHandler handler,
+        MqttRouteOptions? options) =>
+        RegisterManualAcknowledgementRoute(MqttRouteTemplate.Parse(template), handler, options);
+
+    /// <summary>
     /// Opens an <c>await foreach</c>-able stream for a local route template. Subscribe the matching
     /// broker filter separately with <see cref="SubscribeAsync"/>.
     /// </summary>
@@ -636,9 +678,7 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     /// broker filter separately with <see cref="SubscribeAsync"/>.
     /// </summary>
     public MqttAcknowledgedRouteStream OpenAcknowledgedRouteStream(MqttRouteTemplate template, MqttRouteOptions? options) =>
-        Router.OpenAcknowledgedRouteStream(
-            template,
-            options ?? new MqttRouteOptions { Capacity = DefaultAcknowledgedRouteCapacity(_options.Connect.ReceiveMaximum) });
+        Router.OpenAcknowledgedRouteStream(template, AcknowledgedRouteOptionsOrDefault(options));
 
     // An acknowledged route is lossless, so a full queue blocks the shared inbound sink (see MqttRouter).
     // Defaulting its capacity to the advertised Receive Maximum lets the broker's in-flight window
@@ -648,6 +688,9 @@ public sealed class ResilientMqttClient : IAsyncDisposable
     // capacity is provably safe, so fall back to the route default.
     internal static int DefaultAcknowledgedRouteCapacity(ushort? receiveMaximum) =>
         receiveMaximum is { } max and > 0 ? max : new MqttRouteOptions().Capacity;
+
+    private MqttRouteOptions AcknowledgedRouteOptionsOrDefault(MqttRouteOptions? options) =>
+        options ?? new MqttRouteOptions { Capacity = DefaultAcknowledgedRouteCapacity(_options.Connect.ReceiveMaximum) };
 
     /// <summary>
     /// Opens an <c>await foreach</c>-able stream for a local route template given as text where the

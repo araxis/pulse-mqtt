@@ -2,6 +2,12 @@
 
 ## 2.28.0 (unreleased)
 
+- Added declarative route delivery modes. Fluent routes can now opt into
+  `.ManualAcknowledgement()` and finish with `HandleAsync(...)` or `StreamAsync(...)`, while
+  `MapMqtt` endpoints can set `MqttEndpointOptions.Acknowledgement = Manual` and acknowledge or
+  reject through `MqttEndpointContext`. Existing `SubscribeAsync`, automatic routes, route streams,
+  and acknowledged route streams remain supported; request/reply routes stay automatic.
+
 - The published packages now ship source-linked debugging symbols. Every assembly embeds a portable
   PDB (so the `.nupkg` carries symbols with no separate symbol package to fetch) and SourceLink maps
   those symbols to the exact commit on GitHub, so consumers can step into the library source and get

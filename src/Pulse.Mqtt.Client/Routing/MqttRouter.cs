@@ -9,6 +9,9 @@ namespace Pulse.Mqtt.Client;
 /// <summary>Handles one routed message.</summary>
 public delegate ValueTask MqttRouteHandler(MqttPublishPacket message, MqttRouteValues values, CancellationToken cancellationToken);
 
+/// <summary>Handles one routed message with explicit protocol acknowledgement control.</summary>
+public delegate ValueTask MqttManualAcknowledgementRouteHandler(MqttAcknowledgedRoutedMessage message, CancellationToken cancellationToken);
+
 /// <summary>
 /// Dispatches received messages to registered route templates. Handler and stream routes each have
 /// their own bounded queue and consumers, so a slow one does not stall other routes within its
@@ -94,6 +97,38 @@ public sealed class MqttRouter : IAsyncDisposable
     public IDisposable RegisterRoute(string template, MqttRouteHandler handler, MqttRouteOptions? options) =>
         RegisterRoute(MqttRouteTemplate.Parse(template), handler, options);
 
+    /// <summary>Registers a local handler that explicitly acknowledges or rejects matching messages.</summary>
+    public IDisposable RegisterManualAcknowledgementRoute(MqttRouteTemplate template, MqttManualAcknowledgementRouteHandler handler) =>
+        RegisterManualAcknowledgementRoute(template, handler, options: null);
+
+    /// <summary>Registers a local handler that explicitly acknowledges or rejects matching messages.</summary>
+    public IDisposable RegisterManualAcknowledgementRoute(
+        MqttRouteTemplate template,
+        MqttManualAcknowledgementRouteHandler handler,
+        MqttRouteOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(handler);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var routeOptions = options ?? new MqttRouteOptions();
+        ThrowIfAcknowledgedRouteDrops(routeOptions, nameof(options));
+
+        return AddAcknowledgedRoute(new AcknowledgedRoute(
+            this, template, handler, routeOptions, _lifetime.Token));
+    }
+
+    /// <summary>Registers a local handler that explicitly acknowledges or rejects matching messages.</summary>
+    public IDisposable RegisterManualAcknowledgementRoute(string template, MqttManualAcknowledgementRouteHandler handler) =>
+        RegisterManualAcknowledgementRoute(MqttRouteTemplate.Parse(template), handler, options: null);
+
+    /// <summary>Registers a local handler that explicitly acknowledges or rejects matching messages.</summary>
+    public IDisposable RegisterManualAcknowledgementRoute(
+        string template,
+        MqttManualAcknowledgementRouteHandler handler,
+        MqttRouteOptions? options) =>
+        RegisterManualAcknowledgementRoute(MqttRouteTemplate.Parse(template), handler, options);
+
     /// <summary>Opens a consumable stream for a route template instead of registering a handler.</summary>
     public MqttRouteStream OpenRouteStream(MqttRouteTemplate template) =>
         OpenRouteStream(template, options: null);
@@ -128,14 +163,9 @@ public sealed class MqttRouter : IAsyncDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         var routeOptions = options ?? new MqttRouteOptions();
-        if (routeOptions.Overflow != RouteOverflow.Wait)
-        {
-            throw new ArgumentException(
-                "Acknowledged route streams must use RouteOverflow.Wait because dropping a message would also drop its pending protocol acknowledgement.",
-                nameof(options));
-        }
+        ThrowIfAcknowledgedRouteDrops(routeOptions, nameof(options));
 
-        var route = new AcknowledgedRoute(template, routeOptions);
+        var route = new AcknowledgedRoute(this, template, handler: null, routeOptions, _lifetime.Token);
         var registration = AddAcknowledgedRoute(route);
         return new MqttAcknowledgedRouteStream(route.Reader, registration);
     }
@@ -171,7 +201,7 @@ public sealed class MqttRouter : IAsyncDisposable
 
         foreach (var route in _acknowledgedRoutes)
         {
-            route.CompleteChannel();
+            await route.CompleteAsync().ConfigureAwait(false);
         }
 
         _unmatched.Writer.TryComplete();
@@ -236,10 +266,20 @@ public sealed class MqttRouter : IAsyncDisposable
             _acknowledgedRoutes = _acknowledgedRoutes.Where(existing => !ReferenceEquals(existing, route)).ToArray();
         }
 
-        route.CompleteChannel();
+        _ = route.CompleteAsync();
     }
 
     private void RaiseHandlerFaulted(string template, Exception error) => HandlerFaulted?.Invoke(template, error);
+
+    private static void ThrowIfAcknowledgedRouteDrops(MqttRouteOptions options, string paramName)
+    {
+        if (options.Overflow != RouteOverflow.Wait)
+        {
+            throw new ArgumentException(
+                "Acknowledged routes must use RouteOverflow.Wait because dropping a message would also drop its pending protocol acknowledgement.",
+                paramName);
+        }
+    }
 
     // Wraps each handler invocation in a Consumer span. When the message carries a W3C traceparent
     // (a producer with trace propagation enabled), the span is parented on the producer's span, so
@@ -445,11 +485,19 @@ public sealed class MqttRouter : IAsyncDisposable
 
     private sealed class AcknowledgedRoute
     {
+        private readonly MqttRouter _router;
         private readonly Channel<MqttAcknowledgedRoutedMessage> _channel;
+        private readonly Task[] _consumers;
         private readonly RouteOverflow _overflow;
 
-        public AcknowledgedRoute(MqttRouteTemplate template, MqttRouteOptions options)
+        public AcknowledgedRoute(
+            MqttRouter router,
+            MqttRouteTemplate template,
+            MqttManualAcknowledgementRouteHandler? handler,
+            MqttRouteOptions options,
+            CancellationToken cancellationToken)
         {
+            _router = router;
             Template = template;
             _overflow = options.Overflow;
             _channel = Channel.CreateBounded<MqttAcknowledgedRoutedMessage>(new BoundedChannelOptions(options.Capacity)
@@ -462,6 +510,11 @@ public sealed class MqttRouter : IAsyncDisposable
                     _ => BoundedChannelFullMode.Wait,
                 },
             });
+
+            _consumers = handler is null
+                ? []
+                : [.. Enumerable.Range(0, Math.Max(1, options.MaxConcurrency))
+                    .Select(_ => Task.Run(() => ConsumeAsync(handler, cancellationToken), CancellationToken.None))];
         }
 
         public MqttRouteTemplate Template { get; }
@@ -498,5 +551,45 @@ public sealed class MqttRouter : IAsyncDisposable
         }
 
         public void CompleteChannel() => _channel.Writer.TryComplete();
+
+        public async Task CompleteAsync()
+        {
+            CompleteChannel();
+            foreach (var consumer in _consumers)
+            {
+                await consumer.ConfigureAwait(false);
+            }
+        }
+
+        private async Task ConsumeAsync(MqttManualAcknowledgementRouteHandler handler, CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (await _channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    while (_channel.Reader.TryRead(out var routed))
+                    {
+                        using var activity = StartReceiveActivity(routed.Message);
+                        try
+                        {
+                            await handler(routed, cancellationToken).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            return;
+                        }
+                        catch (Exception error)
+                        {
+                            activity?.SetStatus(ActivityStatusCode.Error, error.Message);
+                            _router.RaiseHandlerFaulted(Template.Template, error);
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutdown.
+            }
+        }
     }
 }

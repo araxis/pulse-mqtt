@@ -58,3 +58,10 @@ static Pulse.Mqtt.Endpoints.MapMqttDelegateExtensions.MapMqttRequest(this Micros
 static Pulse.Mqtt.Endpoints.MapMqttDelegateExtensions.MapMqttRequest(this Microsoft.Extensions.Hosting.IHost! app, string! template, System.Delegate! handler, Pulse.Mqtt.Endpoints.MqttEndpointOptions? options = null) -> Pulse.Mqtt.Endpoints.MqttEndpoint!
 static Pulse.Mqtt.Endpoints.MapMqttDelegateExtensions.MapMqttRequest(this Pulse.Mqtt.Client.ResilientMqttClient! client, string! template, System.Delegate! handler, Pulse.Mqtt.Endpoints.MqttEndpointOptions? options = null, System.IServiceProvider? services = null) -> Pulse.Mqtt.Endpoints.MqttEndpoint!
 static Pulse.Mqtt.Endpoints.PulseMqttEndpointExtensions.MapMqttRequest<TRequest, TResponse>(this Pulse.Mqtt.Client.ResilientMqttClient! client, string! template, System.Func<TRequest, Pulse.Mqtt.Endpoints.MqttEndpointContext!, System.Threading.Tasks.ValueTask<TResponse>>! handler, Pulse.Mqtt.Endpoints.MqttEndpointOptions? options = null, System.IServiceProvider? services = null) -> Pulse.Mqtt.Endpoints.MqttEndpoint!
+Pulse.Mqtt.Endpoints.MqttEndpointContext.Acknowledgement.get -> Pulse.Mqtt.Client.MqttAcknowledgementMode
+Pulse.Mqtt.Endpoints.MqttEndpointContext.AcknowledgeAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Endpoints.MqttEndpointContext.CanReject.get -> bool
+Pulse.Mqtt.Endpoints.MqttEndpointContext.IsAcknowledged.get -> bool
+Pulse.Mqtt.Endpoints.MqttEndpointContext.RejectAsync(Pulse.Mqtt.Protocol.MqttReasonCode reasonCode = Pulse.Mqtt.Protocol.MqttReasonCode.UnspecifiedError, string? reasonString = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Endpoints.MqttEndpointOptions.Acknowledgement.get -> Pulse.Mqtt.Client.MqttAcknowledgementMode
+Pulse.Mqtt.Endpoints.MqttEndpointOptions.Acknowledgement.init -> void
