@@ -155,6 +155,7 @@ jobs:
               Pulse.Mqtt.Serialization.Protobuf \
               Pulse.Mqtt.Resilience.Polly \
               Pulse.Mqtt.Storage.LiteDB \
+              Pulse.Mqtt.Storage.SqlServer \
               Pulse.Mqtt.Storage.Sqlite \
               Pulse.Mqtt.Transport.Quic \
               Pulse.Mqtt.Transport.WebSocket \

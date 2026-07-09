@@ -77,9 +77,10 @@ in step with the next planned release after tagging.
 ### Release only on a shipped change
 
 Because a stable tag republishes every package, **cut a release only when shipped content
-actually changed since the last tag** — code under `src/`, dependency versions in
-`Directory.Packages.props`, shared package metadata in `Directory.Build.props` (icon, tags,
-license, ...), or a packed asset (`README.md`, `icon.png`). Docs, tests, samples, and CI changes
+actually changed since the last tag** — code under `src/`, package README files under `src/`,
+dependency versions in `Directory.Packages.props`, shared package metadata in
+`Directory.Build.props` (icon, tags, license, ...), or a packed root asset (`icon.png`). Docs,
+tests, samples, and CI changes
 do not ship in the packages, so they do not warrant a release on their own; let them ride the
 next one that does. Version bumps and `PublicAPI` ledger promotions are release bookkeeping,
 not shipped changes — and neither is the `VersionPrefix` line in `Directory.Build.props`, which

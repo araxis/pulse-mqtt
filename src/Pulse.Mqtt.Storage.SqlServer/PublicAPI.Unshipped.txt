@@ -1,0 +1,35 @@
+#nullable enable
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.Count.get -> int
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.Dispose() -> void
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.DroppedCount.get -> long
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.DateTimeOffset enqueuedAt, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.EnqueueAsync(Pulse.Mqtt.Packets.MqttPublishPacket! packet, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.PeekAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Packets.MqttPublishPacket?>
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.PeekQueuedAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttQueuedPublish?>
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.RemoveAsync(Pulse.Mqtt.Resilience.MqttQueuedPublish! entry, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.RemoveHeadAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.SqlServerMessageStore(string! connectionString, Pulse.Mqtt.Resilience.OfflineQueueOptions! options) -> void
+Pulse.Mqtt.Storage.SqlServer.SqlServerMessageStore.SqlServerMessageStore(string! connectionString, Pulse.Mqtt.Resilience.OfflineQueueOptions! options, Pulse.Mqtt.Storage.SqlServer.SqlServerStorageOptions? storageOptions) -> void
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.ClearAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.Dispose() -> void
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.LoadInFlightAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Pulse.Mqtt.Resilience.MqttInFlightState?>
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.LoadSubscriptionsAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>!>
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.RemoveSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<string!>! topics, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.SaveInFlightAsync(Pulse.Mqtt.Resilience.MqttInFlightState! state, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.SaveSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.SqlServerSessionStore(string! connectionString) -> void
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.SqlServerSessionStore(string! connectionString, Pulse.Mqtt.Storage.SqlServer.SqlServerStorageOptions? options) -> void
+Pulse.Mqtt.Storage.SqlServer.SqlServerSessionStore.UpsertSubscriptionsAsync(System.Collections.Generic.IReadOnlyList<Pulse.Mqtt.MqttTopicFilter!>! topicFilters, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Pulse.Mqtt.Storage.SqlServer.SqlServerStorageException
+Pulse.Mqtt.Storage.SqlServer.SqlServerStorageException.SqlServerStorageException(string! message) -> void
+Pulse.Mqtt.Storage.SqlServer.SqlServerStorageException.SqlServerStorageException(string! message, System.Exception! innerException) -> void
+Pulse.Mqtt.Storage.SqlServer.SqlServerStorageOptions
+Pulse.Mqtt.Storage.SqlServer.SqlServerStorageOptions.SchemaName.get -> string!
+Pulse.Mqtt.Storage.SqlServer.SqlServerStorageOptions.SchemaName.init -> void
+Pulse.Mqtt.Storage.SqlServer.SqlServerStorageOptions.TablePrefix.get -> string!
+Pulse.Mqtt.Storage.SqlServer.SqlServerStorageOptions.TablePrefix.init -> void

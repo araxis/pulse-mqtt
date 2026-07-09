@@ -200,7 +200,7 @@ decides how long to keep it.
 
 The defaults keep everything for the lifetime of the process. To carry the subscription set, the
 offline queue, and the in-flight QoS state across a **process restart**, add a durable storage
-package and point both stores at a file.
+package and point both stores at the provider's backing store.
 
 SQLite:
 
@@ -228,12 +228,28 @@ var options = new ResilientMqttClientOptions
 };
 ```
 
-Both storage packages accept a plain file path or the provider's connection string, create the
-database on first use, and dispose with the client. The message store preserves FIFO order and the
-same overflow policy as the in-memory default; because the flush loop peeks then removes the head,
-a crash between sending and removing re-sends the message rather than losing it. A missing, locked,
-or corrupt database fails fast with a provider-specific storage exception instead of silently
-starting empty.
+SQL Server:
+
+```csharp
+using Pulse.Mqtt.Storage.SqlServer;
+
+var storage = new SqlServerStorageOptions { SchemaName = "mqtt", TablePrefix = "Device7" };
+
+var options = new ResilientMqttClientOptions
+{
+    Connect = new MqttConnectPacket { ClientId = "device-7", CleanStart = false, SessionExpiryInterval = 300 },
+    SessionStore = new SqlServerSessionStore(connectionString, storage),
+    MessageStore = new SqlServerMessageStore(connectionString, new OfflineQueueOptions { Capacity = 1024 }, storage),
+};
+```
+
+SQLite and LiteDB accept a plain file path or the provider's connection string and create the
+database on first use. SQL Server expects the database to already exist, then creates the configured
+schema and tables when the login has permission. The message store preserves FIFO order and the same
+overflow policy as the in-memory default; because the flush loop peeks then removes the head, a crash
+between sending and removing re-sends the message rather than losing it. A missing, locked,
+unavailable, or corrupt store fails fast with a provider-specific storage exception instead of
+silently starting empty.
 
 ## Sessions and re-subscription
 

@@ -247,7 +247,7 @@ public interface ISessionStore
 }
 ```
 
-**Default:** in-memory (process lifetime). A durable implementation (SQLite, LiteDB, files)
+**Default:** in-memory (process lifetime). A durable implementation (SQLite, SQL Server, LiteDB, files)
 restores subscriptions across restarts. The `Upsert`/`Remove` methods ship with default
 implementations built on `Load` + `Save`; override both when subscription counts are high enough
 that rewriting the whole set per call hurts (the in-memory store does exactly this).

@@ -2,6 +2,17 @@
 
 ## 2.29.0 (unreleased)
 
+- Added `Pulse.Mqtt.Storage.SqlServer`, a SQL Server-backed durable session and offline-message
+  store package with the same `ISessionStore` / `IMessageStore` contracts as the existing storage
+  add-ons. It creates prefixed schema tables on first use, persists subscriptions, in-flight QoS
+  state, queued publishes, and enqueue timestamps, and ships with package docs and an opt-in
+  SQL Server test lane.
+
+- NuGet packages now ship package-specific README files instead of reusing the repository
+  landing page for every package. Each packable project includes a short install and usage guide,
+  and the package README metadata now points at that project-local file so NuGet renders focused
+  package documentation without the repository heading markup.
+
 ## 2.28.0
 
 - Added declarative route delivery modes. Fluent routes can now opt into

@@ -31,7 +31,7 @@ QUIC is one line, not a fork.
   session and offline stores, serializer, last-will generation, transport.
 - **Four transports** — TCP/TLS and an in-memory loopback in the core; WebSocket and QUIC as
   opt-in add-ons.
-- **Durable when you need it** — SQLite or LiteDB session and offline-queue stores survive
+- **Durable when you need it** — SQLite, SQL Server, or LiteDB session and offline-queue stores survive
   restarts; the default is bounded in-memory.
 - **Bounded everywhere** — inbound, per-route, and offline queues all apply backpressure to the
   socket instead of buffering without limit. All timing flows through `TimeProvider`.
@@ -59,6 +59,7 @@ QUIC is one line, not a fork.
 | `Pulse.Mqtt.Serialization.Protobuf` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Serialization.Protobuf?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Serialization.Protobuf) | Protocol Buffers payload serialization for generated binary messages. |
 | `Pulse.Mqtt.Resilience.Polly` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Resilience.Polly?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Resilience.Polly) | Reconnect strategy backed by a Polly v8 `ResiliencePipeline`. |
 | `Pulse.Mqtt.Storage.LiteDB` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Storage.LiteDB?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Storage.LiteDB) | Durable LiteDB session and offline-message stores. |
+| `Pulse.Mqtt.Storage.SqlServer` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Storage.SqlServer?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Storage.SqlServer) | Durable SQL Server session and offline-message stores. |
 | `Pulse.Mqtt.Storage.Sqlite` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Storage.Sqlite?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Storage.Sqlite) | Durable SQLite session and offline-message stores. |
 | `Pulse.Mqtt.Transport.WebSocket` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Transport.WebSocket?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Transport.WebSocket) | MQTT over WebSocket (`ws`/`wss`). |
 | `Pulse.Mqtt.Transport.Quic` | [![NuGet](https://img.shields.io/nuget/v/Pulse.Mqtt.Transport.Quic?logo=nuget&label=%20)](https://www.nuget.org/packages/Pulse.Mqtt.Transport.Quic) | MQTT over QUIC (EMQX-style listeners; .NET 10). |
