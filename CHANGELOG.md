@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.29.0 (unreleased)
+## 2.29.0
 
 - Added `Pulse.Mqtt.Storage.SqlServer`, a SQL Server-backed durable session and offline-message
   store package with the same `ISessionStore` / `IMessageStore` contracts as the existing storage
