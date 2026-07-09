@@ -17,6 +17,7 @@ For package-specific setup, see [Package docs](/packages/). For a task-oriented 
 | [`Pulse.Mqtt.Serialization.Protobuf`](/packages/serialization-protobuf) | Protocol Buffers serializer (compact binary, explicit parser registry) | Core, Protobuf runtime |
 | [`Pulse.Mqtt.Resilience.Polly`](/packages/resilience-polly) | `PollyReconnectStrategy` over a Polly v8 `ResiliencePipeline` | Core, `Polly.Core` |
 | [`Pulse.Mqtt.Storage.LiteDB`](/packages/storage-litedb) | `LiteDbSessionStore` + `LiteDbMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `LiteDB` |
+| [`Pulse.Mqtt.Storage.SqlServer`](/packages/storage-sqlserver) | `SqlServerSessionStore` + `SqlServerMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts in SQL Server | Core, `Microsoft.Data.SqlClient` |
 | [`Pulse.Mqtt.Storage.Sqlite`](/packages/storage-sqlite) | `SqliteSessionStore` + `SqliteMessageStore`: subscriptions, the offline queue, and in-flight QoS state survive restarts | Core, `Microsoft.Data.Sqlite` |
 | [`Pulse.Mqtt.Transport.WebSocket`](/packages/transport-websocket) | MQTT over `ws`/`wss` | Core |
 | [`Pulse.Mqtt.Transport.Quic`](/packages/transport-quic) | MQTT over QUIC, one bidirectional stream (.NET 10 only) | Core |

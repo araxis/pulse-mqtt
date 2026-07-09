@@ -25,6 +25,7 @@
     <Project Path="src/Pulse.Mqtt.Serialization.MessagePack/Pulse.Mqtt.Serialization.MessagePack.csproj" />
     <Project Path="src/Pulse.Mqtt.Serialization.Protobuf/Pulse.Mqtt.Serialization.Protobuf.csproj" />
     <Project Path="src/Pulse.Mqtt.Storage.LiteDB/Pulse.Mqtt.Storage.LiteDB.csproj" />
+    <Project Path="src/Pulse.Mqtt.Storage.SqlServer/Pulse.Mqtt.Storage.SqlServer.csproj" />
     <Project Path="src/Pulse.Mqtt.Storage.Sqlite/Pulse.Mqtt.Storage.Sqlite.csproj" />
     <Project Path="src/Pulse.Mqtt.Testing/Pulse.Mqtt.Testing.csproj" />
     <Project Path="src/Pulse.Mqtt.Transport.Quic/Pulse.Mqtt.Transport.Quic.csproj" />
@@ -43,6 +44,7 @@
     <Project Path="tests/Pulse.Mqtt.Serialization.MessagePack.Tests/Pulse.Mqtt.Serialization.MessagePack.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Serialization.Protobuf.Tests/Pulse.Mqtt.Serialization.Protobuf.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Storage.LiteDB.Tests/Pulse.Mqtt.Storage.LiteDB.Tests.csproj" />
+    <Project Path="tests/Pulse.Mqtt.Storage.SqlServer.Tests/Pulse.Mqtt.Storage.SqlServer.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Storage.Sqlite.Tests/Pulse.Mqtt.Storage.Sqlite.Tests.csproj" />
     <Project Path="tests/Pulse.Mqtt.Testing.Tests/Pulse.Mqtt.Testing.Tests.csproj" />
   </Folder>

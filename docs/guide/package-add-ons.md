@@ -34,6 +34,7 @@ codec, raw client, or swap-point contracts without the resilient client.
 | Host-managed clients, keyed DI, options binding, health checks | `Pulse.Mqtt.DependencyInjection` | [Dependency injection](/packages/dependency-injection) |
 | Minimal-API-style topic endpoints | `Pulse.Mqtt.Endpoints` | [Endpoints](/packages/endpoints) |
 | Durable relational session and queue storage | `Pulse.Mqtt.Storage.Sqlite` | [SQLite storage](/packages/storage-sqlite) |
+| Durable server database session and queue storage | `Pulse.Mqtt.Storage.SqlServer` | [SQL Server storage](/packages/storage-sqlserver) |
 | Durable embedded document session and queue storage | `Pulse.Mqtt.Storage.LiteDB` | [LiteDB storage](/packages/storage-litedb) |
 | Bounded worker pipelines over messages, routes, acknowledgements, or state | `Pulse.Mqtt.Dataflow` | [Dataflow](/packages/dataflow) |
 | Source-generated UTF-8 JSON typed payloads | `Pulse.Mqtt.Serialization.Json` | [JSON serializer](/packages/serialization-json) |
@@ -65,8 +66,9 @@ MessagePack for compact generated binary contracts, and Protobuf when messages a
 `.proto` definitions.
 
 Choose one durable storage package per client in most applications. SQLite is a good default when
-you want a relational file store and easy inspection. LiteDB is a good fit when an embedded
-document database is already part of the application.
+you want a relational file store and easy inspection. SQL Server is a good fit when durable client
+state should live in managed database infrastructure. LiteDB is a good fit when an embedded document
+database is already part of the application.
 
 Use Dataflow when pipeline composition, bounded buffering, backpressure, completion, or fault
 propagation matter. Use the client route and stream APIs directly when a simple handler or

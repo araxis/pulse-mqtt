@@ -8,6 +8,7 @@ const addOnPackages = [
   { text: 'Endpoints', link: '/packages/endpoints' },
   { text: 'Dataflow', link: '/packages/dataflow' },
   { text: 'SQLite storage', link: '/packages/storage-sqlite' },
+  { text: 'SQL Server storage', link: '/packages/storage-sqlserver' },
   { text: 'LiteDB storage', link: '/packages/storage-litedb' },
   { text: 'Serializer overview', link: '/packages/serializers' },
   { text: 'JSON serializer', link: '/packages/serialization-json' },

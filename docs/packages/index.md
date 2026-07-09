@@ -11,6 +11,7 @@ pipeline, serializer, transport, test, or analyzer packages only when the projec
 | `Pulse.Mqtt.Endpoints` | [Endpoints](./endpoints) | Minimal-API-style `MapMqtt` with constrained templates and per-message service scopes. |
 | `Pulse.Mqtt.Dataflow` | [Dataflow](./dataflow) | MQTT input should feed bounded source blocks and pipeline consumers. |
 | `Pulse.Mqtt.Storage.Sqlite` | [SQLite storage](./storage-sqlite) | Session state and offline queue need a durable relational file store. |
+| `Pulse.Mqtt.Storage.SqlServer` | [SQL Server storage](./storage-sqlserver) | Session state and offline queue need a durable server database. |
 | `Pulse.Mqtt.Storage.LiteDB` | [LiteDB storage](./storage-litedb) | Session state and offline queue need a durable embedded document store. |
 | `Pulse.Mqtt.Serialization.Json` | [JSON serializer](./serialization-json) | Typed payloads use source-generated JSON. |
 | `Pulse.Mqtt.Serialization.MessagePack` | [MessagePack serializer](./serialization-messagepack) | Typed payloads use compact binary messages. |
